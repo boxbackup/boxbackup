@@ -117,6 +117,7 @@ public:
 	// Use of GetAccountID() is not recommended. It returns S3_FAKE_ACCOUNT_ID on
 	// S3BackupFileSystem.
 	virtual int GetAccountID() = 0;
+	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors) = 0;
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
@@ -224,6 +225,7 @@ public:
 		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID);
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return mAccountID; }
+	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors);
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
@@ -331,6 +333,10 @@ public:
 	}
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return S3_FAKE_ACCOUNT_ID; }
+	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors)
+	{
+		// Filesystem is not transactional, so nothing to do here.
+	}
 
 private:
 	// S3BackupAccountControl wants to call some of these private APIs, but nobody else should:
