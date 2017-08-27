@@ -641,43 +641,7 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID,
 
 	// If it looks like a good object, and it's non-RAID, and
 	// this is a RAID set, then convert it to RAID.
-
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
-	if(!rdiscSet.IsNonRaidSet())
-	{
-		// See if the file exists
-		RaidFileUtil::ExistType existance =
-			RaidFileUtil::RaidFileExists(rdiscSet, rFilename);
-		if(existance == RaidFileUtil::NonRaid)
-		{
-			BOX_WARNING("Found non-RAID write file in RAID set" <<
-				(mFixErrors?", transforming to RAID: ":"") <<
-				(mFixErrors?rFilename:""));
-			if(mFixErrors)
-			{
-				RaidFileWrite write(mDiscSetNumber, rFilename);
-				write.TransformToRaidStorage();
-			}
-		}
-		else if(existance == RaidFileUtil::AsRaidWithMissingReadable)
-		{
-			BOX_WARNING("Found damaged but repairable RAID file" <<
-				(mFixErrors?", repairing: ":"") << 
-				(mFixErrors?rFilename:""));
-			if(mFixErrors)
-			{
-				std::auto_ptr<RaidFileRead> read(
-					RaidFileRead::Open(mDiscSetNumber,
-						rFilename));
-				RaidFileWrite write(mDiscSetNumber, rFilename);
-				write.Open(true /* overwrite */);
-				read->CopyStreamTo(write);
-				read.reset();
-				write.Commit(true /* transform to RAID */);
-			}
-		}
-	}
+	mrFileSystem.EnsureObjectIsPermanent(ObjectID, mFixErrors);
 
 	// Report success
 	return isFile ? ObjectExists_File : ObjectExists_Dir;
