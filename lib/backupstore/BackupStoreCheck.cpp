@@ -86,13 +86,13 @@ BackupStoreCheck::~BackupStoreCheck()
 	FreeInfo();
 
 	// Avoid an exception if we forget to discard mapNewRefs
-	if (mapNewRefs.get())
+	if(mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
 		// just catch and log them.
 		try
 		{
-			mapNewRefs->Discard();
+			mpNewRefs->Discard();
 		}
 		catch(BoxException &e)
 		{
@@ -100,7 +100,7 @@ BackupStoreCheck::~BackupStoreCheck()
 				"the refcount database threw an exception: " << e.what());
 		}
 
-		mapNewRefs.reset();
+		mpNewRefs = NULL;
 	}
 }
 
@@ -127,7 +127,6 @@ void BackupStoreCheck::Check()
 		BOX_INFO("Will fix errors encountered during checking.");
 	}
 
-	BackupStoreAccountDatabase::Entry account(mAccountID, mDiscSetNumber);
 	// If we are read-only, then we should not call GetPotentialRefCountDatabase because
 	// that does actually change the store: the temporary file would conflict with any other
 	// process which wants to do the same thing at the same time (e.g. housekeeping), and if
@@ -136,7 +135,7 @@ void BackupStoreCheck::Check()
 	// case (it will rename it, but still in the temporary directory).
 	if(mFixErrors)
 	{
-		mapNewRefs = BackupStoreRefCountDatabase::Create(account);
+		mpNewRefs = &mrFileSystem.GetPotentialRefCountDatabase();
 	}
 	else
 	{
@@ -160,8 +159,9 @@ void BackupStoreCheck::Check()
 #endif
 
 		BOX_TRACE("Creating temporary refcount DB in a temporary file: " << temp_file_buf);
-		mapNewRefs = BackupStoreRefCountDatabase::Create(temp_file_buf,
-			mAccountID, true); // reuse_existing_file
+		mapOwnNewRefs = BackupStoreRefCountDatabase::Create(temp_file_buf,
+			mrFileSystem.GetAccountID(), true); // reuse_existing_file
+		mpNewRefs = mapOwnNewRefs.get();
 	}
 
 	// Phase 1, check objects
@@ -211,9 +211,12 @@ void BackupStoreCheck::Check()
 
 	try
 	{
-		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
-			BackupStoreRefCountDatabase::Load(account, false);
-		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs);
+		// We should be able to load a reference to the old refcount database
+		// (read-only) at the same time that we have a reference to the new one
+		// (temporary) open but not yet committed.
+		BackupStoreRefCountDatabase& old_refs(
+			mrFileSystem.GetPermanentRefCountDatabase(true)); // ReadOnly
+		mNumberErrorsFound += mpNewRefs->ReportChangesTo(old_refs);
 	}
 	catch(BoxException &e)
 	{
@@ -225,13 +228,14 @@ void BackupStoreCheck::Check()
 	// force file to be saved and closed before releasing the lock below
 	if(mFixErrors)
 	{
-		mapNewRefs->Commit();
+		mpNewRefs->Commit();
 	}
 	else
 	{
-		mapNewRefs->Discard();
+		mpNewRefs->Discard();
+		mapOwnNewRefs.reset();
 	}
-	mapNewRefs.reset();
+	mpNewRefs = NULL;
 
 	if(mNumberErrorsFound > 0)
 	{
@@ -981,7 +985,7 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 			}
 		}
 
-		mapNewRefs->AddReference(en->GetObjectID());
+		mpNewRefs->AddReference(en->GetObjectID());
 	}
 }
 

@@ -199,7 +199,10 @@ private:
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
 
 	// The refcount database, being reconstructed as the check/fix progresses
-	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
+	BackupStoreRefCountDatabase* mpNewRefs;
+	// And a holder for the auto_ptr to a new refcount DB in the temporary directory
+	// (not the one created by BackupFileSystem::GetPotentialRefCountDatabase()):
+	std::auto_ptr<BackupStoreRefCountDatabase> mapOwnNewRefs;
 
 	// Abstracted interface to software-RAID filesystem
 	BackupFileSystem& mrFileSystem;
