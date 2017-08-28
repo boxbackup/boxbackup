@@ -123,6 +123,20 @@ public:
 	// S3BackupFileSystem.
 	virtual int GetAccountID() = 0;
 	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID) = 0;
+
+	class CheckObjectsResult
+	{
+	public:
+		CheckObjectsResult()
+		: maxObjectIDFound(0),
+		  numErrorsFound(0)
+		{ }
+
+		int64_t maxObjectIDFound;
+		int numErrorsFound;
+	};
+
+	virtual CheckObjectsResult CheckObjects(bool fix_errors) = 0;
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors) = 0;
 
 protected:
@@ -243,12 +257,19 @@ public:
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return mAccountID; }
 	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID);
+	virtual CheckObjectsResult CheckObjects(bool fix_errors);
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors);
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
+
+private:
+	void CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName,
+		CheckObjectsResult& Result, bool fix_errors);
+	void CheckObjectsDir(int64_t StartID,
+		BackupFileSystem::CheckObjectsResult& Result, bool fix_errors);
 };
 
 #define S3_INFO_FILE_NAME "boxbackup.info"
@@ -351,6 +372,7 @@ public:
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return S3_FAKE_ACCOUNT_ID; }
 	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID);
+	virtual CheckObjectsResult CheckObjects(bool fix_errors);
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors)
 	{
 		// Filesystem is not transactional, so nothing to do here.
@@ -396,6 +418,14 @@ private:
 	{
 		return mrClient.PutObject(ObjectURI, rStreamToSend, pContentType);
 	}
+
+	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
+	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
+		CheckObjectsResult& result, bool fix_errors,
+		start_id_to_files_t& start_id_to_files);
+	void CheckObjectsDir(int64_t start_id,
+		BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
+		const start_id_to_files_t& start_id_to_files);
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
