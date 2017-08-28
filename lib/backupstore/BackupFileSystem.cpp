@@ -836,6 +836,249 @@ int64_t RaidBackupFileSystem::GetFileSizeInBlocks(int64_t ObjectID)
 }
 
 
+BackupFileSystem::CheckObjectsResult
+RaidBackupFileSystem::CheckObjects(bool fix_errors)
+{
+	// Find the maximum start ID of directories -- worked out by looking at disc
+	// contents, not trusting anything.
+	CheckObjectsResult result;
+	CheckObjectsScanDir(0, 1, mAccountRootDir, result, fix_errors);
+
+	// Then go through and scan all the objects within those directories
+	for(int64_t start_id = 0; start_id <= result.maxObjectIDFound;
+		start_id += (1<<STORE_ID_SEGMENT_LENGTH))
+	{
+		CheckObjectsDir(start_id, result, fix_errors);
+	}
+
+	return result;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    static TwoDigitHexToInt(const char *, int &)
+//		Purpose: Convert a two digit hex string to an int, returning whether it's valid or not
+//		Created: 21/4/04
+//
+// --------------------------------------------------------------------------
+static inline bool TwoDigitHexToInt(const char *String, int &rNumberOut)
+{
+	int n = 0;
+	// Char 0
+	if(String[0] >= '0' && String[0] <= '9')
+	{
+		n = (String[0] - '0') << 4;
+	}
+	else if(String[0] >= 'a' && String[0] <= 'f')
+	{
+		n = ((String[0] - 'a') + 0xa) << 4;
+	}
+	else
+	{
+		return false;
+	}
+	// Char 1
+	if(String[1] >= '0' && String[1] <= '9')
+	{
+		n |= String[1] - '0';
+	}
+	else if(String[1] >= 'a' && String[1] <= 'f')
+	{
+		n |= (String[1] - 'a') + 0xa;
+	}
+	else
+	{
+		return false;
+	}
+
+	// Return a valid number
+	rNumberOut = n;
+	return true;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    RaidBackupFileSystem::CheckObjectsScanDir(
+//			 int64_t StartID, int Level,
+//			 const std::string &rDirName,
+//			 BackupFileSystem::CheckObjectsResult& Result,
+//			 bool fix_errors)
+//		Purpose: Read in the contents of the directory, recurse to
+//			 lower levels, return the maximum starting ID of any
+//			 directory found. Internal method.
+//		Created: 21/4/04
+//
+// --------------------------------------------------------------------------
+void RaidBackupFileSystem::CheckObjectsScanDir(int64_t StartID, int Level,
+	const std::string &rDirName, BackupFileSystem::CheckObjectsResult& Result,
+	bool fix_errors)
+{
+	//TRACE2("Scan directory for max dir starting ID %s, StartID %lld\n", rDirName.c_str(), StartID);
+
+	if(Result.maxObjectIDFound < StartID)
+	{
+		Result.maxObjectIDFound = StartID;
+	}
+
+	// Read in all the directories, and recurse downwards.
+	// If any of the directories is missing, create it.
+	RaidFileController &rcontroller(RaidFileController::GetController());
+	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mStoreDiscSet));
+
+	if(!rdiscSet.IsNonRaidSet())
+	{
+		unsigned int numDiscs = rdiscSet.size();
+
+		for(unsigned int l = 0; l < numDiscs; ++l)
+		{
+			// build name
+			std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
+			EMU_STRUCT_STAT st;
+
+			if(EMU_STAT(dn.c_str(), &st) != 0 &&
+				errno == ENOENT)
+			{
+				if(mkdir(dn.c_str(), 0755) != 0)
+				{
+					THROW_SYS_FILE_ERROR("Failed to create missing "
+						"RaidFile directory", dn,
+						RaidFileException, OSError);
+				}
+			}
+		}
+	}
+
+	std::vector<std::string> dirs;
+	RaidFileRead::ReadDirectoryContents(mStoreDiscSet, rDirName,
+		RaidFileRead::DirReadType_DirsOnly, dirs);
+
+	for(std::vector<std::string>::const_iterator i(dirs.begin());
+		i != dirs.end(); ++i)
+	{
+		// Check to see if it's the right name
+		int n = 0;
+		if((*i).size() == 2 && TwoDigitHexToInt((*i).c_str(), n)
+			&& n < (1<<STORE_ID_SEGMENT_LENGTH))
+		{
+			// Next level down
+			BackupFileSystem::CheckObjectsResult sub_result;
+
+			CheckObjectsScanDir(
+				StartID | (n << (Level * STORE_ID_SEGMENT_LENGTH)),
+				Level + 1, rDirName + DIRECTORY_SEPARATOR + *i,
+				sub_result, fix_errors);
+			Result.numErrorsFound += sub_result.numErrorsFound;
+
+			// Found a greater starting ID?
+			if(Result.maxObjectIDFound < sub_result.maxObjectIDFound)
+			{
+				Result.maxObjectIDFound = sub_result.maxObjectIDFound;
+			}
+		}
+		else
+		{
+			BOX_ERROR("Spurious or invalid directory '" << rDirName <<
+				DIRECTORY_SEPARATOR << (*i) << "' found, " <<
+				(fix_errors?"deleting":"delete manually"));
+			++Result.numErrorsFound;
+		}
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
+//			 BackupFileSystem::CheckObjectsResult& Result,
+//			 bool fix_errors)
+//		Purpose: Check all the files within this directory which has
+//			 the given starting ID.
+//		Created: 22/4/04
+//
+// --------------------------------------------------------------------------
+void RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
+	BackupFileSystem::CheckObjectsResult& Result, bool fix_errors)
+{
+	// Make directory name -- first generate the filename of an entry in it
+	std::string dirName;
+	StoreStructure::MakeObjectFilename(StartID, mAccountRootDir, mStoreDiscSet,
+		dirName, false /* don't make sure the dir exists */);
+
+	// Check expectations
+	ASSERT(dirName.size() > 4 &&
+		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
+	// Remove the filename from it
+	dirName.resize(dirName.size() - 4); // four chars for "/o00"
+
+	// Check directory exists
+	if(!RaidFileRead::DirectoryExists(mStoreDiscSet, dirName))
+	{
+		BOX_ERROR("RaidFile dir " << dirName << " does not exist");
+		Result.numErrorsFound++;
+		return;
+	}
+
+	// Read directory contents
+	std::vector<std::string> files;
+	RaidFileRead::ReadDirectoryContents(mStoreDiscSet, dirName,
+		RaidFileRead::DirReadType_FilesOnly, files);
+
+	// Parse each entry, building up a list of object IDs which are present in the dir.
+	// This is done so that whatever order is retured from the directory, objects are scanned
+	// in order.
+	// Filename must begin with a 'o' and be three characters long, otherwise it gets deleted.
+	for(std::vector<std::string>::const_iterator i(files.begin()); i != files.end(); ++i)
+	{
+		bool fileOK = true;
+		int n = 0;
+		if((*i).size() == 3 && (*i)[0] == 'o' && TwoDigitHexToInt((*i).c_str() + 1, n)
+			&& n < (1<<STORE_ID_SEGMENT_LENGTH))
+		{
+			// Filename is valid, mark as existing
+			if(Result.maxObjectIDFound < (StartID | n))
+			{
+				Result.maxObjectIDFound = (StartID | n);
+			}
+		}
+		// No other files should be present in subdirectories
+		else if(StartID != 0)
+		{
+			fileOK = false;
+		}
+		// info and refcount databases are OK in the root directory
+		else if(*i == "info" || *i == "refcount.db" ||
+			*i == "refcount.rdb" || *i == "refcount.rdbX")
+		{
+			fileOK = true;
+		}
+		else
+		{
+			fileOK = false;
+		}
+
+		if(!fileOK)
+		{
+			// Unexpected or bad file, delete it
+			BOX_ERROR("Spurious file " << dirName <<
+				DIRECTORY_SEPARATOR << (*i) << " found" <<
+				(fix_errors?", deleting":""));
+			++Result.numErrorsFound;
+			if(fix_errors)
+			{
+				RaidFileWrite del(mStoreDiscSet,
+					dirName + DIRECTORY_SEPARATOR + *i);
+				del.Delete();
+			}
+		}
+	}
+}
+
+
 void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors)
 {
 	// If it looks like a good object, and it's non-RAID, and
@@ -1205,4 +1448,270 @@ int64_t S3BackupFileSystem::GetFileSizeInBlocks(int64_t ObjectID)
 	std::string uri = GetFileURI(ObjectID);
 	HTTPResponse response = mrClient.HeadObject(uri);
 	return GetSizeInBlocks(response.GetContentLength());
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3BackupFileSystem::CheckObjects(bool fix_errors)
+//		Purpose: Scan directories on store recursively, counting
+//			 files and identifying ones that should not exist,
+//			 identify the highest object ID that exists, and
+//			 check every object up to that ID.
+//		Created: 2016/03/21
+//
+// --------------------------------------------------------------------------
+
+
+BackupFileSystem::CheckObjectsResult
+S3BackupFileSystem::CheckObjects(bool fix_errors)
+{
+	// Find the maximum start ID of directories -- worked out by looking at list of
+	// objects on store, not trusting anything.
+	CheckObjectsResult result;
+	start_id_to_files_t start_id_to_files;
+	CheckObjectsScanDir(0, 1, "", result, fix_errors, start_id_to_files);
+
+	// Then go through and scan all the objects within those directories
+	for(int64_t StartID = 0; StartID <= result.maxObjectIDFound;
+		StartID += (1<<STORE_ID_SEGMENT_LENGTH))
+	{
+		CheckObjectsDir(StartID, result, fix_errors, start_id_to_files);
+	}
+
+	return result;
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3BackupFileSystem::CheckObjectsScanDir(
+//			 int64_t start_id, int level,
+//			 const std::string &dir_name,
+//			 BackupFileSystem::CheckObjectsResult& result,
+//			 bool fix_errors)
+//		Purpose: Read in the contents of the directory, recurse to
+//			 lower levels, return the maximum starting ID of any
+//			 directory found. Internal method.
+//		Created: 2016/03/21
+//
+// --------------------------------------------------------------------------
+
+void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
+	const std::string &dir_name, BackupFileSystem::CheckObjectsResult& result,
+	bool fix_errors, start_id_to_files_t& start_id_to_files)
+{
+	//TRACE2("Scan directory for max dir starting ID %s, StartID %lld\n", rDirName.c_str(), StartID);
+
+	if(result.maxObjectIDFound < start_id)
+	{
+		result.maxObjectIDFound = start_id;
+	}
+
+	std::vector<S3Client::BucketEntry> files;
+	std::vector<std::string> dirs;
+	bool is_truncated;
+	int max_keys = 1000;
+	start_id_to_files[start_id] = std::vector<std::string>();
+
+	// Remove the initial / from BasePath. It must also end with /, and dir_name
+	// must not start with / but must end with / (or be empty), so that when
+	// concatenated they make a valid URI with a trailing slash ("prefix").
+	if(!StartsWith("/", mBasePath))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+			"BasePath must start and end with '/', but was: " << mBasePath);
+	}
+	std::string prefix = RemovePrefix("/", mBasePath);
+
+	if(!EndsWith("/", mBasePath))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+			"BasePath must start and end with '/', but was: " << mBasePath);
+	}
+
+	if(StartsWith("/", dir_name))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+			"dir_name must not start with '/': '" << dir_name << "'");
+	}
+
+	if(!dir_name.empty() && !EndsWith("/", dir_name))
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+			"dir_name must be empty or end with '/': '" << dir_name << "'");
+	}
+	prefix += dir_name;
+	ASSERT(EndsWith("/", prefix));
+
+	mrClient.ListBucket(&files, &dirs, prefix, "/", // delimiter
+		&is_truncated, max_keys);
+	if(is_truncated)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, TooManyFilesInDirectory,
+			"Failed to check directory: " << prefix << ": too many entries");
+	}
+
+	// Cache the list of files in this directory for later use.
+	for(std::vector<S3Client::BucketEntry>::const_iterator i = files.begin();
+		i != files.end(); i++)
+	{
+		// This will throw an exception if the filename does not start with
+		// the prefix:
+		std::string unprefixed_name = RemovePrefix(prefix, i->name());
+		start_id_to_files[start_id].push_back(unprefixed_name);
+	}
+
+	for(std::vector<std::string>::const_iterator i(dirs.begin());
+		i != dirs.end(); ++i)
+	{
+		std::string subdir_name = RemovePrefix(prefix, *i);
+		subdir_name = RemoveSuffix("/", subdir_name);
+
+		// Check to see if it's the right name
+		int n = 0;
+		if(subdir_name.size() == 2 && TwoDigitHexToInt(subdir_name.c_str(), n)
+			&& n < (1<<STORE_ID_SEGMENT_LENGTH))
+		{
+			// Next level down
+			BackupFileSystem::CheckObjectsResult sub_result;
+
+			CheckObjectsScanDir(
+				start_id | (n << (level * STORE_ID_SEGMENT_LENGTH)),
+				level + 1, dir_name + subdir_name + "/", sub_result,
+				fix_errors, start_id_to_files);
+			result.numErrorsFound += sub_result.numErrorsFound;
+
+			// Found a greater starting ID?
+			if(result.maxObjectIDFound < sub_result.maxObjectIDFound)
+			{
+				result.maxObjectIDFound = sub_result.maxObjectIDFound;
+			}
+		}
+		else
+		{
+			// We can't really "delete" directories on S3 because they don't exist
+			// as separate objects, just prefixes for files, so we'd have to
+			// recursively delete all files within that directory, and I don't feel
+			// like writing that code right now.
+			BOX_ERROR("Spurious or invalid directory '" << subdir_name <<
+				"' found, please remove it");
+			++result.numErrorsFound;
+		}
+	}
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
+//			 BackupFileSystem::CheckObjectsResult& result,
+//			 bool fix_errors,
+//			 const dir_id_to_files_t& dir_id_to_files)
+//		Purpose: Check all the files within this directory which has
+//			 the given starting ID.
+//		Created: 2016/03/21
+//
+// --------------------------------------------------------------------------
+void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
+	BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
+	const start_id_to_files_t& start_id_to_files)
+{
+	// Make directory name -- first generate the filename of an entry that
+	// would be in this directory (it doesn't need to actually be there):
+	std::string prefix = GetFileURI(start_id);
+
+	// Check that GetFileURI returned what we expected:
+	ASSERT(EndsWith(".file", prefix));
+	std::string::size_type last_slash = prefix.find_last_of('/');
+	ASSERT(last_slash != std::string::npos);
+
+	// Remove the filename from it
+	prefix.resize(last_slash);
+
+	// Get directory contents. operator[] is not const, so we can't do this:
+	// std::vector<std::string> files = start_id_to_files[start_id];
+	std::vector<std::string> files = start_id_to_files.find(start_id)->second;
+
+	// Parse each entry, checking whether it has a valid name for an object
+	// file: must begin with '0x', followed by some hex digits and end with
+	// .file or .dir. The object ID must belong in this position in the
+	// directory hierarchy.  Any other file present is an error, and if
+	// fix_errors is true, it will be deleted.
+	for(std::vector<std::string>::const_iterator i(files.begin()); i != files.end(); ++i)
+	{
+		bool fileOK = false;
+		if(StartsWith("0x", (*i)))
+		{
+			std::string object_id_str;
+			if(EndsWith(".file", *i))
+			{
+				object_id_str = RemoveSuffix(".file", *i);
+			}
+			else if(EndsWith(".dir", *i))
+			{
+				object_id_str = RemoveSuffix(".dir", *i);
+			}
+			else
+			{
+				ASSERT(!fileOK);
+			}
+
+			if(!object_id_str.empty())
+			{
+				const char * p_end;
+				int64_t object_id = box_strtoui64(object_id_str.c_str() + 2,
+					&p_end, 16);
+				if(*p_end != 0)
+				{
+					ASSERT(!fileOK);
+				}
+				else if(object_id < start_id ||
+					object_id >= start_id + (1<<STORE_ID_SEGMENT_LENGTH))
+				{
+					ASSERT(!fileOK);
+				}
+				else
+				{
+					fileOK = true;
+					// Filename is valid, mark as existing.
+					if(result.maxObjectIDFound < object_id)
+					{
+						result.maxObjectIDFound = object_id;
+					}
+				}
+			}
+		}
+		// No other files should be present in subdirectories
+		else if(start_id != 0)
+		{
+			ASSERT(!fileOK);
+		}
+		// info and refcount databases are OK in the root directory
+		else if(*i == S3_INFO_FILE_NAME ||
+			*i == S3_REFCOUNT_FILE_NAME)
+		{
+			fileOK = true;
+		}
+		else
+		{
+			ASSERT(!fileOK);
+		}
+
+		if(!fileOK)
+		{
+			// Unexpected or bad file, delete it
+			std::string uri = prefix + "/" + (*i);
+			BOX_ERROR("Spurious file " << uri << " found" <<
+				(fix_errors?", deleting":""));
+			++result.numErrorsFound;
+			if(fix_errors)
+			{
+				mrClient.DeleteObject(uri);
+			}
+		}
+	}
 }

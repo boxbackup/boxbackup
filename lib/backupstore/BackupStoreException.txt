@@ -80,3 +80,4 @@ AccountAlreadyExists		76	Tried to create an account that already exists
 AccountDoesNotExist		77	Tried to open an account that does not exist
 FailedToCreateTemporaryFile	78	Failed to create a temporary file
 BadConfiguration		79	The configuration file contains an error or invalid value
+TooManyFilesInDirectory		80	The S3 directory contains too many files for it to be a Boxbackup store, please check and/or empty it
