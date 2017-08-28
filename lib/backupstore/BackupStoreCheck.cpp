@@ -544,8 +544,7 @@ void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
 				++mNumberErrorsFound;
 				if(mFixErrors)
 				{
-					RaidFileWrite del(mDiscSetNumber, dirName + leaf);
-					del.Delete();
+					mrFileSystem.DeleteObjectUnknown(StartID | i);
 				}
 			}
 		}

@@ -112,6 +112,7 @@ public:
 		std::vector<int64_t>& rPatchChain) = 0;
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
+	virtual void DeleteObjectUnknown(int64_t ObjectID) = 0;
 	virtual bool CanMergePatches() = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID) = 0;
@@ -223,11 +224,17 @@ public:
 	}
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain);
-	virtual void DeleteFile(int64_t ObjectID);
+	virtual void DeleteFile(int64_t ObjectID)
+	{
+		// RaidFile doesn't care what type of object it is
+		DeleteObjectUnknown(ObjectID);
+	}
 	virtual void DeleteDirectory(int64_t ObjectID)
 	{
-		DeleteFile(ObjectID);
+		// RaidFile doesn't care what type of object it is
+		DeleteObjectUnknown(ObjectID);
 	}
+	virtual void DeleteObjectUnknown(int64_t ObjectID);
 	virtual bool CanMergePatches() { return true; }
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID);
@@ -303,6 +310,7 @@ public:
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
 	}
+	virtual void DeleteObjectUnknown(int64_t ObjectID);
 	virtual void DeleteFile(int64_t ObjectID)
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
