@@ -50,7 +50,7 @@ void BackupStoreCheck::CheckRoot()
 	}
 	else
 	{
-		BOX_WARNING("Root directory doesn't exist");
+		BOX_ERROR("Root directory doesn't exist");
 		++mNumberErrorsFound;
 
 		if(mFixErrors)
