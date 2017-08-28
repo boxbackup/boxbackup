@@ -756,7 +756,10 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetFilePatch(int64_t ObjectID,
 	return stream;
 }
 
-void RaidBackupFileSystem::DeleteFile(int64_t ObjectID)
+
+// Delete an object whose type is unknown. For RaidFile, we don't need to know what type
+// it is to use RaidFileWrite::Delete() on it.
+void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
 {
 	std::string filename = GetObjectFileName(ObjectID, false);
 	RaidFileWrite deleteFile(mStoreDiscSet, filename);
@@ -1121,6 +1124,22 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 
 	rDir.SetRevisionID(GetRevisionID(uri, response));
 	rDir.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(out.GetSize()));
+}
+
+
+void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
+{
+	std::string uri = GetFileURI(ObjectID);
+	HTTPResponse response = mrClient.DeleteObject(uri);
+	// It might be a directory instead, try that before returning an error.
+	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		std::string uri = GetDirectoryURI(ObjectID);
+		response = mrClient.DeleteObject(uri);
+	}
+	mrClient.CheckResponse(response,
+		std::string("Failed to delete file or directory: ") + uri,
+		true); // ExpectNoContent
 }
 
 
