@@ -70,7 +70,7 @@ END_STRUCTURE_PACKING_FOR_WIRE
 class BackupStoreInfo
 {
 	friend class BackupStoreCheck;
-private:
+
 	// No copying allowed
 	BackupStoreInfo(const BackupStoreInfo &);
 

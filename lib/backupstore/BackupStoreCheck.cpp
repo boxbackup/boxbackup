@@ -320,8 +320,7 @@ void BackupStoreCheck::CheckObjects()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t,
-//			 const std::string &)
+//		Name:    BackupStoreCheck::CheckAndAddObject(int64_t)
 //		Purpose: Check a specific object and add it to the list
 //			 if it's OK. If there are any errors with the
 //			 reading, return false and it'll be deleted.

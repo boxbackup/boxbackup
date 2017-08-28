@@ -252,7 +252,7 @@ void safe_sleep(int seconds);
 std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	const ConfigurationVerify& verify);
 
-bool compare_lists(const std::vector<std::string>& expected_items,
+bool test_equal_lists(const std::vector<std::string>& expected_items,
 	const std::vector<std::string>& actual_items);
 
 typedef std::map<std::string, std::string> str_map_t;

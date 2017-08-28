@@ -122,7 +122,8 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
-			EndsWith("testfile", filename))
+			EndsWith("testfile", filename) ||
+			EndsWith(".qdbm", filename))
 		{
 			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
 				filename;
@@ -642,7 +643,7 @@ std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	return config;
 }
 
-bool compare_lists(const std::vector<std::string>& expected_items,
+bool test_equal_lists(const std::vector<std::string>& expected_items,
 	const std::vector<std::string>& actual_items)
 {
 	bool all_match = (expected_items.size() == actual_items.size());
@@ -671,4 +672,3 @@ bool test_equal_maps(const str_map_t& expected_attrs, const str_map_t& actual_at
 
 	return differences.empty();
 }
-

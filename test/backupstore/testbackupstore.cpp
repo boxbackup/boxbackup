@@ -3546,7 +3546,7 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 	// There should be no locks at the beginning. In fact the domain should not even
 	// exist: the client should create it itself.
 	std::vector<std::string> expected_domains;
-	TEST_THAT(compare_lists(expected_domains, client.ListDomains()));
+	TEST_THAT(test_equal_lists(expected_domains, client.ListDomains()));
 
 	SimpleDBClient::str_map_t expected;
 

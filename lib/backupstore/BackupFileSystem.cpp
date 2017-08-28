@@ -1710,6 +1710,7 @@ S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 
 
 //! GetObject() can be for either a file or a directory, so we need to try both.
+// TODO FIXME use a cached directory listing to determine which it is
 std::auto_ptr<IOStream> S3BackupFileSystem::GetObject(int64_t ObjectID, bool required)
 {
 	std::string uri = GetFileURI(ObjectID);
@@ -2090,16 +2091,19 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 			"BasePath must start and end with '/', but was: " << mBasePath);
 	}
 	std::string prefix = RemovePrefix("/", mBasePath);
+
 	if(!EndsWith("/", mBasePath))
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
 			"BasePath must start and end with '/', but was: " << mBasePath);
 	}
+
 	if(StartsWith("/", dir_name))
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
 			"dir_name must not start with '/': '" << dir_name << "'");
 	}
+
 	if(!dir_name.empty() && !EndsWith("/", dir_name))
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
@@ -2182,10 +2186,11 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 	BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
 	const start_id_to_files_t& start_id_to_files)
 {
-	// Make directory name -- first generate the filename of an entry in it
+	// Make directory name -- first generate the filename of an entry that
+	// would be in this directory (it doesn't need to actually be there):
 	std::string prefix = GetFileURI(start_id);
 
-	// Check expectations
+	// Check that GetFileURI returned what we expected:
 	ASSERT(EndsWith(".file", prefix));
 	std::string::size_type last_slash = prefix.find_last_of('/');
 	ASSERT(last_slash != std::string::npos);
@@ -2193,16 +2198,15 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 	// Remove the filename from it
 	prefix.resize(last_slash);
 
-	// Get directory contents
-	// operator[] is not const, so we can't do this:
+	// Get directory contents. operator[] is not const, so we can't do this:
 	// std::vector<std::string> files = start_id_to_files[start_id];
 	std::vector<std::string> files = start_id_to_files.find(start_id)->second;
 
-	// Parse each entry, building up a list of object IDs which are present in the dir.
-	// This is done so that whatever order is retured from the directory, objects are scanned
-	// in order.
-	// Filename must begin with '0x', followed by some hex digits and end with .file
-	// or .dir, and belong in this directory, otherwise they will be deleted.
+	// Parse each entry, checking whether it has a valid name for an object
+	// file: must begin with '0x', followed by some hex digits and end with
+	// .file or .dir. The object ID must belong in this position in the
+	// directory hierarchy.  Any other file present is an error, and if
+	// fix_errors is true, it will be deleted.
 	for(std::vector<std::string>::const_iterator i(files.begin()); i != files.end(); ++i)
 	{
 		bool fileOK = false;

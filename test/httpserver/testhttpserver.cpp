@@ -191,8 +191,7 @@ bool exercise_s3client(S3Client& client)
 	response = client.PutObject("/newfile", fs);
 	TEST_EQUAL(200, response.GetResponseCode());
 	TEST_THAT(!response.IsKeepAlive());
-	TEST_EQUAL("\"" + digest + "\"",
-		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	TEST_EQUAL("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"));
 
 	// This will fail if the file was created in the wrong place:
 	TEST_THAT(FileExists("testfiles/store/newfile"));
@@ -203,8 +202,7 @@ bool exercise_s3client(S3Client& client)
 
 	fs.Seek(0, IOStream::SeekType_Absolute);
 	TEST_THAT(fs.CompareWith(response));
-	TEST_EQUAL("\"" + digest + "\"",
-		response.GetHeaders().GetHeaderValue("etag", false)); // !required
+	TEST_EQUAL("\"" + digest + "\"", response.GetHeaders().GetHeaderValue("etag"));
 
 	// Test that GET requests set the Content-Length header correctly.
 	int actual_size = TestGetFileSize("testfiles/dsfdsfs98.fd");
@@ -291,12 +289,12 @@ bool exercise_s3client(S3Client& client)
 
 	std::vector<std::string> expected_contents;
 	expected_contents.push_back("dsfdsfs98.fd");
-	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
 
 	std::vector<std::string> expected_common_prefixes;
 	expected_common_prefixes.push_back("photos/");
 	expected_common_prefixes.push_back("subdir/");
-	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
 
 	// Test that max_keys works.
 	actual_contents.clear();
@@ -315,11 +313,11 @@ bool exercise_s3client(S3Client& client)
 	expected_contents.clear();
 	expected_contents.push_back("dsfdsfs98.fd");
 	actual_entry_names = get_entry_names(actual_contents);
-	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
 
 	expected_common_prefixes.clear();
 	expected_common_prefixes.push_back("photos/");
-	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
 
 	// Test that marker works.
 	actual_contents.clear();
@@ -337,10 +335,10 @@ bool exercise_s3client(S3Client& client)
 	TEST_THAT(!is_truncated);
 	expected_contents.clear();
 	actual_entry_names = get_entry_names(actual_contents);
-	TEST_THAT(compare_lists(expected_contents, actual_entry_names));
+	TEST_THAT(test_equal_lists(expected_contents, actual_entry_names));
 
 	expected_common_prefixes.push_back("subdir/");
-	TEST_THAT(compare_lists(expected_common_prefixes, actual_common_prefixes));
+	TEST_THAT(test_equal_lists(expected_common_prefixes, actual_common_prefixes));
 
 	// Test is successful if the number of failures has not increased.
 	return (num_failures == num_failures_initial);
@@ -612,8 +610,8 @@ bool simpledb_get_attributes(const std::string& access_key, const std::string& s
 	bool all_match = (const_attributes.size() ==
 		response_tree.get_child("GetAttributesResponse.GetAttributesResult").size());
 
-	std::multimap<std::string, std::string> attributes = const_attributes;
-	std::multimap<std::string, std::string>::iterator i = attributes.begin();
+	multimap_t attributes = const_attributes;
+	multimap_t::iterator i = attributes.begin();
 	BOOST_FOREACH(ptree::value_type &v,
 		response_tree.get_child(
 			"GetAttributesResponse.GetAttributesResult"))
@@ -646,6 +644,64 @@ bool test_httpserver()
 {
 	SETUP();
 
+	{
+		FileStream fs("testfiles/dsfdsfs98.fd");
+		MD5DigestStream digester;
+		fs.CopyStreamTo(digester);
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		digester.Close();
+		std::string digest = digester.DigestAsString();
+		TEST_EQUAL("dc3b8c5e57e71d31a0a9d7cbeee2e011", digest);
+	}
+
+	// Test that HTTPRequest with parameters is encoded correctly
+	{
+		HTTPRequest request(HTTPRequest::Method_GET, "/newfile");
+		CollectInBufferStream request_buffer;
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_buffer.SetForReading();
+
+		std::string request_str((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		const std::string expected_str("GET /newfile HTTP/1.1\r\nConnection: close\r\n\r\n");
+		TEST_EQUAL(expected_str, request_str);
+
+		request.AddParameter("foo", "Bar");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.AddParameter("foo", "baz");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar&foo=baz HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.SetParameter("whee", "bonk");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=Bar&foo=baz&whee=bonk HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		request.SetParameter("foo", "bolt");
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request_str = std::string((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		TEST_EQUAL("GET /newfile?foo=bolt&whee=bonk HTTP/1.1\r\nConnection: close\r\n\r\n", request_str);
+
+		HTTPRequest newreq = request;
+		TEST_EQUAL("bolt", newreq.GetParameterString("foo"));
+		TEST_EQUAL("bonk", newreq.GetParameterString("whee"));
+		TEST_EQUAL("blue", newreq.GetParameterString("colour", "blue"));
+		TEST_CHECK_THROWS(newreq.GetParameterString("colour"), HTTPException,
+			ParameterNotFound);
+	}
+
 	// Test that HTTPRequest can be written to and read from a stream.
 	{
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
@@ -657,15 +713,30 @@ bool test_httpserver()
 		request.AddHeader("Content-Type", "text/plain");
 		request.SetClientKeepAliveRequested(true);
 
-		// Stream it to a CollectInBufferStream
+		// First stream just the headers into a CollectInBufferStream, and check the
+		// exact contents written:
 		CollectInBufferStream request_buffer;
-
-		// Because there isn't an HTTP server to respond to us, we can't use
-		// SendWithStream, so just send the content after the request.
 		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
-		FileStream fs("testfiles/dsfdsfs98.fd");
-		fs.CopyStreamTo(request_buffer);
+		request_buffer.SetForReading();
+		const std::string request_str((const char *)request_buffer.GetBuffer(),
+			request_buffer.GetSize());
+		const std::string expected_str(
+			"PUT /newfile HTTP/1.1\r\n"
+			"Content-Type: text/plain\r\n"
+			"Host: quotes.s3.amazonaws.com\r\n"
+			"Connection: keep-alive\r\n"
+			"date: Wed, 01 Mar  2006 12:00:00 GMT\r\n"
+			"authorization: AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=\r\n"
+			"\r\n");
+		TEST_EQUAL(expected_str, request_str);
 
+		// Now stream the entire request into the CollectInBufferStream. Because there
+		// isn't an HTTP server to respond to us, we can't use SendWithStream, so just
+		// send the headers and then the content separately:
+		request_buffer.Reset();
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		FileStream fs("testfiles/photos/puppy.jpg");
+		fs.CopyStreamTo(request_buffer);
 		request_buffer.SetForReading();
 
 		IOStreamGetLine getLine(request_buffer);
@@ -706,8 +777,7 @@ bool test_httpserver()
 		CollectInBufferStream response_buffer;
 
 		HTTPResponse response(&response_buffer);
-		FileStream fs("testfiles/dsfdsfs98.fd");
-
+		FileStream fs("testfiles/photos/puppy.jpg");
 		// Write headers in lower case.
 		response.SetResponseCode(HTTPResponse::Code_OK);
 		response.AddHeader("date", "Wed, 01 Mar  2006 12:00:00 GMT");
@@ -983,7 +1053,7 @@ bool test_httpserver()
 			}
 
 			expected_contents.push_back("dsfdsfs98.fd");
-			TEST_THAT(compare_lists(expected_contents, contents));
+			TEST_THAT(test_equal_lists(expected_contents, contents));
 
 			int num_common_prefixes = 0;
 			BOOST_FOREACH(ptree::value_type &v,
@@ -1047,6 +1117,13 @@ bool test_httpserver()
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
+	}
+
+	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
+	{
+		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
+		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
+		in.CopyStreamTo(out);
 	}
 
 	// S3Client tests with S3Simulator in-process server for debugging
@@ -1127,7 +1204,7 @@ bool test_httpserver()
 		TEST_EQUAL("F2A8CCCA26B4B26D", response.GetHeaderValue("x-amz-request-id"));
 		TEST_EQUAL("Wed, 01 Mar  2006 12:00:00 GMT", response.GetHeaderValue("Date"));
 		TEST_EQUAL("Sun, 1 Jan 2006 12:00:00 GMT", response.GetHeaderValue("Last-Modified"));
-		TEST_EQUAL(34, response.GetHeaderValue("ETag").size());
+		TEST_EQUAL("\"dc3b8c5e57e71d31a0a9d7cbeee2e011\"", response.GetHeaderValue("ETag"));
 		TEST_EQUAL("text/plain", response.GetContentType());
 		TEST_EQUAL("AmazonS3", response.GetHeaderValue("Server"));
 		TEST_THAT(!response.IsKeepAlive());
@@ -1234,7 +1311,7 @@ bool test_httpserver()
 		// Check that there are no existing domains at the start
 		std::vector<std::string> domains = simpledb_list_domains(access_key, secret_key);
 		std::vector<std::string> expected_domains;
-		TEST_THAT(compare_lists(expected_domains, domains));
+		TEST_THAT(test_equal_lists(expected_domains, domains));
 
 		// Create a domain
 		request.SetParameter("Action", "CreateDomain");
@@ -1248,7 +1325,7 @@ bool test_httpserver()
 		// List domains again, check that our new domain is present.
 		domains = simpledb_list_domains(access_key, secret_key);
 		expected_domains.push_back("MyDomain");
-		TEST_THAT(compare_lists(expected_domains, domains));
+		TEST_THAT(test_equal_lists(expected_domains, domains));
 
 		// Create the same domain again. "CreateDomain is an idempotent operation;
 		// running it multiple times using the same domain name will not result in
@@ -1260,7 +1337,7 @@ bool test_httpserver()
 		// (it wasn't created a second time). Therefore expected_domains is the
 		// same as it was above.
 		domains = simpledb_list_domains(access_key, secret_key);
-		TEST_THAT(compare_lists(expected_domains, domains));
+		TEST_THAT(test_equal_lists(expected_domains, domains));
 
 		// Create an item
 		request.SetParameter("Action", "PutAttributes");
@@ -1276,8 +1353,7 @@ bool test_httpserver()
 
 		// Get the item back, and check that all attributes were written
 		// correctly.
-		std::multimap<std::string, std::string> expected_attrs;
-		typedef std::multimap<std::string, std::string>::value_type attr_t;
+		multimap_t expected_attrs;
 		expected_attrs.insert(attr_t("Color", "Blue"));
 		expected_attrs.insert(attr_t("Size", "Med"));
 		TEST_THAT(simpledb_get_attributes(access_key, secret_key, expected_attrs));
@@ -1403,7 +1479,7 @@ bool test_httpserver()
 			"ResetResponse"));
 		domains = simpledb_list_domains(access_key, secret_key);
 		expected_domains.clear();
-		TEST_THAT(compare_lists(expected_domains, domains));
+		TEST_THAT(test_equal_lists(expected_domains, domains));
 	}
 
 	// Test that SimpleDBClient works the same way.
