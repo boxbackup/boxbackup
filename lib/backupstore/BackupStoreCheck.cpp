@@ -285,50 +285,6 @@ void BackupStoreCheck::Check()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    static TwoDigitHexToInt(const char *, int &)
-//		Purpose: Convert a two digit hex string to an int, returning whether it's valid or not
-//		Created: 21/4/04
-//
-// --------------------------------------------------------------------------
-static inline bool TwoDigitHexToInt(const char *String, int &rNumberOut)
-{
-	int n = 0;
-	// Char 0
-	if(String[0] >= '0' && String[0] <= '9')
-	{
-		n = (String[0] - '0') << 4;
-	}
-	else if(String[0] >= 'a' && String[0] <= 'f')
-	{
-		n = ((String[0] - 'a') + 0xa) << 4;
-	}
-	else
-	{
-		return false;
-	}
-	// Char 1
-	if(String[1] >= '0' && String[1] <= '9')
-	{
-		n |= String[1] - '0';
-	}
-	else if(String[1] >= 'a' && String[1] <= 'f')
-	{
-		n |= (String[1] - 'a') + 0xa;
-	}
-	else
-	{
-		return false;
-	}
-
-	// Return a valid number
-	rNumberOut = n;
-	return true;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    BackupStoreCheck::CheckObjects()
 //		Purpose: Read in the contents of the directory, recurse to other levels,
 //				 checking objects for sanity and readability
@@ -337,215 +293,25 @@ static inline bool TwoDigitHexToInt(const char *String, int &rNumberOut)
 // --------------------------------------------------------------------------
 void BackupStoreCheck::CheckObjects()
 {
-	// Maximum start ID of directories -- worked out by looking at disc contents, not trusting anything
-	int64_t maxDir = 0;
+	// Scan all available files to identify the largest object ID that we know
+	// about, worked out by looking at disc contents, not trusting anything.
+	BackupFileSystem::CheckObjectsResult check =
+		mrFileSystem.CheckObjects(mFixErrors);
 
-	// Find the maximum directory starting ID
+	mNumberErrorsFound += check.numErrorsFound;
+
+	// Then try to open each object, for initial consistency checks.
+	for(int64_t ObjectID = 1; ObjectID <= check.maxObjectIDFound; ObjectID++)
 	{
-		// Make sure the starting root dir doesn't end with '/'.
-		std::string start(mStoreRoot);
-		if(start.size() > 0 && (
-			start[start.size() - 1] == '/' ||
-			start[start.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR))
+		if(CheckAndAddObject(ObjectID) == ObjectExists_Unknown)
 		{
-			start.resize(start.size() - 1);
-		}
-
-		maxDir = CheckObjectsScanDir(0, 1, start);
-		BOX_TRACE("Max dir starting ID is " <<
-			BOX_FORMAT_OBJECTID(maxDir));
-	}
-
-	// Then go through and scan all the objects within those directories
-	for(int64_t d = 0; d <= maxDir; d += (1<<STORE_ID_SEGMENT_LENGTH))
-	{
-		CheckObjectsDir(d);
-	}
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreCheck::CheckObjectsScanDir(int64_t, int, int, const std::string &)
-//		Purpose: Read in the contents of the directory, recurse to other levels,
-//				 return the maximum starting ID of any directory found.
-//		Created: 21/4/04
-//
-// --------------------------------------------------------------------------
-int64_t BackupStoreCheck::CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName)
-{
-	//TRACE2("Scan directory for max dir starting ID %s, StartID %lld\n", rDirName.c_str(), StartID);
-
-	int64_t maxID = StartID;
-
-	// Read in all the directories, and recurse downwards
-	{
-		// If any of the directories is missing, create it.
-		RaidFileController &rcontroller(RaidFileController::GetController());
-		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mDiscSetNumber));
-
-		if(!rdiscSet.IsNonRaidSet())
-		{
-			unsigned int numDiscs = rdiscSet.size();
-
-			for(unsigned int l = 0; l < numDiscs; ++l)
-			{
-				// build name
-				std::string dn(rdiscSet[l] + DIRECTORY_SEPARATOR + rDirName);
-				EMU_STRUCT_STAT st;
-
-				if(EMU_STAT(dn.c_str(), &st) != 0 &&
-					errno == ENOENT)
-				{
-					if(mkdir(dn.c_str(), 0755) != 0)
-					{
-						THROW_SYS_FILE_ERROR("Failed to "
-							"create missing RaidFile "
-							"directory", dn,
-							RaidFileException, OSError);
-					}
-				}
-			}
-		}
-
-		std::vector<std::string> dirs;
-		RaidFileRead::ReadDirectoryContents(mDiscSetNumber, rDirName,
-			RaidFileRead::DirReadType_DirsOnly, dirs);
-
-		for(std::vector<std::string>::const_iterator i(dirs.begin()); i != dirs.end(); ++i)
-		{
-			// Check to see if it's the right name
-			int n = 0;
-			if((*i).size() == 2 && TwoDigitHexToInt((*i).c_str(), n)
-				&& n < (1<<STORE_ID_SEGMENT_LENGTH))
-			{
-				// Next level down
-				int64_t mi = CheckObjectsScanDir(StartID | (n << (Level * STORE_ID_SEGMENT_LENGTH)), Level + 1,
-					rDirName + DIRECTORY_SEPARATOR + *i);
-				// Found a greater starting ID?
-				if(mi > maxID)
-				{
-					maxID = mi;
-				}
-			}
-			else
-			{
-				BOX_ERROR("Spurious or invalid directory " <<
-					rDirName << DIRECTORY_SEPARATOR <<
-					(*i) << " found, " <<
-					(mFixErrors?"deleting":"delete manually"));
-				++mNumberErrorsFound;
-			}
-		}
-	}
-
-	return maxID;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreCheck::CheckObjectsDir(int64_t)
-//		Purpose: Check all the files within this directory which has
-//			 the given starting ID.
-//		Created: 22/4/04
-//
-// --------------------------------------------------------------------------
-void BackupStoreCheck::CheckObjectsDir(int64_t StartID)
-{
-	// Make directory name -- first generate the filename of an entry in it
-	std::string dirName;
-	StoreStructure::MakeObjectFilename(StartID, mStoreRoot, mDiscSetNumber, dirName, false /* don't make sure the dir exists */);
-	// Check expectations
-	ASSERT(dirName.size() > 4 &&
-		dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR);
-	// Remove the filename from it
-	dirName.resize(dirName.size() - 4); // four chars for "/o00"
-
-	// Check directory exists
-	if(!RaidFileRead::DirectoryExists(mDiscSetNumber, dirName))
-	{
-		BOX_WARNING("RaidFile dir " << dirName << " does not exist");
-		return;
-	}
-
-	// Read directory contents
-	std::vector<std::string> files;
-	RaidFileRead::ReadDirectoryContents(mDiscSetNumber, dirName,
-		RaidFileRead::DirReadType_FilesOnly, files);
-
-	// Array of things present
-	bool idsPresent[(1<<STORE_ID_SEGMENT_LENGTH)];
-	for(int l = 0; l < (1<<STORE_ID_SEGMENT_LENGTH); ++l)
-	{
-		idsPresent[l] = false;
-	}
-
-	// Parse each entry, building up a list of object IDs which are present in the dir.
-	// This is done so that whatever order is retured from the directory, objects are scanned
-	// in order.
-	// Filename must begin with a 'o' and be three characters long, otherwise it gets deleted.
-	for(std::vector<std::string>::const_iterator i(files.begin()); i != files.end(); ++i)
-	{
-		bool fileOK = true;
-		int n = 0;
-		if((*i).size() == 3 && (*i)[0] == 'o' && TwoDigitHexToInt((*i).c_str() + 1, n)
-			&& n < (1<<STORE_ID_SEGMENT_LENGTH))
-		{
-			// Filename is valid, mark as existing
-			idsPresent[n] = true;
-		}
-		// No other files should be present in subdirectories
-		else if(StartID != 0)
-		{
-			fileOK = false;
-		}
-		// info and refcount databases are OK in the root directory
-		else if(*i == "info" || *i == "refcount.db" ||
-			*i == "refcount.rdb" || *i == "refcount.rdbX")
-		{
-			fileOK = true;
-		}
-		else
-		{
-			fileOK = false;
-		}
-
-		if(!fileOK)
-		{
-			// Unexpected or bad file, delete it
-			BOX_ERROR("Spurious file " << dirName <<
-				DIRECTORY_SEPARATOR << (*i) << " found" <<
-				(mFixErrors?", deleting":""));
+			// File was bad, delete it
+			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " "
+				"is invalid" << (mFixErrors?", deleting":""));
 			++mNumberErrorsFound;
 			if(mFixErrors)
 			{
-				RaidFileWrite del(mDiscSetNumber, dirName + DIRECTORY_SEPARATOR + *i);
-				del.Delete();
-			}
-		}
-	}
-
-	// Check all the objects found in this directory
-	for(int i = 0; i < (1<<STORE_ID_SEGMENT_LENGTH); ++i)
-	{
-		if(idsPresent[i])
-		{
-			// Check the object is OK, and add entry
-			char leaf[8];
-			::snprintf(leaf, sizeof(leaf),
-				DIRECTORY_SEPARATOR "o%02x", i);
-			if(CheckAndAddObject(StartID | i) == ObjectExists_Unknown)
-			{
-				// File was bad, delete it
-				BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(StartID | i) << " "
-					"is corrupt" << (mFixErrors?", deleting":""));
-				++mNumberErrorsFound;
-				if(mFixErrors)
-				{
-					mrFileSystem.DeleteObjectUnknown(StartID | i);
-				}
+				mrFileSystem.DeleteObjectUnknown(ObjectID);
 			}
 		}
 	}
