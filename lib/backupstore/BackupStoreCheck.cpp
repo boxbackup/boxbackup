@@ -45,12 +45,8 @@
 //		Created: 21/4/04
 //
 // --------------------------------------------------------------------------
-BackupStoreCheck::BackupStoreCheck(BackupFileSystem& FileSystem,
-	const std::string &rStoreRoot, int DiscSetNumber, bool FixErrors,
-	bool Quiet)
-: mStoreRoot(rStoreRoot),
-  mDiscSetNumber(DiscSetNumber),
-  mAccountID(FileSystem.GetAccountID()), // will be 0 for S3BackupFileSystem
+BackupStoreCheck::BackupStoreCheck(BackupFileSystem& FileSystem, bool FixErrors, bool Quiet)
+: mAccountID(FileSystem.GetAccountID()), // will be 0 for S3BackupFileSystem
   mFixErrors(FixErrors),
   mQuiet(Quiet),
   mNumberErrorsFound(0),

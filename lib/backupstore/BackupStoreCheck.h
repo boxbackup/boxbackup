@@ -73,8 +73,7 @@ typedef int64_t BackupStoreCheck_Size_t;
 class BackupStoreCheck
 {
 public:
-	BackupStoreCheck(BackupFileSystem& rFileSystem, const std::string &rStoreRoot,
-		int DiscSetNumber, bool FixErrors, bool Quiet);
+	BackupStoreCheck(BackupFileSystem& rFileSystem, bool FixErrors, bool Quiet);
 	~BackupStoreCheck();
 
 private:
@@ -171,8 +170,6 @@ private:
 #endif
 
 private:
-	std::string mStoreRoot;
-	int mDiscSetNumber;
 	int32_t mAccountID;
 	std::string mAccountName;
 	bool mFixErrors;
