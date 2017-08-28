@@ -514,11 +514,11 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 void BackupStoreCheck::WriteNewStoreInfo()
 {
 	// Attempt to load the existing store info file
-	std::auto_ptr<BackupStoreInfo> pOldInfo;
+	std::auto_ptr<BackupStoreInfo> apOldInfo;
 	try
 	{
-		pOldInfo = mrFileSystem.GetBackupStoreInfoUncached();
-		mAccountName = pOldInfo->GetAccountName();
+		apOldInfo = mrFileSystem.GetBackupStoreInfoUncached();
+		mAccountName = apOldInfo->GetAccountName();
 	}
 	catch(...)
 	{
@@ -536,14 +536,14 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	int64_t minSoft = ((mBlocksUsed * 11) / 10) + 1024;
 	int64_t minHard = ((minSoft * 11) / 10) + 1024;
 
-	int64_t softLimit = pOldInfo.get() ? pOldInfo->GetBlocksSoftLimit() : minSoft;
-	int64_t hardLimit = pOldInfo.get() ? pOldInfo->GetBlocksHardLimit() : minHard;
+	int64_t softLimit = apOldInfo.get() ? apOldInfo->GetBlocksSoftLimit() : minSoft;
+	int64_t hardLimit = apOldInfo.get() ? apOldInfo->GetBlocksHardLimit() : minHard;
 
-	if(mNumberErrorsFound && pOldInfo.get())
+	if(mNumberErrorsFound && apOldInfo.get())
 	{
-		if(pOldInfo->GetBlocksSoftLimit() > minSoft)
+		if(apOldInfo->GetBlocksSoftLimit() > minSoft)
 		{
-			softLimit = pOldInfo->GetBlocksSoftLimit();
+			softLimit = apOldInfo->GetBlocksSoftLimit();
 		}
 		else
 		{
@@ -551,9 +551,9 @@ void BackupStoreCheck::WriteNewStoreInfo()
 				"housekeeping doesn't delete files on next run.");
 		}
 
-		if(pOldInfo->GetBlocksHardLimit() > minHard)
+		if(apOldInfo->GetBlocksHardLimit() > minHard)
 		{
-			hardLimit = pOldInfo->GetBlocksHardLimit();
+			hardLimit = apOldInfo->GetBlocksHardLimit();
 		}
 		else
 		{
@@ -571,15 +571,15 @@ void BackupStoreCheck::WriteNewStoreInfo()
 
 	// Build a new store info
 	std::auto_ptr<MemBlockStream> extra_data;
-	if(pOldInfo.get())
+	if(apOldInfo.get())
 	{
-		extra_data.reset(new MemBlockStream(pOldInfo->GetExtraData()));
+		extra_data.reset(new MemBlockStream(apOldInfo->GetExtraData()));
 	}
 	else
 	{
 		extra_data.reset(new MemBlockStream(/* empty */));
 	}
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::CreateForRegeneration(
+	std::auto_ptr<BackupStoreInfo> apNewInfo(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
 		mAccountName,
 		lastObjID,
@@ -590,35 +590,35 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		mBlocksInDirectories,
 		softLimit,
 		hardLimit,
-		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
+		(apOldInfo.get() ? apOldInfo->IsAccountEnabled() : true),
 		*extra_data));
-	info->AdjustNumCurrentFiles(mNumCurrentFiles);
-	info->AdjustNumOldFiles(mNumOldFiles);
-	info->AdjustNumDeletedFiles(mNumDeletedFiles);
-	info->AdjustNumDirectories(mNumDirectories);
+	apNewInfo->AdjustNumCurrentFiles(mNumCurrentFiles);
+	apNewInfo->AdjustNumOldFiles(mNumOldFiles);
+	apNewInfo->AdjustNumDeletedFiles(mNumDeletedFiles);
+	apNewInfo->AdjustNumDirectories(mNumDirectories);
 
 	// If there are any errors (apart from wrong block counts), then we
 	// should reset the ClientStoreMarker to zero, which
 	// CreateForRegeneration does. But if there are no major errors, then
 	// we should maintain the old ClientStoreMarker, to avoid invalidating
 	// the client's directory cache.
-	if (pOldInfo.get() && !mNumberErrorsFound)
+	if(apOldInfo.get() && !mNumberErrorsFound)
 	{
 		BOX_INFO("No major errors found, preserving old "
 			"ClientStoreMarker: " <<
-			pOldInfo->GetClientStoreMarker());
-		info->SetClientStoreMarker(pOldInfo->GetClientStoreMarker());
+			apOldInfo->GetClientStoreMarker());
+		apNewInfo->SetClientStoreMarker(apOldInfo->GetClientStoreMarker());
 	}
 
-	if(pOldInfo.get())
+	if(apOldInfo.get())
 	{
-		mNumberErrorsFound += info->ReportChangesTo(*pOldInfo);
+		mNumberErrorsFound += apNewInfo->ReportChangesTo(*apOldInfo);
 	}
 
 	// Save to disc?
 	if(mFixErrors)
 	{
-		mrFileSystem.PutBackupStoreInfo(*info);
+		mrFileSystem.PutBackupStoreInfo(*apNewInfo);
 		BOX_INFO("New store info file written successfully.");
 	}
 }
