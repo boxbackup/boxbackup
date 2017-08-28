@@ -443,7 +443,7 @@ int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	OPEN_ACCOUNT(FixErrors); // readWrite
 
 	// Check it
-	BackupStoreCheck check(*mapFileSystem, mRootDir, mDiscSetNum, FixErrors, Quiet);
+	BackupStoreCheck check(*mapFileSystem, FixErrors, Quiet);
 	check.Check();
 
 	if(ReturnNumErrorsFound)
