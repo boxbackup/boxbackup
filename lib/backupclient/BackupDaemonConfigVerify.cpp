@@ -52,7 +52,8 @@ static const ConfigurationVerifyKey verifys3keys[] =
 	ConfigurationVerifyKey("Port", ConfigTest_Exists | ConfigTest_IsInt, 80),
 	ConfigurationVerifyKey("BasePath", ConfigTest_Exists),
 	ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
-	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists | ConfigTest_LastEntry)
+	ConfigurationVerifyKey("SecretKey", ConfigTest_Exists),
+	ConfigurationVerifyKey("CacheDirectory", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
 static const ConfigurationVerify verifyserver[] =
