@@ -297,6 +297,10 @@ private:
 	{
 		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
 	}
+	std::string GetRefCountDatabaseCachePath()
+	{
+		return mCacheDirectory + DIRECTORY_SEPARATOR + S3_REFCOUNT_FILE_NAME;
+	}
 	void GetCacheLock();
 
 public:
