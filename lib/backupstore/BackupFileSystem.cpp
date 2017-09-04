@@ -60,6 +60,9 @@ void BackupFileSystem::GetLock()
 				throw;
 			}
 		}
+
+		// Success!
+		break;
 	}
 }
 
