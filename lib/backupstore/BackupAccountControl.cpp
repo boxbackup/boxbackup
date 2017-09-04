@@ -573,7 +573,9 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 		s3config.GetKeyValue("AccessKey"),
 		s3config.GetKeyValue("SecretKey")));
 
-	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, *mapS3Client));
+	std::string cache_dir = s3config.GetKeyValue("CacheDirectory");
+	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, cache_dir,
+		*mapS3Client));
 }
 
 std::string S3BackupAccountControl::GetFullURL(const std::string ObjectPath) const
