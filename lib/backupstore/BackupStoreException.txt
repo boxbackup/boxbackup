@@ -78,6 +78,7 @@ FileSystemNotInitialised	74	No BackupFileSystem has been configured for this acc
 ObjectDoesNotExist		75	The specified object ID does not exist in the store, or is not of this type
 AccountAlreadyExists		76	Tried to create an account that already exists
 AccountDoesNotExist		77	Tried to open an account that does not exist
-FailedToCreateTemporaryFile	78	Failed to create a temporary file
-BadConfiguration		79	The configuration file contains an error or invalid value
-TooManyFilesInDirectory		80	The S3 directory contains too many files for it to be a Boxbackup store, please check and/or empty it
+CacheDirectoryLocked		80	The cache directory is already locked by another process
+BadConfiguration		82	The configuration file contains an error or invalid value
+TooManyFilesInDirectory		83	The S3 directory contains too many files for it to be a Boxbackup store, please check and/or empty it
+FailedToCreateTemporaryFile	84	Failed to create a temporary file
