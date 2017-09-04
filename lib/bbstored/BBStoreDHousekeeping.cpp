@@ -217,6 +217,7 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
 	if(mInterProcessComms.IsEOF())
 	{
+		BOX_INFO("Housekeeping process was hungup by main daemon, terminating");
 		SetTerminateWanted();
 		return true;
 	}
