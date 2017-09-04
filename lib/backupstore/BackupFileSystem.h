@@ -289,21 +289,21 @@ class S3BackupFileSystem : public BackupFileSystem
 {
 private:
 	const Configuration& mrConfig;
-	std::string mBasePath;
+	std::string mBasePath, mCacheDirectory;
+	NamedLock mCacheLock;
 	S3Client& mrClient;
+	bool mHaveLock;
 	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
 	int GetSizeInBlocks(int64_t bytes)
 	{
 		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
 	}
+	void GetCacheLock();
 
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
-		S3Client& rClient)
-	: mrConfig(config),
-	  mBasePath(BasePath),
-	  mrClient(rClient)
-	{ }
+		const std::string& CacheDirectory, S3Client& rClient);
+
 	virtual void TryGetLock() { }
 	virtual void ReleaseLock() { }
 	virtual bool HaveLock() { return false; }

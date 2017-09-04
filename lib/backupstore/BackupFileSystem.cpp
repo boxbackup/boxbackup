@@ -1127,6 +1127,22 @@ void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_er
 }
 
 
+S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
+	const std::string& BasePath, const std::string& CacheDirectory, S3Client& rClient)
+: mrConfig(config),
+  mBasePath(BasePath),
+  mCacheDirectory(CacheDirectory),
+  mrClient(rClient),
+  mHaveLock(false)
+{
+	if(mBasePath.size() == 0 || mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
+			"mBasePath is invalid: must start and end with a slash (/)");
+	}
+}
+
+
 int S3BackupFileSystem::GetBlockSize()
 {
 	return S3_NOTIONAL_BLOCK_SIZE;
@@ -1216,6 +1232,21 @@ void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 	std::string info_url = GetObjectURL(S3_INFO_FILE_NAME);
 	mrClient.CheckResponse(response, std::string("Failed to upload the new "
 		"BackupStoreInfo file to this URL: ") + info_url);
+}
+
+
+void S3BackupFileSystem::GetCacheLock()
+{
+	if(!mCacheLock.GotLock())
+	{
+		std::string cache_lockfile_name = mCacheDirectory + DIRECTORY_SEPARATOR +
+			S3_CACHE_LOCK_NAME;
+		if(!mCacheLock.TryAndGetLock(cache_lockfile_name))
+		{
+			THROW_FILE_ERROR("Cache directory is locked by another process",
+				mCacheDirectory, BackupStoreException, CacheDirectoryLocked);
+		}
+	}
 }
 
 
