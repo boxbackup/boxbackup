@@ -1206,7 +1206,7 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bo
 {
 	std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
 	std::string info_url = GetObjectURL(info_uri);
-	HTTPResponse response = GetObject(info_uri);
+	HTTPResponse response = mrClient.GetObject(info_url);
 	mrClient.CheckResponse(response, std::string("No BackupStoreInfo file exists "
 		"at this URL: ") + info_url);
 
@@ -1230,7 +1230,7 @@ void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 	rInfo.Save(out);
 	out.SetForReading();
 
-	HTTPResponse response = PutObject(S3_INFO_FILE_NAME, out);
+	HTTPResponse response = mrClient.PutObject(S3_INFO_FILE_NAME, out);
 
 	std::string info_url = GetObjectURL(S3_INFO_FILE_NAME);
 	mrClient.CheckResponse(response, std::string("Failed to upload the new "
@@ -1416,7 +1416,7 @@ std::string S3BackupFileSystem::GetObjectURI(int64_t ObjectID, int Type) const
 void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut)
 {
 	std::string uri = GetDirectoryURI(ObjectID);
-	HTTPResponse response = GetObject(uri);
+	HTTPResponse response = mrClient.GetObject(uri);
 	mrClient.CheckResponse(response,
 		std::string("Failed to download directory: ") + uri);
 	rDirOut.ReadFromStream(response, mrClient.GetNetworkTimeout());
@@ -1436,7 +1436,7 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 	out.SetForReading();
 
 	std::string uri = GetDirectoryURI(rDir.GetObjectID());
-	HTTPResponse response = PutObject(uri, out);
+	HTTPResponse response = mrClient.PutObject(uri, out);
 	mrClient.CheckResponse(response,
 		std::string("Failed to upload directory: ") + uri);
 
