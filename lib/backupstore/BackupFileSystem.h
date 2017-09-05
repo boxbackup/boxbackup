@@ -331,7 +331,6 @@ private:
 		return mCacheDirectory + DIRECTORY_SEPARATOR + S3_REFCOUNT_FILE_NAME;
 	}
 	void GetCacheLock();
-	std::string GetObjectRelativeURI(int64_t ObjectID, int Type);
 
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
@@ -368,19 +367,6 @@ public:
 	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
 	std::string GetObjectURL(const std::string& ObjectPath) const;
-	HTTPResponse GetObject(const std::string& ObjectPath)
-	{
-		return mrClient.GetObject(ObjectPath);
-	}
-	HTTPResponse HeadObject(const std::string& ObjectPath)
-	{
-		return mrClient.HeadObject(ObjectPath);
-	}
-	HTTPResponse PutObject(const std::string& ObjectPath,
-		IOStream& rStreamToSend, const char* pContentType = NULL)
-	{
-		return mrClient.PutObject(ObjectPath, rStreamToSend, pContentType);
-	}
 
 	// These should not really be APIs, but they are public to make them testable:
 	const std::string& GetSimpleDBDomain() const { return mSimpleDBDomain; }
@@ -444,6 +430,7 @@ protected:
 
 private:
 	std::string GetObjectURI(int64_t ObjectID, int Type) const;
+
 	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
 	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
 		CheckObjectsResult& result, bool fix_errors,
