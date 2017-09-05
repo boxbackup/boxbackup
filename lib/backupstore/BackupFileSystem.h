@@ -403,34 +403,6 @@ private:
 	// and type into a URI, which starts with mBasePath:
 	std::string GetObjectURI(int64_t ObjectID, int Type) const;
 
-	// GetObject() retrieves the object with the specified URI from the
-	// configured S3 server. S3Client has no idea about path prefixes
-	// (mBasePath), so it must already be added: the supplied ObjectURI
-	// must start with it.
-	HTTPResponse GetObject(const std::string& ObjectURI)
-	{
-		return mrClient.GetObject(ObjectURI);
-	}
-
-	// HeadObject() retrieves the headers (metadata) for the object with
-	// the specified URI from the configured S3 server. S3Client has no
-	// idea about path prefixes (mBasePath), so it must already be added:
-	// the supplied ObjectURI must start with it.
-	HTTPResponse HeadObject(const std::string& ObjectURI)
-	{
-		return mrClient.HeadObject(ObjectURI);
-	}
-
-	// PutObject() uploads the supplied stream to the configured S3 server,
-	// saving it with the supplied URI. S3Client has no idea about path
-	// prefixes (mBasePath), so it must already be added: the supplied
-	// ObjectURI must start with it.
-	HTTPResponse PutObject(const std::string& ObjectURI,
-		IOStream& rStreamToSend, const char* pContentType = NULL)
-	{
-		return mrClient.PutObject(ObjectURI, rStreamToSend, pContentType);
-	}
-
 	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
 	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
 		CheckObjectsResult& result, bool fix_errors,
