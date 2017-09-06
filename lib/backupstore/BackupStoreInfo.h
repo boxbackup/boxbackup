@@ -88,8 +88,8 @@ public:
 	// handle the RaidFile part.
 	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
 
-	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+	BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
+		int64_t BlockHardLimit);
 	~BackupStoreInfo();
 
 	// Load it from a stream (file or RaidFile)
@@ -122,7 +122,6 @@ public:
 	int64_t GetNumDirectories() const {return mNumDirectories;}
 	bool IsAccountEnabled() const {return mAccountEnabled;}
 	bool IsReadOnly() const {return mReadOnly;}
-	int GetDiscSetNumber() const {return mDiscSet;}
 
 	int ReportChangesTo(BackupStoreInfo& rOldInfo);
 
@@ -158,7 +157,7 @@ public:
 	 * This is exposed to allow testing, do not use otherwise!
 	 */
 	static std::auto_ptr<BackupStoreInfo> CreateForRegeneration(
-		int32_t AccountID, const std::string& rAccountName,
+		int32_t AccountID, const std::string &rAccountName,
 		int64_t LastObjectID, int64_t BlocksUsed,
 		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,

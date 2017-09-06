@@ -48,6 +48,7 @@
 		throw; \
 	}
 
+
 void BackupAccountControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
 	if(SoftLimit > HardLimit)
@@ -63,6 +64,7 @@ void BackupAccountControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLi
 				/ 100) << " in this case.");
 	}
 }
+
 
 int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSize)
 {
@@ -105,11 +107,13 @@ int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSi
 	}
 }
 
+
 std::string BackupAccountControl::BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize)
 {
 	return FormatUsageBar(Blocks, Blocks * BlockSize, MaxBlocks * BlockSize,
 		mMachineReadableOutput);
 }
+
 
 int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 {
@@ -125,52 +129,48 @@ int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 	return controller.GetDiscSet(discSetNum).GetBlockSize();
 }
 
-int BackupStoreAccountControl::SetLimit(const char *SoftLimitStr,
+
+int BackupAccountControl::SetLimit(const char *SoftLimitStr,
 	const char *HardLimitStr)
 {
-	OPEN_ACCOUNT(true); // readWrite
+	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, GetBlockSize());
+	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, GetBlockSize());
+	return BackupAccountControl::SetLimit(softlimit, hardlimit);
+}
 
-	// Load the info
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID, mRootDir,
-		mDiscSetNum, false /* Read/Write */));
+
+int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
+{
+	CheckSoftHardLimits(softlimit, hardlimit);
 
 	// Change the limits
-	int blocksize = GetBlockSize();
-	int64_t softlimit = SizeStringToBlocks(SoftLimitStr, blocksize);
-	int64_t hardlimit = SizeStringToBlocks(HardLimitStr, blocksize);
-	CheckSoftHardLimits(softlimit, hardlimit);
-	info->ChangeLimits(softlimit, hardlimit);
+	OPEN_ACCOUNT(true); // readWrite
+	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
+	info.ChangeLimits(softlimit, hardlimit);
+	mapFileSystem->PutBackupStoreInfo(info);
 
-	// Save
-	info->Save();
-
-	BOX_NOTICE("Limits on account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
-		" changed to " << softlimit << " soft, " <<
-		hardlimit << " hard.");
+	BOX_NOTICE("Limits on account " << mapFileSystem->GetAccountIdentifier() << " "
+		"changed to " << softlimit << " blocks soft, " << hardlimit << " hard.");
 
 	return 0;
 }
 
-int BackupStoreAccountControl::SetAccountName(const std::string& rNewAccountName)
+
+int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 {
 	OPEN_ACCOUNT(true); // readWrite
+	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
+	info.SetAccountName(rNewAccountName);
+	mapFileSystem->PutBackupStoreInfo(info);
 
-	// Load the info
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
-		mRootDir, mDiscSetNum, false /* Read/Write */));
-
-	info->SetAccountName(rNewAccountName);
-
-	// Save
-	info->Save();
-
-	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(mAccountID) <<
-		" name changed to " << rNewAccountName);
+	BOX_NOTICE("Name of account " << mapFileSystem->GetAccountIdentifier() << " "
+		"changed to " << rNewAccountName);
 
 	return 0;
 }
 
-int BackupStoreAccountControl::PrintAccountInfo()
+
+int BackupAccountControl::PrintAccountInfo()
 {
 	OPEN_ACCOUNT(false); // !readWrite
 
@@ -222,15 +222,17 @@ int BackupStoreAccountControl::PrintAccountInfo()
 	return 0;
 }
 
-int BackupStoreAccountControl::SetAccountEnabled(bool enabled)
+
+int BackupAccountControl::SetAccountEnabled(bool enabled)
 {
 	OPEN_ACCOUNT(true); // readWrite
+	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
+	info.SetAccountEnabled(enabled);
+	mapFileSystem->PutBackupStoreInfo(info);
 
-	// Load it in
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(mAccountID,
-		mRootDir, mDiscSetNum, false /* ReadOnly */));
-	info->SetAccountEnabled(enabled);
-	info->Save();
+	BOX_NOTICE("Account " << mapFileSystem->GetAccountIdentifier() << " is now " <<
+		(enabled ? "enabled" : "disabled"));
+
 	return 0;
 }
 
@@ -238,9 +240,10 @@ int BackupStoreAccountControl::SetAccountEnabled(bool enabled)
 int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	int32_t HardLimit, const std::string& AccountName)
 {
-	OPEN_ACCOUNT(true); // readWrite
+	// We definitely need a lock to do something this destructive!
+	mapFileSystem->GetLock();
 
-	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
+	BackupStoreInfo info(AccountID, SoftLimit, HardLimit);
 	info.SetAccountName(AccountName);
 
 	// And an empty directory
@@ -271,8 +274,10 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	return 0;
 }
 
+
 int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
+	// Obtain a write lock, as the daemon user
 	// We definitely need a lock to do something this destructive!
 	OPEN_ACCOUNT(true); // readWrite
 
@@ -377,6 +382,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	return retcode;
 }
 
+
 void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
 	if(mapFileSystem.get())
@@ -436,6 +442,7 @@ void BackupStoreAccountControl::OpenAccount(bool readWrite)
 	}
 }
 
+
 int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
@@ -456,9 +463,12 @@ int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	}
 }
 
-int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
-	int32_t SoftLimit, int32_t HardLimit)
+
+int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLimit,
+	int32_t HardLimit)
 {
+	CheckSoftHardLimits(SoftLimit, HardLimit);
+
 	// Load in the account database
 	std::auto_ptr<BackupStoreAccountDatabase> db(
 		BackupStoreAccountDatabase::Read(
@@ -504,8 +514,6 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber,
 	RaidFileWrite::CreateDirectory(mDiscSetNum, mRootDir, true /* recursive */);
 
 	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
-	BackupStoreInfo::CreateNew(mAccountID, mRootDir, mDiscSetNum, SoftLimit, HardLimit);
-
 	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
 	BackupAccountControl::CreateAccount(mAccountID, SoftLimit, HardLimit, "");
 
@@ -537,6 +545,7 @@ int BackupStoreAccountControl::HousekeepAccountNow()
 		return 0;
 	}
 }
+
 
 S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 	bool machineReadableOutput)
@@ -578,12 +587,6 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 		*mapS3Client));
 }
 
-std::string S3BackupAccountControl::GetFullURL(const std::string ObjectPath) const
-{
-	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
-	return std::string("http://") + s3config.GetKeyValue("HostName") + ":" +
-		s3config.GetKeyValue("Port") + GetFullPath(ObjectPath);
-}
 
 int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftLimit,
 	int32_t HardLimit)
@@ -591,52 +594,34 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	// Try getting the info file. If we get a 200 response then it already
 	// exists, and we should bail out. If we get a 404 then it's safe to
 	// continue. Otherwise something else is wrong and we should bail out.
-	std::string info_url = GetFullURL(S3_INFO_FILE_NAME);
-
-	HTTPResponse response = GetObject(S3_INFO_FILE_NAME);
-	if(response.GetResponseCode() == HTTPResponse::Code_OK)
+	S3BackupFileSystem& s3fs(*(S3BackupFileSystem *)(mapFileSystem.get()));
+	try
 	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException, AccountAlreadyExists,
-			"The BackupStoreInfo file already exists at this URL: " <<
-			info_url);
+		// We expect this to throw a FileNotFound HTTPException.
+		HideSpecificExceptionGuard guard(HTTPException::ExceptionType,
+			HTTPException::FileNotFound);
+		s3fs.GetBackupStoreInfoUncached();
+
+		// If it doesn't, then the file already exists, which is bad.
+		BOX_FATAL("The BackupStoreInfo file already exists at this URL: " <<
+			s3fs.GetObjectURL(s3fs.GetMetadataURI(S3_INFO_FILE_NAME)));
+		return 1;
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, FileNotFound))
+		{
+			// This is what we want to see, so don't do anything rash.
+		}
+		else
+		{
+			// This is not what we wanted to see, so reraise the exception.
+			throw;
+		}
 	}
 
-	if(response.GetResponseCode() != HTTPResponse::Code_NotFound)
-	{
-		mapS3Client->CheckResponse(response, std::string("Failed to check for an "
-			"existing BackupStoreInfo file at this URL: ") + info_url);
-	}
-
-	BackupStoreInfo info(0, // fake AccountID for S3 stores
-		info_url, // FileName,
-		SoftLimit, HardLimit);
-	info.SetAccountName(name);
-
-	// And an empty directory
-	BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
-	mapFileSystem->PutDirectory(rootDir);
-	int64_t rootDirSize = rootDir.GetUserInfo1_SizeInBlocks();
-
-	// Update the store info to reflect the size of the root directory
-	info.ChangeBlocksUsed(rootDirSize);
-	info.ChangeBlocksInDirectories(rootDirSize);
-	info.AdjustNumDirectories(1);
-	int64_t id = info.AllocateObjectID();
-	ASSERT(id == BACKUPSTORE_ROOT_DIRECTORY_ID);
-
-	CollectInBufferStream out;
-	info.Save(out);
-	out.SetForReading();
-
-	response = PutObject(S3_INFO_FILE_NAME, out);
-	mapS3Client->CheckResponse(response, std::string("Failed to upload the new BackupStoreInfo "
-		"file to this URL: ") + info_url);
-
-	// Now get the file again, to check that it really worked.
-	response = GetObject(S3_INFO_FILE_NAME);
-	mapS3Client->CheckResponse(response, std::string("Failed to download the new BackupStoreInfo "
-		"file that we just created: ") + info_url);
+	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
+	BackupAccountControl::CreateAccount(S3_FAKE_ACCOUNT_ID, SoftLimit, HardLimit, name);
 
 	return 0;
 }
-

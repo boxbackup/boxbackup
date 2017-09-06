@@ -35,6 +35,7 @@ protected:
 	{
 		return mapFileSystem->GetBlockSize();
 	}
+	virtual int SetLimit(int64_t softlimit, int64_t hardlimit);
 
 public:
 	BackupAccountControl(const Configuration& config,
@@ -46,7 +47,10 @@ public:
 	void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit);
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);
-	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
+	virtual int SetLimit(const char *SoftLimitStr, const char *HardLimitStr);
+	virtual int SetAccountName(const std::string& rNewAccountName);
+	virtual int PrintAccountInfo();
+	virtual int SetAccountEnabled(bool enabled);
 	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
 		const std::string& AccountName);
 };
@@ -74,11 +78,6 @@ public:
 		return BlockSizeOfDiscSet(mDiscSetNum);
 	}
 	int BlockSizeOfDiscSet(int discSetNum);
-	int SetLimit(const char *SoftLimitStr,
-		const char *HardLimitStr);
-	int SetAccountName(const std::string& rNewAccountName);
-	int PrintAccountInfo();
-	int SetAccountEnabled(bool enabled);
 	int DeleteAccount(bool AskForConfirmation);
 	int CheckAccount(bool FixErrors, bool Quiet,
 		bool ReturnNumErrorsFound = false);
@@ -98,23 +97,14 @@ private:
 public:
 	S3BackupAccountControl(const Configuration& config,
 		bool machineReadableOutput = false);
-	std::string GetFullPath(const std::string ObjectPath) const
+	virtual ~S3BackupAccountControl()
 	{
-		return mBasePath + ObjectPath;
+		// Destroy mapFileSystem before mapS3Client, because it may need it
+		// for cleanup.
+		mapFileSystem.reset();
 	}
-	std::string GetFullURL(const std::string ObjectPath) const;
 	int CreateAccount(const std::string& name, int32_t SoftLimit, int32_t HardLimit);
 	int GetBlockSize() { return 4096; }
-	HTTPResponse GetObject(const std::string& name)
-	{
-		return mapS3Client->GetObject(GetFullPath(name));
-	}
-	HTTPResponse PutObject(const std::string& name, IOStream& rStreamToSend,
-		const char* pContentType = NULL)
-	{
-		return mapS3Client->PutObject(GetFullPath(name), rStreamToSend,
-			pContentType);
-	}
 };
 
 // max size of soft limit as percent of hard limit
