@@ -1167,6 +1167,7 @@ std::string S3BackupFileSystem::GetObjectURL(const std::string& ObjectPath) cons
 		s3config.GetKeyValue("Port") + ObjectPath;
 }
 
+
 int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 	HTTPResponse& response) const
 {
@@ -1206,7 +1207,7 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bo
 {
 	std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
 	std::string info_url = GetObjectURL(info_uri);
-	HTTPResponse response = mrClient.GetObject(info_url);
+	HTTPResponse response = mrClient.GetObject(info_uri);
 	mrClient.CheckResponse(response, std::string("No BackupStoreInfo file exists "
 		"at this URL: ") + info_url);
 
@@ -1226,13 +1227,20 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bo
 
 void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
+	if(rInfo.IsReadOnly())
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, StoreInfoIsReadOnly,
+			"Tried to save BackupStoreInfo when configured as read-only");
+	}
+
 	CollectInBufferStream out;
 	rInfo.Save(out);
 	out.SetForReading();
 
-	HTTPResponse response = mrClient.PutObject(S3_INFO_FILE_NAME, out);
+	std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
+	HTTPResponse response = mrClient.PutObject(info_uri, out);
 
-	std::string info_url = GetObjectURL(S3_INFO_FILE_NAME);
+	std::string info_url = GetObjectURL(info_uri);
 	mrClient.CheckResponse(response, std::string("Failed to upload the new "
 		"BackupStoreInfo file to this URL: ") + info_url);
 }
