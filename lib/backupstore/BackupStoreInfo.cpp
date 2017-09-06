@@ -94,11 +94,11 @@ void BackupStoreInfo::CreateNew(int32_t AccountID, const std::string &rRootDir, 
 	info.Save(false);
 }
 
-BackupStoreInfo::BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-	int64_t BlockSoftLimit, int64_t BlockHardLimit)
+BackupStoreInfo::BackupStoreInfo(int32_t AccountID, int64_t BlockSoftLimit,
+	int64_t BlockHardLimit)
 : mAccountID(AccountID),
   mDiscSet(-1),
-  mFilename(FileName),
+  mFilename("<unused>"),
   mReadOnly(false),
   mIsModified(false),
   mClientStoreMarker(0),
