@@ -291,10 +291,8 @@ private:
 	NamedLock mCacheLock;
 	S3Client& mrClient;
 	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
-	int GetSizeInBlocks(int64_t bytes)
-	{
-		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
-	}
+	S3BackupFileSystem(const S3BackupFileSystem& forbidden); // no copying
+	S3BackupFileSystem& operator=(const S3BackupFileSystem& forbidden); // no assignment
 	std::string GetRefCountDatabaseCachePath()
 	{
 		return mCacheDirectory + DIRECTORY_SEPARATOR + S3_REFCOUNT_FILE_NAME;
@@ -368,7 +366,10 @@ public:
 	{
 		return GetObjectURI(ObjectID, ObjectExists_File);
 	}
-
+	int GetSizeInBlocks(int64_t bytes)
+	{
+		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
+	}
 	virtual bool CanMergePatches() { return false; }
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
