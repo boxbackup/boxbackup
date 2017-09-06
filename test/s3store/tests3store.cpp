@@ -80,9 +80,13 @@ bool test_create_account_with_account_control()
 		BackupDaemonConfigVerify);
 	TEST_LINE_OR(config.get(), "Failed to load configuration, aborting", FAIL);
 
-	S3BackupAccountControl control(*config);
-	control.CreateAccount("test", 1000, 2000);
-	TEST_THAT(check_new_account_info());
+	{
+		S3BackupAccountControl control(*config);
+		control.CreateAccount("test", 1000, 2000);
+		TEST_THAT(check_new_account_info());
+		// Exit scope to release S3BackupFileSystem now, writing the refcount db back to the
+		// store, before stopping the simulator daemon!
+	}
 
 	TEARDOWN_TEST_S3SIMULATOR();
 }
@@ -94,7 +98,7 @@ bool check_new_account_info()
 	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
 	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(fs, fs.GetFileName(),
 		true); // ReadOnly
-	TEST_EQUAL(0, info->GetAccountID());
+	TEST_EQUAL(S3_FAKE_ACCOUNT_ID, info->GetAccountID());
 	TEST_EQUAL(1, info->GetLastObjectIDUsed());
 	TEST_EQUAL(1, info->GetBlocksUsed());
 	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
