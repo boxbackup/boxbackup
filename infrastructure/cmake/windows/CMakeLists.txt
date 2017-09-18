@@ -100,9 +100,9 @@ ExternalProject_Add(boost
 	URL "http://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORES}.tar.bz2"
 	URL_HASH ${BOOST_HASH}
 	# DOWNLOAD_NO_PROGRESS 1
-	CONFIGURE_COMMAND "" # none needed
-	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed" # none needed
-	INSTALL_COMMAND "" # none needed
+	CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "No configure step needed"
+	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed"
+	INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "No install step needed"
 )
 
 if(BOXBACKUP_VERSION)
@@ -119,6 +119,7 @@ ExternalProject_Add(boxbackup
 		-DPCRE_ROOT=${install_dir}
 		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/Source/boost
 		-DBOX_SUPPORT_READLINE=OFF
+		-DCMAKE_INSTALL_PREFIX=${install_dir}
 		-DAPPVEYOR_MODE=1
 		-DDEBUG=${DEBUG}
 		${boxbackup_cmake_args}
