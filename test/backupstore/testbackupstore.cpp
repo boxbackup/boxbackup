@@ -1940,9 +1940,9 @@ bool test_server_commands()
 			}
 		}
 
-		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts());
 
+		// Create some nice recursive directories
 		write_test_file(1);
 		int64_t dirtodelete;
 
@@ -2125,7 +2125,11 @@ bool test_directory_parent_entry_tracks_directory_size()
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	// Now modify the root directory to remove its entry for this one
+	// Now modify the root directory to remove its entry for this one, and
+	// then add a directory inside this one. This should try to push the
+	// object size back up, which will try to modify the subdir's entry in
+	// its parent, which no longer exists, which should just return a
+	// protocol error instead of aborting/segfaulting.
 	BackupStoreDirectory root(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
 		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
@@ -2133,34 +2137,18 @@ bool test_directory_parent_entry_tracks_directory_size()
 	BackupStoreDirectory::Entry enCopy(*en);
 	root.DeleteEntry(subdirid);
 	TEST_THAT(write_dir(root));
-
-	// Add a directory, this should try to push the object size back up,
-	// which will try to modify the subdir's entry in its parent, which
-	// no longer exists, which should just log an error instead of
-	// aborting/segfaulting.
-	create_directory(protocol, subdirid);
+	TEST_CHECK_THROWS(
+		create_directory(protocol, subdirid),
+		ConnectionException,
+		Protocol_UnexpectedReply);
+	TEST_PROTOCOL_ERROR_OR(protocol, Err_DoesNotExistInDirectory,);
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
 	enCopy.SetSizeInBlocks(get_raid_file(subdirid)->GetDiscUsageInBlocks());
 	root.AddEntry(enCopy);
 	TEST_THAT(write_dir(root));
-
-	// We also have to remove the entry for lovely_directory created by
-	// create_directory(), because otherwise we can't create it again.
-	// (Perhaps it should not have been committed because we failed to
-	// update the parent, but currently it is.)
-	BackupStoreDirectory subdir(*get_raid_file(subdirid),
-		IOStream::TimeOutInfinite);
-	{
-		BackupStoreDirectory::Iterator i(subdir);
-		en = i.FindMatchingClearName(
-			BackupStoreFilenameClear("lovely_directory"));
-	}
-	TEST_THAT_OR(en, return false);
 	protocol.Reopen();
-	protocol.QueryDeleteDirectory(en->GetObjectID());
-	set_refcount(en->GetObjectID(), 0);
 
 	// This should have fixed the error, so we should be able to add the
 	// entry now. This should push the object size back up.

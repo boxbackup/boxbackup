@@ -36,13 +36,13 @@ private:
 
 public:
 #ifndef BOX_RELEASE_BUILD
-	void Invalidate()
+	void Invalidate(bool invalid = true)
 	{
-		mInvalidated = true;
+		mInvalidated = invalid;
 		for (std::vector<Entry*>::iterator i = mEntries.begin();
 			i != mEntries.end(); i++)
 		{
-			(*i)->Invalidate();
+			(*i)->Invalidate(invalid);
 		}
 	}
 #endif
@@ -86,7 +86,7 @@ public:
 
 	public:
 #ifndef BOX_RELEASE_BUILD
-		void Invalidate() { mInvalidated = true; }
+		void Invalidate(bool invalid) { mInvalidated = invalid; }
 #endif
 
 		friend class BackupStoreDirectory;
