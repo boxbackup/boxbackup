@@ -379,8 +379,6 @@ for my $mod (@modules, @implicit_deps)
 		while($f =~ m/\#include\s+"([^"]+?)"/g)
 		{
 			my $i = $1;
-			# ignore autogen exceptions
-			next if $i =~ m/\Aautogen_.+?Exception.h\Z/;
 			# record dependency
 			${$header_dependency{$h}}{$i} = 1 if exists $hfiles{$i};
 		}
@@ -829,6 +827,22 @@ __E
 		{
 			my @prefixed_inputs  = map {"$mod/$_"} (split /\s+/, $inputs);
 			my @prefixed_outputs = map {"$mod/$_"} (split /\s+/, $outputs);
+
+			# If any inputs contain .., it will break Make's dependency tracking, so
+			# convert paths to canonical form:
+			sub canonicalise($)
+			{
+				my ($current_value) = @_;
+				my $previous_value = '';
+				while($current_value ne $previous_value)
+				{
+					$previous_value = $current_value;
+					$current_value =~ s@([^/]+)/\.\./@@;
+				}
+				return $current_value;
+			}
+			@prefixed_inputs  = map {canonicalise($_)} (@prefixed_inputs);
+
 			# Delegate to the extra sub-makefile:
 			print MASTER_MAKEFILE "\n";
 			print MASTER_MAKEFILE "@prefixed_outputs: @prefixed_inputs\n";
@@ -1348,6 +1362,34 @@ EOF
 		print MASTER_MAKEFILE "install-$parcel:\n";
 		print MASTER_MAKEFILE "\t(cd $dir; ./install-$parcel)\n\n";
 	}
+}
+
+# There doesn't seem to be an easy way to get the list of files configured with AC_CONFIG_FILES
+# out of Autoconf, so we open config.status and parse it ourselves.
+my @configured_files;
+open CONFIG_STATUS, "< config.status" or die "config.status: $!";
+while (my $line = <CONFIG_STATUS>)
+{
+	if($line =~ m/^config_files=" +([^"]*)"/)
+	{
+		@configured_files = split / +/, $1;
+	}
+}
+close CONFIG_STATUS;
+if (not @configured_files)
+{
+	die "Failed to find value of config_files in config.status";
+}
+
+# Output targets to regenerate the output if the inputs change
+foreach my $output (@configured_files)
+{
+	my $input = $output . ".in";
+	print MASTER_MAKEFILE <<EOF;
+$output: $input
+	./config.status $output
+
+EOF
 }
 
 print MASTER_MAKEFILE <<EOF;
