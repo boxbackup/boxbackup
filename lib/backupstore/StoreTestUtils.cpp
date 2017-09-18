@@ -76,6 +76,10 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount)
 		{
 			ExpectedRefCounts.resize(i);
 		}
+		else
+		{
+			break;
+		}
 	}
 }
 
@@ -294,6 +298,10 @@ bool check_reference_counts()
 bool check_reference_counts(BackupStoreRefCountDatabase& references)
 {
 	bool counts_ok = true;
+
+	TEST_EQUAL_OR(ExpectedRefCounts.size(),
+		references.GetLastObjectIDUsed() + 1,
+		counts_ok = false);
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
 		i < ExpectedRefCounts.size(); i++)

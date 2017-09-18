@@ -67,7 +67,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolReplyable::HandleException(Bo
 	}
 	else if (e.GetType() == BackupStoreException::ExceptionType)
 	{
-		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
+		// Slightly broken or really broken, both thrown by VerifyStream:
+		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify ||
+			e.GetSubType() == BackupStoreException::BadBackupStoreFile)
 		{
 			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
 		}
