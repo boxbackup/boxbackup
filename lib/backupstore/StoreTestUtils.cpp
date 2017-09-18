@@ -63,16 +63,21 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount)
 	{
 		ExpectedRefCounts.resize(ObjectID + 1, 0);
 	}
+
 	ExpectedRefCounts[ObjectID] = RefCount;
+
+	// BackupStoreCheck and housekeeping will both regenerate the refcount
+	// DB without any missing items at the end, so we need to prune
+	// ourselves of all items with no references to match.
 	for (size_t i = ExpectedRefCounts.size() - 1; i >= 1; i--)
 	{
 		if (ExpectedRefCounts[i] == 0)
 		{
-			// BackupStoreCheck and housekeeping will both
-			// regenerate the refcount DB without any missing
-			// items at the end, so we need to prune ourselves
-			// of all items with no references to match.
 			ExpectedRefCounts.resize(i);
+		}
+		else
+		{
+			break;
 		}
 	}
 }
@@ -250,10 +255,11 @@ bool check_reference_counts()
 
 	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
 		BackupStoreRefCountDatabase::Load(account, true));
-	TEST_EQUAL(ExpectedRefCounts.size(),
-		apReferences->GetLastObjectIDUsed() + 1);
-
 	bool counts_ok = true;
+
+	TEST_EQUAL_OR(ExpectedRefCounts.size(),
+		apReferences->GetLastObjectIDUsed() + 1,
+		counts_ok = false);
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
 		i < ExpectedRefCounts.size(); i++)

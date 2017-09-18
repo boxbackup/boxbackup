@@ -1126,43 +1126,14 @@ bool test_server_housekeeping()
 	TEST_THAT(change_account_limits("0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
+	set_refcount(store1objid, 0);
 
 	TEST_THAT(check_num_files(0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
 
-	// Used to not consume the stream
-	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
-	TEST_COMMAND_RETURNS_ERROR(protocol, QueryStoreFile(
-			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			0,
-			0, /* use for attr hash too */
-			99999, /* diff from ID */
-			uploads[0].name,
-			upload),
-		Err_DiffFromFileDoesNotExist);
-
-	// TODO FIXME These tests should not be here, but in
-	// test_server_commands. But make sure you use a network protocol,
-	// not a local one, when you move them.
-
-	// Try using GetFile on a directory
-	{
-		int64_t subdirid = create_directory(protocol);
-		TEST_COMMAND_RETURNS_ERROR(protocol,
-			QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid),
-			Err_FileDoesNotVerify);
-	}
-
-	// Try retrieving an object that doesn't exist. That used to return
-	// BackupProtocolSuccess(NoObject) for no apparent reason.
-	TEST_COMMAND_RETURNS_ERROR(protocol, QueryGetObject(store1objid + 1),
-		Err_DoesNotExist);
-
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
 
-	ExpectedRefCounts.resize(3); // stop test failure in teardown_test_backupstore()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
@@ -1526,12 +1497,46 @@ bool test_server_commands()
 		new BackupProtocolLocal2(0x01234567, "test",
 			"backup/01234567/", 0, false));
 
-	// Try using GetFile on an object ID that doesn't exist in the directory
+	// Try retrieving an object that doesn't exist. That used to return
+	// BackupProtocolSuccess(NoObject) for no apparent reason.
+	{
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryGetObject(2),
+			Err_DoesNotExist);
+	}
+
+	// Try using GetFile on an object ID that doesn't exist in the directory.
 	{
 		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 			QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
 				BACKUPSTORE_ROOT_DIRECTORY_ID),
 			Err_DoesNotExistInDirectory);
+	}
+
+	// Try uploading a file that doesn't verify.
+	{
+		std::auto_ptr<IOStream> upload(new ZeroStream(1000));
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryStoreFile(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				0,
+				0, /* use for attr hash too */
+				0, /* diff from ID */
+				uploads[0].name,
+				upload),
+			Err_FileDoesNotVerify);
+	}
+
+	// Try uploading a file referencing another file which doesn't exist.
+	// This used to not consume the stream, leaving it unusable.
+	{
+		std::auto_ptr<IOStream> upload(new ZeroStream(1000));
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryStoreFile(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				0,
+				0, /* use for attr hash too */
+				99999, /* diff from ID */
+				uploads[0].name,
+				upload),
+			Err_DiffFromFileDoesNotExist);
 	}
 
 	// BLOCK
