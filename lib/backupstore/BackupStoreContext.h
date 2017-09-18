@@ -19,7 +19,6 @@
 #include "BackupFileSystem.h"
 #include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
-#include "NamedLock.h"
 #include "Message.h"
 #include "Utils.h"
 
@@ -48,6 +47,9 @@ class BackupStoreContext
 {
 public:
 	BackupStoreContext(int32_t ClientID,
+		HousekeepingInterface* mpHousekeeping,
+		const std::string& rConnectionDetails);
+	BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
 	virtual ~BackupStoreContext();
@@ -90,16 +92,20 @@ public:
 	// Not really an API, but useful for BackupProtocolLocal2.
 	void ReleaseWriteLock()
 	{
-		if(mWriteLock.GotLock())
-		{
-			mWriteLock.ReleaseLock();
-		}
+		// Even a read-only filesystem may hold some locks, for example
+		// S3BackupFileSystem's cache lock, so we always notify the filesystem
+		// to release any locks that it holds, even if we are read-only.
+		mpFileSystem->ReleaseLock();
 	}
 
+	// TODO: stop using this version, which has the side-effect of creating a
+	// BackupStoreFileSystem:
 	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet);
+	void SetClientHasAccount()
+	{
+		mClientHasAccount = true;
+	}
 	bool GetClientHasAccount() const {return mClientHasAccount;}
-	const std::string &GetAccountRoot() const {return mAccountRootDir;}
-	int GetStoreDiscSet() const {return mStoreDiscSet;}
 
 	// Store info
 	void LoadStoreInfo();
@@ -113,11 +119,14 @@ public:
 
 	const std::string GetAccountName()
 	{
-		if(!mapStoreInfo.get())
+		if(!mpFileSystem)
 		{
-			return "Unknown";
+			// This can happen if the account doesn't exist on the server, e.g. not
+			// created yet, because BackupStoreDaemon doesn't call
+			// SetClientHasAccount(), which creates the BackupStoreFileSystem.
+			return "no such account";
 		}
-		return mapStoreInfo->GetAccountName();
+		return mpFileSystem->GetBackupStoreInfo(true).GetAccountName(); // ReadOnly
 	}
 
 	// Client marker
@@ -182,6 +191,7 @@ public:
 	};
 	bool ObjectExists(int64_t ObjectID, int MustBe = ObjectExists_Anything);
 	std::auto_ptr<IOStream> OpenObject(int64_t ObjectID);
+	std::auto_ptr<IOStream> GetFile(int64_t ObjectID, int64_t InDirectory);
 
 	// Info
 	int32_t GetClientID() const {return mClientID;}
@@ -189,7 +199,6 @@ public:
 	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
 private:
-	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
 		bool AllowFlushCache = true);
 	void SaveDirectory(BackupStoreDirectory &rDir);
@@ -203,15 +212,8 @@ private:
 	HousekeepingInterface *mpHousekeeping;
 	int mProtocolPhase;
 	bool mClientHasAccount;
-	std::string mAccountRootDir;	// has final directory separator
-	int mStoreDiscSet;
-
 	bool mReadOnly;
-	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
-
-	// Store info
-	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
 
 	// mapOwnFileSystem is initialised when we created our own BackupFileSystem,
 	// using the old constructor. It ensures that the BackupFileSystem is deleted
@@ -227,15 +229,15 @@ private:
 	// Non-const version for internal use:
 	BackupStoreInfo& GetBackupStoreInfoInternal() const
 	{
-		if(!mapStoreInfo.get())
+		if(!mpFileSystem)
 		{
-			THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded);
+			THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised);
 		}
-		return *mapStoreInfo;
+		return mpFileSystem->GetBackupStoreInfo(mReadOnly);
 	}
 
 	// Refcount database
-	std::auto_ptr<BackupStoreRefCountDatabase> mapRefCount;
+	BackupStoreRefCountDatabase* mpRefCount;
 
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
