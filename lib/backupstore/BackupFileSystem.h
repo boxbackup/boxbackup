@@ -108,7 +108,8 @@ public:
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount) = 0;
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
-		int64_t DiffFromFileID, IOStream& rPatchData) = 0;
+		int64_t DiffFromFileID, IOStream& rPatchData,
+		BackupStoreRefCountDatabase::refcount_t refcount) = 0;
 	// GetObject() will retrieve either a file or directory, whichever exists.
 	// GetFile() and GetDirectory() are only guaranteed to work on objects of the
 	// correct type, but may be faster (depending on the implementation).
@@ -144,6 +145,18 @@ public:
 
 	virtual CheckObjectsResult CheckObjects(bool fix_errors) = 0;
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors) = 0;
+
+	// CloseRefCountDatabase() closes the active database, saving changes to permanent
+	// storage if necessary. It invalidates any references to the current database!
+	// It is needed to allow a BackupStoreContext to be Finished, changes made to the
+	// BackupFileSystem's BackupStoreInfo by BackupStoreCheck and HousekeepStoreAccount,
+	// and the Context to be reopened.
+	void CloseRefCountDatabase(BackupStoreRefCountDatabase* p_refcount_db)
+	{
+		ASSERT(p_refcount_db == mapPermanentRefCountDatabase.get());
+		SaveRefCountDatabase(*p_refcount_db);
+		mapPermanentRefCountDatabase.reset();
+	}
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
@@ -228,7 +241,8 @@ public:
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
-		int64_t DiffFromFileID, IOStream& rPatchData);
+		int64_t DiffFromFileID, IOStream& rPatchData,
+		BackupStoreRefCountDatabase::refcount_t refcount);
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID)
 	{
 		// For RaidBackupFileSystem, GetObject() is equivalent to GetFile().
@@ -326,14 +340,12 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount)
-	{
-		return std::auto_ptr<Transaction>();
-	}
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
-		int64_t DiffFromFileID, IOStream& rPatchData)
+		int64_t DiffFromFileID, IOStream& rPatchData,
+		BackupStoreRefCountDatabase::refcount_t refcount)
 	{
-		return std::auto_ptr<Transaction>();
+		return PutFileComplete(ObjectID, rPatchData, refcount);
 	}
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,

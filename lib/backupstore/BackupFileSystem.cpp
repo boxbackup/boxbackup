@@ -24,6 +24,7 @@
 #include "BackupStoreRefCountDatabase.h"
 #include "BufferedStream.h"
 #include "BufferedWriteStream.h"
+#include "ByteCountingStream.h"
 #include "CollectInBufferStream.h"
 #include "Configuration.h"
 #include "BackupStoreObjectMagic.h"
@@ -510,8 +511,11 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	// We can only do this when the file (ObjectID) doesn't already exist.
 	ASSERT(refcount == 0);
 
+	// But RaidFileWrite won't allow us to write to a file that doesn't have exactly one
+	// reference, so we pretend for now that there is one. If the file already exists,
+	// then Open(false) below will raise an exception for us.
 	RaidPutFileCompleteTransaction* pTrans = new RaidPutFileCompleteTransaction(
-		mStoreDiscSet, filename, refcount);
+		mStoreDiscSet, filename, 1);
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());
@@ -547,9 +551,14 @@ private:
 public:
 	RaidPutFilePatchTransaction(int StoreDiscSet,
 		const std::string& newCompleteFilename,
-		const std::string& reversedPatchFilename)
-	: mNewCompleteFile(StoreDiscSet, newCompleteFilename),
-	  mReversedPatchFile(StoreDiscSet, reversedPatchFilename),
+		const std::string& reversedPatchFilename,
+		BackupStoreRefCountDatabase::refcount_t refcount)
+	// It's not quite true that mNewCompleteFile has 1 reference: it doesn't exist
+	// yet, so it has 0 right now. However when the transaction is committed it will
+	// have 1, and RaidFileWrite gets upset if we try to modify a file with != 1
+	// references, so we need to pretend now that we already have the reference.
+	: mNewCompleteFile(StoreDiscSet, newCompleteFilename, 1),
+	  mReversedPatchFile(StoreDiscSet, reversedPatchFilename, refcount),
 	  mReversedDiffIsCompletelyDifferent(false),
 	  mBlocksUsedByNewFile(0),
 	  mChangeInBlocksUsedByOldFile(0)
@@ -593,7 +602,7 @@ void RaidPutFilePatchTransaction::Commit()
 
 std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
-	IOStream& rPatchData)
+	IOStream& rPatchData, BackupStoreRefCountDatabase::refcount_t refcount)
 {
 	// Create the containing directory if it doesn't exist.
 	std::string newVersionFilename = GetObjectFileName(ObjectID, true);
@@ -603,7 +612,7 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 		false); // no need to make sure the directory it's in exists
 
 	RaidPutFilePatchTransaction* pTrans = new RaidPutFilePatchTransaction(
-		mStoreDiscSet, newVersionFilename, oldVersionFilename);
+		mStoreDiscSet, newVersionFilename, oldVersionFilename, refcount);
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rNewCompleteFile(pTrans->GetNewCompleteFile());
@@ -1466,6 +1475,77 @@ void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
 	mrClient.CheckResponse(response,
 		std::string("Failed to delete file or directory: ") + uri,
 		true); // ExpectNoContent
+}
+
+
+
+class S3PutFileCompleteTransaction : public BackupFileSystem::Transaction
+{
+private:
+	S3Client& mrClient;
+	std::string mFileURI;
+	bool mCommitted;
+	int64_t mNumBlocks;
+
+public:
+	S3PutFileCompleteTransaction(S3BackupFileSystem& fs, S3Client& client,
+		const std::string& file_uri, IOStream& file_data);
+	~S3PutFileCompleteTransaction();
+	virtual void Commit();
+	virtual int64_t GetNumBlocks() { return mNumBlocks; }
+
+	// It doesn't matter what we return here, because this should never be called
+	// for a PutFileCompleteTransaction (the API is intended for
+	// PutFilePatchTransaction instead):
+	virtual bool IsNewFileIndependent() { return false; }
+};
+
+
+S3PutFileCompleteTransaction::S3PutFileCompleteTransaction(S3BackupFileSystem& fs,
+	S3Client& client, const std::string& file_uri, IOStream& file_data)
+: mrClient(client),
+  mFileURI(file_uri),
+  mCommitted(false),
+  mNumBlocks(0)
+{
+	ByteCountingStream counter(file_data);
+	HTTPResponse response = mrClient.PutObject(file_uri, counter);
+	if(response.GetResponseCode() != HTTPResponse::Code_OK)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, FileUploadFailed,
+			"Failed to upload file to Amazon S3: " <<
+			response.ResponseCodeString());
+	}
+	mNumBlocks = fs.GetSizeInBlocks(counter.GetNumBytesRead());
+}
+
+
+void S3PutFileCompleteTransaction::Commit()
+{
+	mCommitted = true;
+}
+
+
+S3PutFileCompleteTransaction::~S3PutFileCompleteTransaction()
+{
+	if(!mCommitted)
+	{
+		HTTPResponse response = mrClient.DeleteObject(mFileURI);
+		mrClient.CheckResponse(response, "Failed to delete uploaded file from Amazon S3",
+			true); // ExpectNoContent
+	}
+}
+
+
+std::auto_ptr<BackupFileSystem::Transaction>
+S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
+	BackupStoreRefCountDatabase::refcount_t refcount)
+{
+	ASSERT(refcount == 0 || refcount == 1);
+	BackupStoreFile::VerifyStream validator(rFileData);
+	S3PutFileCompleteTransaction* pTrans = new S3PutFileCompleteTransaction(*this,
+		mrClient, GetFileURI(ObjectID), validator);
+	return std::auto_ptr<BackupFileSystem::Transaction>(pTrans);
 }
 
 
