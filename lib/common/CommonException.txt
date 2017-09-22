@@ -58,3 +58,4 @@ ReferenceNotFound			50	The database does not contain an expected reference
 TimersNotInitialised			51	The timer framework should have been ready at this point
 InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file
 IOStreamTimedOut			53	A network operation timed out
+SignalReceived				54	The function call returned because the process received a signal

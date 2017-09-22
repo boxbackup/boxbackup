@@ -173,19 +173,33 @@ int main(int argc, const char *argv[])
 	
 	// Wait for the configuration summary
 	std::string configSummary;
-	if(!getLine.GetLine(configSummary, false, PROTOCOL_DEFAULT_TIMEOUT))
+	while(true)
 	{
-		BOX_ERROR("Failed to receive configuration summary "
-			"from daemon");
-		return 1;
-	}
+		try
+		{
+			configSummary = getLine.GetLine(false, PROTOCOL_DEFAULT_TIMEOUT);
+			break;
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				BOX_ERROR("Server rejected the connection. Are you running "
+					"bbackupctl as the same user as the daemon?");
+			}
+			else
+			{
+				BOX_ERROR("Failed to receive configuration summary "
+					"from daemon: " << e.what());
+			}
 
-	// Was the connection rejected by the server?
-	if(getLine.IsEOF())
-	{
-		BOX_ERROR("Server rejected the connection. Are you running "
-			"bbackupctl as the same user as the daemon?");
-		return 1;
+			return 1;
+		}
 	}
 
 	// Decode it
@@ -206,10 +220,28 @@ int main(int argc, const char *argv[])
 		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
 	std::string stateLine;
-	if(!getLine.GetLine(stateLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
+	while(true)
 	{
-		BOX_ERROR("Failed to receive state line from daemon");
-		return 1;
+		try
+		{
+			stateLine = getLine.GetLine(false, PROTOCOL_DEFAULT_TIMEOUT);
+			break;
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else
+			{
+				BOX_ERROR("Failed to receive configuration summary "
+					"from daemon: " << e.what());
+			}
+
+			return 1;
+		}
 	}
 
 	// Decode it
@@ -297,13 +329,37 @@ int main(int argc, const char *argv[])
 	}
 	
 	// Read the response
-	std::string line;
 	bool syncIsRunning = false;
 	bool finished = false;
 
-	while(command != NoCommand && !finished && !getLine.IsEOF() &&
-		getLine.GetLine(line, false, PROTOCOL_DEFAULT_TIMEOUT))
+	while(command != NoCommand && !finished)
 	{
+		std::string line;
+		try
+		{
+			line = getLine.GetLine(false, PROTOCOL_DEFAULT_TIMEOUT);
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				BOX_ERROR("Server disconnected unexpectedly. It may have shut "
+					"down.");
+			}
+			else
+			{
+				BOX_ERROR("Failed to receive configuration summary "
+					"from daemon: " << e.what());
+			}
+
+			break;
+		}
+
 		BOX_TRACE("Received line: " << line);
 
 		if(line.substr(0, 6) == "state ")
