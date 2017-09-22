@@ -273,15 +273,12 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// error
 			if(errno == EINTR)
 			{
-				// Signal. Just return 0 bytes
-				return 0;
+				THROW_EXCEPTION(CommonException, SignalReceived);
 			}
 			else
 			{
-				// Bad!
-				BOX_LOG_SYS_ERROR("Failed to poll socket");
-				THROW_EXCEPTION(ServerException,
-					SocketPollError)
+				THROW_SYS_ERROR("Failed to poll socket", ServerException,
+					SocketPollError);
 			}
 			break;
 			

@@ -143,8 +143,15 @@ bool IOStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int T
 		int bytesRead = Read(buffer, bytesToGo, Timeout);
 		if(bytesRead == 0)
 		{
-			// Timeout or something
-			return false;
+			if(errno == EINTR)
+			{
+				THROW_EXCEPTION(CommonException, SignalReceived);
+			}
+			else
+			{
+				// Timeout or something
+				return false;
+			}
 		}
 		// Increment things
 		bytesToGo -= bytesRead;

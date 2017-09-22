@@ -29,28 +29,27 @@
 // --------------------------------------------------------------------------
 //
 // Class
-//		Name:    GetLine
+//		Name:    LineBuffer
 //		Purpose: Common base class for line based file descriptor reading
 //		Created: 2011/04/22
 //
 // --------------------------------------------------------------------------
-class GetLine
+class LineBuffer
 {
 protected:
-	GetLine();
+	LineBuffer();
 
 private:
-	GetLine(const GetLine &rToCopy);
+	LineBuffer(const LineBuffer &forbidden);
 
 public:
 	virtual bool IsEOF() {return mEOF;}
 	int GetLineNumber() {return mLineNumber;}
-	virtual ~GetLine() { }
+	virtual ~LineBuffer() { }
+	std::string GetLine(bool Preprocess,
+		int Timeout = IOStream::TimeOutInfinite);
 	
 protected:
-	bool GetLineInternal(std::string &rOutput,
-		bool Preprocess = false,
-		int Timeout = IOStream::TimeOutInfinite);
 	virtual int ReadMore(int Timeout = IOStream::TimeOutInfinite) = 0;
 	virtual bool IsStreamDataLeft() = 0;
 

@@ -1850,36 +1850,51 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 
 	// Run it?
 	pid_t pid = 0;
-	try
+	while(true)
 	{
-		std::auto_ptr<IOStream> pscript(LocalProcessStream(script,
-			pid));
-
-		// Read in the result
-		IOStreamGetLine getLine(*pscript);
-		std::string line;
-		if(getLine.GetLine(line, true, 30000)) // 30 seconds should be enough
+		try
 		{
+			std::auto_ptr<IOStream> pscript(LocalProcessStream(script, pid));
+
+			// Read in and parse the script output:
+			IOStreamGetLine getLine(*pscript);
+			std::string line = getLine.GetLine(true, 30000); // 30 seconds should be enough
 			waitInSeconds = BackupDaemon::ParseSyncAllowScriptOutput(script, line);
 		}
-		else
+		catch(BoxException &e)
 		{
-			BOX_ERROR("SyncAllowScript output nothing within "
-				"30 seconds, waiting 5 minutes to try again"
-				" (" << script << ")");
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				BOX_ERROR("SyncAllowScript exited without any output "
+					"(" << script << ")");
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				BOX_ERROR("SyncAllowScript output nothing within "
+					"30 seconds, waiting 5 minutes to try again "
+					"(" << script << ")");
+				waitInSeconds = 5 * 60;
+			}
+			else
+			{
+				// Ignore any other exceptions, and log that something bad happened.
+				BOX_ERROR("Unexpected error while trying to execute the "
+					"SyncAllowScript: " << e.what() << " (" << script << ")");
+			}
 		}
-	}
-	catch(std::exception &e)
-	{
-		BOX_ERROR("Internal error running SyncAllowScript: "
-			<< e.what() << " (" << script << ")");
-	}
-	catch(...)
-	{
-		// Ignore any exceptions
-		// Log that something bad happened
-		BOX_ERROR("Unknown error running SyncAllowScript (" <<
-			script << ")");
+		catch(...)
+		{
+			// Ignore any other exceptions, and log that something bad happened.
+			BOX_ERROR("Unexpected error while trying to execute the SyncAllowScript "
+				"(" << script << ")");
+		}
+
+		break;
 	}
 
 	// Wait and then cleanup child process, if any
@@ -2141,17 +2156,15 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		ASSERT(mapCommandSocketInfo->mapGetLine.get() != 0);
 		
 		// Ping the remote side, to provide errors which will mean the socket gets closed
-		mapCommandSocketInfo->mpConnectedSocket->Write("ping\n", 5,
-			timeout);
+		mapCommandSocketInfo->mpConnectedSocket->Write("ping\n", 5, timeout);
 		
 		// Wait for a command or something on the socket
 		std::string command;
-		while(mapCommandSocketInfo->mapGetLine.get() != 0
-			&& !mapCommandSocketInfo->mapGetLine->IsEOF()
-			&& mapCommandSocketInfo->mapGetLine->GetLine(command, false /* no preprocessing */, timeout))
+		while(mapCommandSocketInfo->mapGetLine.get() != 0)
 		{
-			BOX_TRACE("Receiving command '" << command 
-				<< "' over command socket");
+			command = mapCommandSocketInfo->mapGetLine->GetLine(
+				false /* no preprocessing */, timeout);
+			BOX_TRACE("Received command '" << command << "' over command socket");
 			
 			bool sendOK = false;
 			bool sendResponse = true;
@@ -2201,13 +2214,6 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			// Set timeout to something very small, so this just checks for data which is waiting
 			timeout = 1;
 		}
-		
-		// Close on EOF?
-		if(mapCommandSocketInfo->mapGetLine.get() != 0 &&
-			mapCommandSocketInfo->mapGetLine->IsEOF())
-		{
-			CloseCommandConnection();
-		}
 	}
 	catch(ConnectionException &ce)
 	{
@@ -2227,10 +2233,30 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			CloseCommandConnection();
 		}
 	}
+	catch(BoxException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived) ||
+			EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+		{
+			// No special handling, wait for us to be called again
+			return;
+		}
+		else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+		{
+			// Need to close the connection, then we can just return, and next time
+			// we're called we'll listen for a new one.
+			CloseCommandConnection();
+			return;
+		}
+		else
+		{
+			BOX_ERROR("Failed to read from command socket: " << e.what());
+			return;
+		}
+	}
 	catch(std::exception &e)
 	{
-		BOX_ERROR("Failed to write to command socket: " <<
-			e.what());
+		BOX_ERROR("Failed to write to command socket: " << e.what());
 
 		// If an error occurs, and there is a connection active,
 		// just close that connection and continue. Otherwise,
@@ -2313,6 +2339,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 		mapCommandSocketInfo->mpConnectedSocket.get() != 0)
 	{
 		std::string message = SendStart ? "start-sync" : "finish-sync";
+		BOX_TRACE("Writing to command socket: " << message);
 		try
 		{
 			message += "\n";
