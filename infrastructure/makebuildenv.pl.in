@@ -1,4 +1,6 @@
 #!@PERL@
+
+use warnings;
 use strict;
 use Symbol;
 
@@ -156,7 +158,7 @@ mkdir "debug",0755;
 
 # is the library code in another directory?
 my $external_lib = readlink('lib');
-if($external_lib ne '')
+if(defined $external_lib and $external_lib ne '')
 {
 	# adjust to root of the library distribution
 	$external_lib =~ s!/lib\Z!!;
@@ -234,9 +236,12 @@ for(@modules_files)
 	for(@deps_i)
 	{
 		my ($dep,$exclude_from) = split /!/;
+		$exclude_from = '' if not defined $exclude_from;
+
 		# generic library translation
 		$dep = $env_flags{'LIBTRANS_'.$dep} if exists($env_flags{'LIBTRANS_'.$dep});
 		next if $dep eq '';
+
 		if($exclude_from =~ m/\A\+(.+)\Z/)
 		{
 			$exclude_from = $1;
@@ -281,12 +286,15 @@ for(@modules_files)
 
 	# make directories, but not if we're using an external library and this a library module
 	my ($s,$d) = split /\//,$mod;
-	if ($s ne 'lib' or $external_lib eq '')
+	if (defined $s and ($s ne 'lib' or not defined $external_lib))
 	{
 		mkdir "release/$s",0755;
-		mkdir "release/$s/$d",0755;
 		mkdir "debug/$s",0755;
-		mkdir "debug/$s/$d",0755;
+		if (defined $d)
+		{
+			mkdir "release/$s/$d",0755;
+			mkdir "debug/$s/$d",0755;
+		}
 	}
 }
 
@@ -630,7 +638,7 @@ __E
 		{
 			writetestfile("$mod/t-gdb",
 				"echo 'No debugger was detected by configure script'\n".
-				"exit 2");
+				"exit 2", "#");
 		}
 	}
 
@@ -785,9 +793,9 @@ __E
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
 	{
-		open FL,"$mod/$h";
+		open FL,"$h" or die "$h: $!";
 		my $f;
-		read FL,$f,-s "$mod/$h";
+		read FL,$f,-s "$h";
 		close FL;
 
 		while($f =~ m/\#include\s+"([^"]+?)"/g)
