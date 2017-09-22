@@ -217,11 +217,35 @@ void HTTPResponse::Receive(IOStream& rStream, int Timeout)
 	}
 
 	std::string statusLine;
-	if(!rGetLine.GetLine(statusLine, false /* no preprocess */, Timeout))
+	while(true)
 	{
-		// Timeout
-		THROW_EXCEPTION_MESSAGE(HTTPException, ResponseReadFailed,
-			"Failed to get a response from the HTTP server within the timeout");
+		try
+		{
+			statusLine = rGetLine.GetLine(false /* no preprocess */, Timeout);
+			break;
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+					"Server disconnected before sending status line");
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, ResponseTimedOut,
+					"Server took too long to send the status line");
+			}
+			else
+			{
+				throw;
+			}
+		}
 	}
 
 	if(statusLine.substr(0, 7) != "HTTP/1." || statusLine[8] != ' ')

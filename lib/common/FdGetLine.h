@@ -12,7 +12,7 @@
 
 #include <string>
 
-#include "GetLine.h"
+#include "LineBuffer.h"
 
 // --------------------------------------------------------------------------
 //
@@ -22,16 +22,15 @@
 //		Created: 2003/07/24
 //
 // --------------------------------------------------------------------------
-class FdGetLine : public GetLine
+class FdGetLine : public LineBuffer
 {
 public:
 	FdGetLine(int fd);
 	virtual ~FdGetLine();
 private:
-	FdGetLine(const FdGetLine &rToCopy);
+	FdGetLine(const FdGetLine &forbidden);
 
 public:
-	virtual std::string GetLine(bool Preprocess = false);
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();
