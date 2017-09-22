@@ -75,8 +75,6 @@ private:
 class S3Simulator : public HTTPServer
 {
 public:
-	// Increase timeout to 5 minutes, from HTTPServer default of 1 minute,
-	// to help with debugging.
 	S3Simulator();
 	~S3Simulator() { }
 

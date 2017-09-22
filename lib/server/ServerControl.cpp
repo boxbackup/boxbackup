@@ -51,17 +51,32 @@ bool SendCommands(const std::string& rCmd)
 	
 	// Wait for the configuration summary
 	std::string configSummary;
-	if(!getLine.GetLine(configSummary))
+	while(true)
 	{
-		BOX_ERROR("Failed to receive configuration summary from daemon");
-		return false;
-	}
+		try
+		{
+			configSummary = getLine.GetLine(false /* no preprocess */);
+			break;
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				BOX_ERROR("Server rejected the connection");
+			}
+			else
+			{
+				BOX_ERROR("Failed to receive configuration summary from daemon: " <<
+					e.what());
+			}
 
-	// Was the connection rejected by the server?
-	if(getLine.IsEOF())
-	{
-		BOX_ERROR("Server rejected the connection");
-		return false;
+			return false;
+		}
 	}
 
 	// Decode it
@@ -92,11 +107,36 @@ bool SendCommands(const std::string& rCmd)
 	connection.Write(cmds.c_str(), cmds.size());
 	
 	// Read the response
-	std::string line;
 	bool statusOk = !expectResponse;
 
-	while (expectResponse && !getLine.IsEOF() && getLine.GetLine(line))
+	while (expectResponse)
 	{
+		std::string line;
+		try
+		{
+			line = getLine.GetLine(false /* no preprocessing */,
+				120000); // 2 minute timeout for tests
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF) ||
+				EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				BOX_WARNING("Disconnected by daemon or timed out waiting for "
+					"response: " << e.what());
+				break;
+			}
+			else
+			{
+				throw;
+			}
+		}
+
 		// Is this an OK or error line?
 		if (line == "ok")
 		{
@@ -231,7 +271,7 @@ bool KillServer(std::string pid_file, bool WaitForProcess)
 {
 	FileStream fs(pid_file);
 	IOStreamGetLine getline(fs);
-	std::string line = getline.GetLine();
+	std::string line = getline.GetLine(false); // !preprocess
 	int pid = atoi(line.c_str());
 	bool status = KillServer(pid, WaitForProcess);
 	TEST_EQUAL_LINE(true, status, std::string("kill(") + pid_file + ")");
