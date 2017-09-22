@@ -2036,8 +2036,7 @@ bool test_absolute_symlinks_not_followed_during_restore()
 		// check that the original file was not overwritten
 		FileStream fs(SYM_DIR "/a/subdir/content");
 		IOStreamGetLine gl(fs);
-		std::string line;
-		TEST_THAT(gl.GetLine(line));
+		std::string line = gl.GetLine(false);
 		TEST_THAT(line != "before");
 		TEST_EQUAL("after", line);
 
@@ -2347,11 +2346,10 @@ bool test_unicode_filenames_can_be_backed_up()
 		TEST_THAT(bbackupquery_pid != -1);
 
 		IOStreamGetLine reader(*queryout);
-		std::string line;
 		bool found = false;
 		while (!reader.IsEOF())
 		{
-			TEST_THAT(reader.GetLine(line));
+			std::string line = reader.GetLine(false); // !preprocess
 			if (line.find(consoleDirName) != std::string::npos)
 			{
 				found = true;
@@ -2376,7 +2374,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		found = false;
 		while (!reader2.IsEOF())
 		{
-			TEST_THAT(reader2.GetLine(line));
+			std::string line = reader2.GetLine(false); // !preprocess
 			if (line.find(consoleFileName) != std::string::npos)
 			{
 				found = true;

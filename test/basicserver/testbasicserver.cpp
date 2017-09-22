@@ -85,9 +85,7 @@ void testservers_connection(SocketStream &rStream)
 	if(typeid(rStream) == typeid(SocketStreamTLS))
 	{
 		// need to wait for some data before sending stuff, otherwise timeout test doesn't work
-		std::string line;
-		while(!getline.GetLine(line))
-			;
+		std::string line = getline.GetLine(false); // !preprocess
 		SocketStreamTLS &rtls = (SocketStreamTLS&)rStream;
 		std::string line1("CONNECTED:");
 		line1 += rtls.GetPeerCommonName();
@@ -102,9 +100,7 @@ void testservers_connection(SocketStream &rStream)
 
 	while(!getline.IsEOF())
 	{
-		std::string line;
-		while(!getline.GetLine(line))
-			;
+		std::string line = getline.GetLine(false); // !preprocess
 		if(line == "QUIT")
 		{
 			break;
@@ -326,18 +322,16 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			// Send some data, any data, to get the first response.
 			conns[c]->Write("Hello\n", 6);
 		
-			std::string line1;
-
 			// First read should timeout, while server sleeps in
 			// testservers_pause_before_reply():
-			TEST_THAT(!getline[c]->GetLine(line1, false,
-				COMMS_SERVER_WAIT_BEFORE_REPLYING * 0.5));
-			TEST_EQUAL(line1, "");
+			TEST_CHECK_THROWS(getline[c]->GetLine(false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING * 0.5),
+				CommonException, IOStreamTimedOut);
 
 			// Second read should not timeout, because we should have waited
 			// COMMS_SERVER_WAIT_BEFORE_REPLYING * 1.5
-			TEST_THAT(getline[c]->GetLine(line1, false,
-				COMMS_SERVER_WAIT_BEFORE_REPLYING));
+			std::string line1 = getline[c]->GetLine(false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING);
 			TEST_EQUAL(line1, "CONNECTED:CLIENT");
 		}
 	}
@@ -350,8 +344,32 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			conns[c]->Write(tosend[q], strlen(tosend[q]));
 			std::string rep;
 			bool hadTimeout = false;
-			while(!getline[c]->GetLine(rep, false, COMMS_READ_TIMEOUT))
-				hadTimeout = true;
+			while(true)
+			{
+				try
+				{
+					// COMMS_READ_TIMEOUT is very short, so we will get a lot of these:
+					HideSpecificExceptionGuard guard(CommonException::ExceptionType,
+						CommonException::IOStreamTimedOut);
+					rep = getline[c]->GetLine(false, COMMS_READ_TIMEOUT);
+					break;
+				}
+				catch(BoxException &e)
+				{
+					if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+					{
+						hadTimeout = true;
+					}
+					else if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+					{
+						// just try again
+					}
+					else
+					{
+						throw;
+					}
+				}
+			}
 			TEST_EQUAL_LINE(rep, recieve[q], "Line " << q);
 			TEST_LINE(hadTimeout, "Line " << q)
 		}

@@ -467,7 +467,7 @@ int main(int argc, const char *argv[])
 
 			try
 			{
-				cmd_str = apGetLine->GetLine();
+				cmd_str = apGetLine->GetLine(false);
 			}
 			catch(CommonException &e)
 			{

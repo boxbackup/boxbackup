@@ -32,17 +32,32 @@ void HTTPHeaders::ReadFromStream(IOStreamGetLine &rGetLine, int Timeout)
 	bool haveHeader = false;
 	while(true)
 	{
-		if(rGetLine.IsEOF())
-		{
-			// Header terminates unexpectedly
-			THROW_EXCEPTION(HTTPException, BadRequest)
-		}
-
 		std::string currentLine;
-		if(!rGetLine.GetLine(currentLine, false /* no preprocess */, Timeout))
+
+		try
 		{
-			// Timeout
-			THROW_EXCEPTION(HTTPException, RequestReadFailed)
+			currentLine = rGetLine.GetLine(false /* no preprocess */, Timeout);
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+					"Client disconnected while sending headers");
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				THROW_EXCEPTION(HTTPException, RequestTimedOut);
+			}
+			else
+			{
+				throw;
+			}
 		}
 
 		// Is this a continuation of the previous line?
