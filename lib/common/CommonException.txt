@@ -58,5 +58,6 @@ ReferenceNotFound			50	The database does not contain an expected reference
 TimersNotInitialised			51	The timer framework should have been ready at this point
 InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file
 IOStreamTimedOut			53	A network operation timed out
-NamedLockFailed				54	Failed to acquire a named lock
-TempDirNotSet				55	Your temporary directory is not set. Either the TMP or TEMP environment variable should be set to a path
+SignalReceived				54	The function call returned because the process received a signal
+NamedLockFailed				55	Failed to acquire a named lock
+TempDirNotSet				56	Your temporary directory is not set. Either the TMP or TEMP environment variable should be set to a path

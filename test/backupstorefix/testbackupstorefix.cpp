@@ -576,7 +576,7 @@ int test(int argc, const char *argv[])
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
 			discSetNum, false);
 
-		for(getline.GetLine(line, true); line != ""; getline.GetLine(line, true))
+		for(line = getline.GetLine(true); line != ""; line = getline.GetLine(true))
 		{
 			std::string full_path = line;
 			ASSERT(StartsWith("testfiles/TestDir1/", full_path));

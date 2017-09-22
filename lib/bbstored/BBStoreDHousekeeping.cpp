@@ -214,46 +214,69 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 		return false;
 	}
 
-	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
-	if(mInterProcessComms.IsEOF())
-	{
-		SetTerminateWanted();
-		return true;
-	}
-
 	// Get a line, and process the message
 	std::string line;
-	if(mInterProcessComms.GetLine(line, false /* no pre-processing */, MaximumWaitTime))
+
+	try
 	{
-		BOX_TRACE("Housekeeping received command '" << line <<
-			"' over interprocess comms");
-
-		int account = 0;
-
-		if(line == "h")
+		line = mInterProcessComms.GetLine(false /* no pre-processing */,
+			MaximumWaitTime);
+	}
+	catch(BoxException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived) ||
+			EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
 		{
-			// HUP signal received by main process
-			SetReloadConfigWanted();
-			return true;
+			// No special handling, just return empty-handed. We will be called again.
+			return false;
 		}
-		else if(line == "t")
+		else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
 		{
-			// Terminate signal received by main process
+			// This means something has gone wrong with the main server process, and the
+			// housekeeping process should also terminate.
+			BOX_INFO("Housekeeping process was hungup by main daemon, terminating");
 			SetTerminateWanted();
 			return true;
 		}
-		else if(sscanf(line.c_str(), "r%x", &account) == 1)
+		else
 		{
-			// Main process is trying to lock an account -- are we processing it?
-			if(account == AccountNum)
-			{
-				// Yes! -- need to stop now so when it retries to get the lock, it will succeed
-				BOX_INFO("Housekeeping on account " <<
-					BOX_FORMAT_ACCOUNT(AccountNum) <<
-					"giving way to client connection");
-				return true;
-			}
+			throw;
 		}
+	}
+
+	BOX_TRACE("Housekeeping received command '" << line <<
+		"' over interprocess comms");
+
+	int account = 0;
+
+	if(line == "h")
+	{
+		// HUP signal received by main process
+		SetReloadConfigWanted();
+		return true;
+	}
+	else if(line == "t")
+	{
+		// Terminate signal received by main process
+		SetTerminateWanted();
+		return true;
+	}
+	else if(sscanf(line.c_str(), "r%x", &account) == 1)
+	{
+		// Main process is trying to lock an account -- are we processing it?
+		if(account == AccountNum)
+		{
+			// Yes! -- need to stop now so when it retries to get the lock, it will succeed
+			BOX_INFO("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(AccountNum) <<
+				"giving way to client connection");
+			return true;
+		}
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal, "Housekeeping received "
+			"unexpected command from main daemon: " << line);
 	}
 
 	return false;

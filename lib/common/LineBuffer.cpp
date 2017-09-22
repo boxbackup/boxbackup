@@ -17,7 +17,7 @@
 
 #include "autogen_CommonException.h"
 #include "BoxTime.h"
-#include "GetLine.h"
+#include "LineBuffer.h"
 
 #include "MemLeakFindOn.h"
 
@@ -31,12 +31,12 @@ inline bool iw(int c)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    GetLine::GetLine(int)
-//		Purpose: Constructor, taking file descriptor
+//		Name:    LineBuffer::LineBuffer()
+//		Purpose: Constructor
 //		Created: 2011/04/22
 //
 // --------------------------------------------------------------------------
-GetLine::GetLine()
+LineBuffer::LineBuffer()
 : mLineNumber(0),
   mBufferBegin(0),
   mBytesInBuffer(0),
@@ -47,24 +47,25 @@ GetLine::GetLine()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    GetLine::GetLineInternal(std::string &, bool, int)
-//		Purpose: Gets a line from the file, returning it in rOutput.
-//			 If Preprocess is true, leading and trailing
-//			 whitespace is removed, and comments (after #)  are
-//			 deleted. Returns true if a line is available now,
-//			 false if retrying may get a line (eg timeout,
-//			 signal), and exceptions if it's EOF.
+//		Name:    LineBuffer::GetLine(bool, int)
+//		Purpose: Gets a line from the input using ReadMore, and
+//		         returns it. If Preprocess is true, leading and
+//		         trailing whitespace is removed, and comments (after
+//		         #) are deleted. Throws exceptions on timeout, signal
+//		         received and EOF.
 //		Created: 2011/04/22
 //
 // --------------------------------------------------------------------------
-bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
-	int timeout)
+std::string LineBuffer::GetLine(bool preprocess, int timeout)
 {
 	// EOF?
-	if(mEOF) {THROW_EXCEPTION(CommonException, GetLineEOF)}
+	if(mEOF)
+	{
+		THROW_EXCEPTION(CommonException, GetLineEOF);
+	}
 	
 	// Initialise string to stored into
-	rOutput = mPendingString;
+	std::string output = mPendingString;
 	mPendingString.erase();
 
 	box_time_t start_time = GetCurrentBoxTime();
@@ -91,7 +92,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 			else
 			{
 				// Add to string
-				rOutput += c;
+				output += c;
 			}
 			
 			// Implicit line ending at EOF
@@ -102,21 +103,21 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 		}
 		
 		// Check size
-		if(rOutput.size() > GETLINE_MAX_LINE_SIZE)
+		if(output.size() > GETLINE_MAX_LINE_SIZE)
 		{
-			THROW_EXCEPTION(CommonException, GetLineTooLarge)
+			THROW_EXCEPTION(CommonException, GetLineTooLarge);
 		}
 
 		if(timeout != IOStream::TimeOutInfinite)
 		{
 			// Update remaining time, and if we have run out and not yet found EOL, then
 			// stash what we've read so far, and return false. (If the timeout is infinite,
-			// the only way out is EOL or EOF.)
+			// the only way out is EOL or EOF or a signal).
 			remaining_time = end_time - GetCurrentBoxTime();
 			if(!found_line_end && remaining_time < 0)
 			{
-			       mPendingString = rOutput;
-			       return false;
+			       mPendingString = output;
+			       THROW_EXCEPTION(CommonException, IOStreamTimedOut);
 			}
 		}
 
@@ -140,7 +141,7 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 			// Error?
 			if(bytes == -1)
 			{
-				THROW_EXCEPTION(CommonException, OSFileError)
+				THROW_EXCEPTION(CommonException, OSFileError);
 			}
 			
 			// Adjust buffer info
@@ -148,12 +149,22 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 			mBufferBegin = 0;
 
 			// No data returned?
-			if(bytes == 0 && IsStreamDataLeft())
+			if(bytes == 0)
 			{
-			       // store string away
-			       mPendingString = rOutput;
-			       // Return false;
-			       return false;
+				// This could mean that (1) we reached EOF:
+				if(!IsStreamDataLeft())
+				{
+					mPendingEOF = true;
+					// Exception will be thrown at next start of loop.
+				}
+				// Or (2) we ran out of time waiting to read enough data
+				// (signals throw an exception in SocketStream instead).
+				else
+				{
+					// Store string away, ready for when the caller asks us again.
+					mPendingString = output;
+					THROW_EXCEPTION(CommonException, IOStreamTimedOut);
+				}
 			}
 		}
 		
@@ -173,10 +184,10 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 		// first character not in the string (== length, or a # mark
 		// or whitespace)
 		int end = 0;
-		int size = rOutput.size();
+		int size = output.size();
 		while(end < size)
 		{
-			if(rOutput[end] == '#' && (end == 0 || (iw(rOutput[end-1]))))
+			if(output[end] == '#' && (end == 0 || (iw(output[end-1]))))
 			{
 				break;
 			}
@@ -185,21 +196,21 @@ bool GetLine::GetLineInternal(std::string &rOutput, bool preprocess,
 		
 		// Remove whitespace
 		int begin = 0;
-		while(begin < size && iw(rOutput[begin]))
+		while(begin < size && iw(output[begin]))
 		{
 			begin++;
 		}
 
-		while(end > begin && end <= size && iw(rOutput[end-1]))
+		while(end > begin && end <= size && iw(output[end-1]))
 		{
 			end--;
 		}
 		
 		// Return a sub string
-		rOutput = rOutput.substr(begin, end - begin);
+		output = output.substr(begin, end - begin);
 	}
 
-	return true;
+	return output;
 }
 
 

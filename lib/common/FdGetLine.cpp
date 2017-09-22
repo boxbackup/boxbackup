@@ -52,33 +52,6 @@ FdGetLine::~FdGetLine()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    FdGetLine::GetLine(bool)
-//		Purpose: Returns a file from the file. If Preprocess is true, leading
-//				 and trailing whitespace is removed, and comments (after #)
-//				 are deleted.
-//		Created: 2003/07/24
-//
-// --------------------------------------------------------------------------
-std::string FdGetLine::GetLine(bool Preprocess)
-{
-	if(mFileHandle == -1) {THROW_EXCEPTION(CommonException, GetLineNoHandle)}
-	
-	std::string r;
-	bool result = GetLineInternal(r, Preprocess);
-
-	if(!result)
-	{
-		// should never fail for FdGetLine
-		THROW_EXCEPTION(CommonException, Internal);
-	}
-	
-	return r;
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    FdGetLine::ReadMore()
 //		Purpose: Read more bytes from the handle, possible the
 //			 console, into mBuffer and return the number of
@@ -88,6 +61,11 @@ std::string FdGetLine::GetLine(bool Preprocess)
 // --------------------------------------------------------------------------
 int FdGetLine::ReadMore(int Timeout)
 {
+	if(mFileHandle == -1)
+	{
+		THROW_EXCEPTION(CommonException, GetLineNoHandle);
+	}
+
 	int bytes;
 	
 #ifdef WIN32

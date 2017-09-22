@@ -71,6 +71,8 @@ std::string PtreeToXmlString(const ptree& pt)
 }
 
 S3Simulator::S3Simulator()
+// Increase timeout to 5 minutes, from HTTPServer default of 1 minute,
+// to help with debugging.
 : HTTPServer(300000)
 { }
 

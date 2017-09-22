@@ -583,17 +583,13 @@ void test_getline()
 		while(testfilelines[l] != 0)
 		{
 			TEST_THAT(!getline.IsEOF());
-			std::string line;
-			while(!getline.GetLine(line, true))
-			{
-				// skip line
-			}
+			std::string line = getline.GetLine(true);
 			TEST_EQUAL(testfilelines[l], line);
 			l++;
 		}
 		TEST_THAT(getline.IsEOF());
 		std::string dummy;
-		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
+		TEST_CHECK_THROWS(getline.GetLine(false), CommonException, GetLineEOF);
 	}
 
 	// and again without pre-processing
@@ -618,14 +614,12 @@ void test_getline()
 			ll[e] = '\0';
 
 			TEST_THAT(!getline.IsEOF());
-			std::string line;
-			while(!getline.GetLine(line, false))
-				;
+			std::string line = getline.GetLine(false);
 			TEST_EQUAL(ll, line);
 		}
 		TEST_THAT(getline.IsEOF());
 		std::string dummy;
-		TEST_CHECK_THROWS(getline.GetLine(dummy, true), CommonException, GetLineEOF);
+		TEST_CHECK_THROWS(getline.GetLine(true), CommonException, GetLineEOF);
 
 		fclose(file2);
 	}
