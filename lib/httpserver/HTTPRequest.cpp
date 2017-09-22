@@ -158,11 +158,39 @@ bool HTTPRequest::Receive(IOStreamGetLine &rGetLine, int Timeout)
 
 	// Read the first line, which is of a different format to the rest of the lines
 	std::string requestLine;
-	if(!rGetLine.GetLine(requestLine, false /* no preprocessing */, Timeout))
+	while(true)
 	{
-		// Didn't get the request line, probably end of connection which had been kept alive
-		return false;
+		try
+		{
+			requestLine = rGetLine.GetLine(false /* no preprocessing */, Timeout);
+			break;
+		}
+		catch(BoxException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+			{
+				// try again
+				continue;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
+			{
+				// Didn't get the request line, probably end of connection which
+				// had been kept alive
+				return false;
+			}
+			else if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				THROW_EXCEPTION(HTTPException, RequestTimedOut);
+			}
+			else
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadRequest,
+					"Unexpected error while reading request: " <<
+					e.what());
+			}
+		}
 	}
+
 	BOX_TRACE("Request line: " << requestLine);
 
 	// Check the method

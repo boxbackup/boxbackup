@@ -43,24 +43,6 @@ IOStreamGetLine::~IOStreamGetLine()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    IOStreamGetLine::GetLine(std::string &, bool, int)
-//		Purpose: Gets a line from the file, returning it in rOutput. If Preprocess is true, leading
-//				 and trailing whitespace is removed, and comments (after #)
-//				 are deleted.
-//				 Returns true if a line is available now, false if retrying may get a line (eg timeout, signal),
-//				 and exceptions if it's EOF.
-//		Created: 2003/07/24
-//
-// --------------------------------------------------------------------------
-bool IOStreamGetLine::GetLine(std::string &rOutput, bool Preprocess, int Timeout)
-{
-	return GetLineInternal(rOutput, Preprocess, Timeout);
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    IOStreamGetLine::ReadMore()
 //		Purpose: Read more bytes from the handle, possible the
 //			 console, into mBuffer and return the number of
@@ -106,10 +88,10 @@ void IOStreamGetLine::DetachFile()
 //
 // Function
 //		Name:    IOStreamGetLine::IgnoreBufferedData(int)
-//		Purpose: Ignore buffered bytes (effectively removing them from the
-//				 beginning of the buffered data.)
-//				 Cannot remove more bytes than are currently in the buffer.
-//				 Be careful when this is used!
+//		Purpose: Ignore buffered bytes (effectively removing them
+//		         from the beginning of the buffered data.) Cannot
+//		         remove more bytes than are currently in the buffer.
+//		         Be careful when this is used!
 //		Created: 22/12/04
 //
 // --------------------------------------------------------------------------
