@@ -198,12 +198,15 @@ public:
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
+	// This is not an API, but it's useful in tests with multiple contexts, to allow
+	// synchronisation between them:
+	void ClearDirectoryCache();
+
 private:
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
 		bool AllowFlushCache = true);
 	void SaveDirectory(BackupStoreDirectory &rDir);
 	void RemoveDirectoryFromCache(int64_t ObjectID);
-	void ClearDirectoryCache();
 	void DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete);
 	int64_t AllocateObjectID();
 
