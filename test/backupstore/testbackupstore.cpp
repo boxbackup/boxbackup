@@ -158,7 +158,7 @@ bool teardown_test_backupstore()
 	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
 	{
 		TEST_THAT_OR(check_reference_counts(), status = false);
-		TEST_THAT_OR(check_account(), status = false);
+		TEST_EQUAL_OR(0, check_account_for_errors(), status = false);
 	}
 
 	return status;
