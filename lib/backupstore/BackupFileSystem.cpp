@@ -1523,7 +1523,6 @@ void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rD
 	rDirOut.ReadFromStream(response, mrClient.GetNetworkTimeout());
 
 	rDirOut.SetRevisionID(GetRevisionID(uri, response));
-	ASSERT(false); // set the size in blocks
 	rDirOut.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(response.GetContentLength()));
 }
 
