@@ -754,4 +754,15 @@ void operator delete(void *ptr) throw ()
 	internal_delete(ptr);
 }
 
+void operator delete(void *ptr, const char *file, int line)
+{
+	internal_delete(ptr);
+}
+
+void operator delete[](void *ptr, const char *file, int line)
+{
+	internal_delete(ptr);
+}
+
+
 #endif // BOX_MEMORY_LEAK_TESTING
