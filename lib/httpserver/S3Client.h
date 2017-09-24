@@ -13,6 +13,7 @@
 #include <string>
 #include <map>
 
+#include "Configuration.h"
 #include "HTTPRequest.h"
 #include "SocketStream.h"
 
@@ -50,6 +51,17 @@ class S3Client
 	  mVirtualHostName(VirtualHostName),
 	  mAccessKey(rAccessKey),
 	  mSecretKey(rSecretKey),
+	  mNetworkTimeout(30000)
+	{ }
+
+	// Constructor with a Configuration (file):
+	S3Client(const Configuration& s3config)
+	: mpSimulator(NULL),
+	  mHostName(s3config.GetKeyValue("HostName")),
+	  mPort(s3config.GetKeyValueInt("Port")),
+	  mVirtualHostName(s3config.GetKeyValue("S3VirtualHostName")),
+	  mAccessKey(s3config.GetKeyValue("AccessKey")),
+	  mSecretKey(s3config.GetKeyValue("SecretKey")),
 	  mNetworkTimeout(30000)
 	{ }
 
