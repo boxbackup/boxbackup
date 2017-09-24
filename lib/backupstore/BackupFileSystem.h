@@ -157,6 +157,10 @@ public:
 		SaveRefCountDatabase(*p_refcount_db);
 		mapPermanentRefCountDatabase.reset();
 	}
+	BackupStoreRefCountDatabase* GetCurrentRefCountDatabase()
+	{
+		return mapPermanentRefCountDatabase.get();
+	}
 
 protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
