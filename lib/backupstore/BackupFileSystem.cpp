@@ -1274,6 +1274,89 @@ void S3BackupFileSystem::GetCacheLock()
 BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 	bool ReadOnly)
 {
+	if(mapPermanentRefCountDatabase.get())
+	{
+		return *mapPermanentRefCountDatabase;
+	}
+
+	// It's dangerous to have two read-write databases open at the same time (it would
+	// be too easy to update the refcounts in the wrong one by mistake), and temporary
+	// databases are always read-write, so if a temporary database is already open
+	// then we should only allow a read-only permanent database to be opened.
+	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
+
+	GetCacheLock();
+
+	// If we have a cached copy, check that it's up to date.
+	std::string local_path = GetRefCountDatabaseCachePath();
+	std::string digest;
+
+	if(FileExists(local_path))
+	{
+		FileStream fs(local_path);
+		MD5DigestStream digester;
+		fs.CopyStreamTo(digester);
+		digester.Close();
+		digest = digester.DigestAsString();
+	}
+
+	// Try to fetch it from the remote server. If we pass a digest, and if it matches,
+	// then the server won't send us the same file data again.
+	std::string uri = GetMetadataURI(S3_REFCOUNT_FILE_NAME);
+	HTTPResponse response = mrClient.GetObject(uri, digest);
+	if(response.GetResponseCode() == HTTPResponse::Code_OK)
+	{
+		if(digest.size() > 0)
+		{
+			BOX_WARNING("We had a cached copy of the refcount DB, but it "
+				"didn't match the one in S3, so the server sent us a new "
+				"copy and the cache will be updated");
+		}
+
+		FileStream fs(local_path, O_CREAT | O_RDWR);
+		response.CopyStreamTo(fs);
+
+		// Check that we got the full and correct file. TODO: calculate the MD5
+		// digest while writing the file, instead of afterwards.
+		fs.Seek(0, IOStream::SeekType_Absolute);
+		MD5DigestStream digester;
+		fs.CopyStreamTo(digester);
+		digester.Close();
+		digest = digester.DigestAsString();
+
+		if(response.GetHeaders().GetHeaderValue("etag") !=
+			"\"" + digest + "\"")
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				FileDownloadedIncorrectly, "Downloaded invalid file from "
+				"S3: expected MD5 digest to be " <<
+				response.GetHeaders().GetHeaderValue("etag") << " but "
+				"it was actually " << digest);
+		}
+	}
+	else if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
+	{
+		// Do not create a new refcount DB here, it is not safe! Users may wonder
+		// why they have lost all their files, and/or unwittingly overwrite their
+		// backup data.
+		THROW_EXCEPTION_MESSAGE(BackupStoreException,
+			CorruptReferenceCountDatabase, "Reference count database is "
+			"missing, cannot safely open account. Please run bbstoreaccounts "
+			"check on the account to recreate it. 404 Not Found: " << uri);
+	}
+	else if(response.GetResponseCode() == HTTPResponse::Code_NotModified)
+	{
+		// The copy on the server is the same as the one in our cache, so we don't
+		// need to download it again, nothing to do!
+	}
+	else
+	{
+		mrClient.CheckResponse(response, "Failed to download reference "
+			"count database");
+	}
+
+	mapPermanentRefCountDatabase = BackupStoreRefCountDatabase::Load(local_path,
+		S3_FAKE_ACCOUNT_ID, ReadOnly);
 	return *mapPermanentRefCountDatabase;
 }
 
@@ -1603,6 +1686,25 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetFile(int64_t ObjectID)
 	mrClient.CheckResponse(*ap_response,
 		std::string("Failed to download requested file: " + uri));
 	return static_cast<std::auto_ptr<IOStream> >(ap_response);
+}
+
+
+S3BackupFileSystem::~S3BackupFileSystem()
+{
+	// Close any open refcount DBs before partially destroying the
+	// BackupFileSystem that they need to close down. Need to do this in
+	// the subclass to avoid calling SaveRefCountDatabase() when the
+	// subclass has already been partially destroyed.
+	// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
+	mapPotentialRefCountDatabase.reset();
+	mapPermanentRefCountDatabase.reset();
+
+	// This needs to be in the source file, not inline, as long as we don't include
+	// the whole of SimpleDBClient.h in BackupFileSystem.h.
+	if(mHaveLock)
+	{
+		ReleaseLock();
+	}
 }
 
 
