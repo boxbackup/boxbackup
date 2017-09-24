@@ -55,6 +55,14 @@ void memleakfinder_delete(void *ptr);
 
 void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
+// "If the object is being created as part of a new expression, and an exception is thrown, the
+// object’s memory is deallocated by calling the appropriate deallocation function. If the object
+// is being created with a placement new operator, the corresponding placement delete operator is
+// called—that is, the delete function that takes the same additional parameters as the placement
+// new operator. If no matching placement delete is found, no deallocation takes place."
+// So to avoid memory leaks, we need to implement placement delete operators too.
+void operator delete  (void *ptr, const char *file, int line);
+void operator delete[](void *ptr, const char *file, int line);
 
 // Define the malloc functions now, if required. These should match the definitions
 // in MemLeakFindOn.h.

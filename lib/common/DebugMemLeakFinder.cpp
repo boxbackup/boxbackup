@@ -750,7 +750,28 @@ void operator delete(void *ptr) throw ()
 	internal_delete(ptr);
 }
 
-void memleakfinder_delete(void *ptr)
+/*
+    We need to implement a placement operator delete too:
+
+    "If the object is being created as part of a new expression, and an exception
+    is thrown, the object’s memory is deallocated by calling the appropriate
+    deallocation function. If the object is being created with a placement new
+    operator, the corresponding placement delete operator is called—that is, the
+    delete function that takes the same additional parameters as the placement new
+    operator. If no matching placement delete is found, no deallocation takes
+    place."
+
+    So to avoid memory leaks, we need to implement placement delete operators that
+    correspond to our placement new, which we use for leak detection (ironically)
+    in debug builds.
+*/
+
+void operator delete(void *ptr, const char *file, int line)
+{
+	internal_delete(ptr);
+}
+
+void operator delete[](void *ptr, const char *file, int line)
 {
 	internal_delete(ptr);
 }
