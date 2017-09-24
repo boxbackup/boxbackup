@@ -317,17 +317,7 @@ private:
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
 		const std::string& CacheDirectory, S3Client& rClient);
-	virtual ~S3BackupFileSystem()
-	{
-		// Call ReleaseLock() to close any open refcount DBs before
-		// partially destroying the BackupFileSystem that they need to
-		// close down. Need to do this in the subclass to avoid calling
-		// SaveRefCountDatabase() (from
-		// ~BackupStoreRefCountDatabaseWrapper) when the subclass has
-		// already been partially destroyed.
-		// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-		ReleaseLock();
-	}
+	virtual ~S3BackupFileSystem();
 
 	virtual void TryGetLock() { }
 	virtual bool HaveLock() { return false; }
