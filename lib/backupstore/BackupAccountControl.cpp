@@ -576,12 +576,7 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 		}
 	}
 
-	mapS3Client.reset(new S3Client(
-		s3config.GetKeyValue("HostName"),
-		s3config.GetKeyValueInt("Port"),
-		s3config.GetKeyValue("AccessKey"),
-		s3config.GetKeyValue("SecretKey")));
-
+	mapS3Client.reset(new S3Client(s3config));
 	std::string cache_dir = s3config.GetKeyValue("CacheDirectory");
 	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, cache_dir,
 		*mapS3Client));
