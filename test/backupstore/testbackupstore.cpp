@@ -1692,7 +1692,7 @@ bool test_server_commands()
 			TEST_THAT(changereply->GetObjectID() == subdirid);
 		}
 
-		// Check the new attributes
+		// Check the new attributes using the read-only connection
 		{
 			// Command
 			protocolReadOnly.QueryListDirectory(
