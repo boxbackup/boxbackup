@@ -16,6 +16,7 @@
 #include "BackupAccountControl.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
+#include "BackupStoreCheck.h"
 #include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreInfo.h"
@@ -136,15 +137,26 @@ bool check_num_files(int files, int old, int deleted, int dirs)
 	std::auto_ptr<BackupStoreInfo> apInfo =
 		BackupStoreInfo::Load(0x1234567,
 		"backup/01234567/", 0, true);
-	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(), "current files");
-	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), "old files");
-	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), "deleted files");
-	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), "directories");
+	return check_num_files(*apInfo, files, old, deleted, dirs);
+}
 
-	return (files == apInfo->GetNumCurrentFiles() &&
-		old == apInfo->GetNumOldFiles() &&
-		deleted == apInfo->GetNumDeletedFiles() &&
-		dirs == apInfo->GetNumDirectories());
+bool check_num_files(BackupFileSystem& fs, int files, int old, int deleted, int dirs)
+{
+	std::auto_ptr<BackupStoreInfo> apInfo = fs.GetBackupStoreInfoUncached();
+	return check_num_files(*apInfo, files, old, deleted, dirs);
+}
+
+bool check_num_files(BackupStoreInfo& info, int files, int old, int deleted, int dirs)
+{
+	TEST_EQUAL_LINE(files, info.GetNumCurrentFiles(), "current files");
+	TEST_EQUAL_LINE(old, info.GetNumOldFiles(), "old files");
+	TEST_EQUAL_LINE(deleted, info.GetNumDeletedFiles(), "deleted files");
+	TEST_EQUAL_LINE(dirs, info.GetNumDirectories(), "directories");
+
+	return (files == info.GetNumCurrentFiles() &&
+		old == info.GetNumOldFiles() &&
+		deleted == info.GetNumDeletedFiles() &&
+		dirs == info.GetNumDirectories());
 }
 
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
@@ -182,26 +194,32 @@ bool change_account_limits(const char* soft, const char* hard)
 
 int check_account_for_errors(Log::Level log_level)
 {
+	// TODO FIXME remove this backward-compatibility function
+	RaidBackupFileSystem fs(0x1234567, "backup/01234567/", 0);
+	return check_account_for_errors(fs, log_level);
+}
+
+int check_account_for_errors(BackupFileSystem& filesystem, Log::Level log_level)
+{
 	Logger::LevelGuard guard(Logging::GetConsole(), log_level);
 	Logging::Tagger tag("check fix", true);
 	Logging::ShowTagOnConsole show;
-	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify("testfiles/bbstored.conf",
-			&BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config, 0x01234567);
-	int errors_fixed = control.CheckAccount(
-		true, // FixErrors
-		false, // Quiet
-		true); // ReturnNumErrorsFound
-	return errors_fixed;
-}
 
-bool check_account(Log::Level log_level)
-{
-	int errors_fixed = check_account_for_errors(log_level);
-	TEST_EQUAL(0, errors_fixed);
-	return (errors_fixed == 0);
+	// The caller may already have opened a permanent read-write database, but
+	// BackupStoreCheck needs to open a temporary one, so we need to close the
+	// permanent one in that case.
+	if(filesystem.GetCurrentRefCountDatabase() &&
+		!filesystem.GetCurrentRefCountDatabase()->IsReadOnly())
+	{
+		filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+	}
+
+	filesystem.TryGetLock();
+	BackupStoreCheck check(filesystem,
+		true, // FixErrors
+		false); // Quiet
+	check.Check();
+	return check.GetNumErrorsFound();
 }
 
 int64_t run_housekeeping(BackupStoreAccountDatabase::Entry& rAccount)
@@ -230,24 +248,35 @@ int64_t run_housekeeping(BackupFileSystem& filesystem)
 
 bool run_housekeeping_and_check_account()
 {
-	int error_count;
+	// TODO FIXME remove this backward-compatibility function
+	RaidBackupFileSystem fs(0x1234567, "backup/01234567/", 0);
+	return run_housekeeping_and_check_account(fs);
+}
+
+bool run_housekeeping_and_check_account(BackupFileSystem& filesystem)
+{
+	if(filesystem.GetCurrentRefCountDatabase() != NULL)
+	{
+		filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+	}
+
+	int num_housekeeping_errors;
 
 	{
 		Logging::Tagger tag("", true);
 		Logging::ShowTagOnConsole show;
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-		error_count = run_housekeeping(account);
+		num_housekeeping_errors = run_housekeeping(filesystem);
 	}
+	TEST_EQUAL_LINE(0, num_housekeeping_errors, "run_housekeeping");
 
-	TEST_EQUAL_LINE(0, error_count, "housekeeping errors");
+	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 
-	bool check_account_is_ok = check_account();
-	TEST_THAT(check_account_is_ok);
+	int num_check_errors = check_account_for_errors(filesystem);
+	TEST_EQUAL_LINE(0, num_check_errors, "check_account_for_errors");
 
-	return error_count == 0 && check_account_is_ok;
+	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+
+	return num_housekeeping_errors == 0 && num_check_errors == 0;
 }
 
 bool check_reference_counts()
@@ -257,21 +286,25 @@ bool check_reference_counts()
 	BackupStoreAccountDatabase::Entry account =
 		apAccounts->GetEntry(0x1234567);
 
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
-		BackupStoreRefCountDatabase::Load(account, true));
-	bool counts_ok = true;
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
+		BackupStoreRefCountDatabase::Load(account, true);
+	TEST_EQUAL(ExpectedRefCounts.size(),
+		apReferences->GetLastObjectIDUsed() + 1);
 
-	TEST_EQUAL_OR(ExpectedRefCounts.size(),
-		apReferences->GetLastObjectIDUsed() + 1,
-		counts_ok = false);
+	return check_reference_counts(*apReferences);
+}
+
+bool check_reference_counts(BackupStoreRefCountDatabase& references)
+{
+	bool counts_ok = true;
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
 		i < ExpectedRefCounts.size(); i++)
 	{
 		TEST_EQUAL_LINE(ExpectedRefCounts[i],
-			apReferences->GetRefCount(i),
+			references.GetRefCount(i),
 			"object " << BOX_FORMAT_OBJECTID(i));
-		if (ExpectedRefCounts[i] != apReferences->GetRefCount(i))
+		if (ExpectedRefCounts[i] != references.GetRefCount(i))
 		{
 			counts_ok = false;
 		}
