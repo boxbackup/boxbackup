@@ -703,6 +703,7 @@ bool test_httpserver()
 	}
 
 	// Test that HTTPRequest can be written to and read from a stream.
+	for(int enable_continue = 0; enable_continue < 2; enable_continue++)
 	{
 		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
@@ -716,25 +717,30 @@ bool test_httpserver()
 		// First stream just the headers into a CollectInBufferStream, and check the
 		// exact contents written:
 		CollectInBufferStream request_buffer;
-		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite,
+			(bool)enable_continue);
 		request_buffer.SetForReading();
-		const std::string request_str((const char *)request_buffer.GetBuffer(),
+		std::string request_str((const char *)request_buffer.GetBuffer(),
 			request_buffer.GetSize());
-		const std::string expected_str(
+		std::string expected_str(
 			"PUT /newfile HTTP/1.1\r\n"
 			"Content-Type: text/plain\r\n"
 			"Host: quotes.s3.amazonaws.com\r\n"
 			"Connection: keep-alive\r\n"
 			"date: Wed, 01 Mar  2006 12:00:00 GMT\r\n"
-			"authorization: AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=\r\n"
-			"\r\n");
-		TEST_EQUAL(expected_str, request_str);
+			"authorization: AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=\r\n");
+		if(enable_continue == 1)
+		{
+			expected_str += "Expect: 100-continue\r\n";
+		}
+		TEST_EQUAL(expected_str + "\r\n", request_str);
 
 		// Now stream the entire request into the CollectInBufferStream. Because there
 		// isn't an HTTP server to respond to us, we can't use SendWithStream, so just
 		// send the headers and then the content separately:
 		request_buffer.Reset();
-		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite);
+		request.SendHeaders(request_buffer, IOStream::TimeOutInfinite,
+			(bool)enable_continue);
 		FileStream fs("testfiles/photos/puppy.jpg");
 		fs.CopyStreamTo(request_buffer);
 		request_buffer.SetForReading();
@@ -760,6 +766,7 @@ bool test_httpserver()
 		TEST_EQUAL("AWS " EXAMPLE_S3_ACCESS_KEY ":XtMYZf0hdOo4TdPYQknZk0Lz7rw=",
 			headers.GetHeaderValue("Authorization"));
 		TEST_THAT(request2.GetClientKeepAliveRequested());
+		TEST_EQUAL((bool)enable_continue, request2.IsExpectingContinue());
 
 		CollectInBufferStream request_data;
 		request2.ReadContent(request_data, IOStream::TimeOutInfinite);
