@@ -44,7 +44,7 @@ bin/bbackupquery	lib/bbackupquery
 bin/bbackupctl		lib/backupclient	qdbm	lib/bbackupd
 bin/s3simulator		lib/httpserver
 
-test/backupstore	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	lib/raidfile
+test/backupstore	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulator
 test/backupstorefix	bin/bbstored	bin/bbstoreaccounts	lib/backupclient	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
 test/backupstorepatch	bin/bbstored	bin/bbstoreaccounts	lib/backupclient
 test/backupdiff		lib/backupclient

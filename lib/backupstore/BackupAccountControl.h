@@ -51,6 +51,12 @@ public:
 	virtual int SetAccountName(const std::string& rNewAccountName);
 	virtual int PrintAccountInfo();
 	virtual int SetAccountEnabled(bool enabled);
+	virtual BackupFileSystem& GetFileSystem()
+	{
+		ASSERT(mapFileSystem.get() != NULL);
+		return *mapFileSystem;
+	}
+	virtual BackupFileSystem* GetCurrentFileSystem() { return mapFileSystem.get(); }
 	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
 		const std::string& AccountName);
 };

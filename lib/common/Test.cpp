@@ -41,9 +41,17 @@ std::list<std::string> run_only_named_tests;
 std::map<std::string, std::string> s_test_status;
 box_time_t current_test_start;
 
-bool setUp(const char* function_name)
+bool setUp(const std::string& function_name, const std::string& specialisation)
 {
-	current_test_name = function_name;
+	std::ostringstream specialised_name;
+	specialised_name << function_name;
+
+	if(!specialisation.empty())
+	{
+		specialised_name << "(" << specialisation << ")";
+	}
+
+	current_test_name = specialised_name.str();
 
 	if (!run_only_named_tests.empty())
 	{
@@ -53,7 +61,7 @@ bool setUp(const char* function_name)
 			i = run_only_named_tests.begin();
 			i != run_only_named_tests.end(); i++)
 		{
-			if (*i == current_test_name)
+			if (*i == function_name || *i == current_test_name)
 			{
 				run_this_test = true;
 				break;
@@ -67,7 +75,7 @@ bool setUp(const char* function_name)
 		}
 	}
 
-	printf("\n\n== %s ==\n", function_name);
+	printf("\n\n== %s ==\n", current_test_name.c_str());
 	num_tests_selected++;
 	old_failure_count = num_failures;
 	current_test_start = GetCurrentBoxTime();
