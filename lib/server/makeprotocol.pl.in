@@ -892,6 +892,13 @@ __E
 private:
 	$context_class &mrContext;
 	std::auto_ptr<$message_base_class> mapLastReply;
+
+protected:
+	$context_class& GetContext()
+	{
+		return mrContext;
+	}
+
 public:
 	virtual std::auto_ptr<IOStream> ReceiveStream()
 	{
@@ -1100,16 +1107,18 @@ void $server_or_client_class\::DoServer($context_class &rContext)
 			}
 			catch(BoxException &e)
 			{
-				// First try a the built-in exception handler
+				// Give the server a chance to handle the exception itself. It will
+				// rethrow if it cannot, and we will fall through to the generic
+				// handler below.
 				preply = HandleException(e);
 			}
 		}
 		catch (...)
 		{
-			// Fallback in case the exception isn't a BoxException
-			// or the exception handler fails as well. This path
-			// throws the exception upwards, killing the process
-			// that handles the current client.
+			// Fallback in case the exception isn't a BoxException or the server's
+			// exception handler fails as well. This path rethrows the exception, and it
+			// is not caught again, so it kills the process that is serving the current
+			// client.
 			Send($cmd_classes{$error_message}(-1));
 			throw;
 		}

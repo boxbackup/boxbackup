@@ -1145,8 +1145,7 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 : mrConfig(config),
   mBasePath(BasePath),
   mCacheDirectory(CacheDirectory),
-  mrClient(rClient),
-  mHaveLock(false)
+  mrClient(rClient)
 {
 	if(mBasePath.size() == 0 || mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
 	{
@@ -1280,8 +1279,8 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 	}
 
 	// It's dangerous to have two read-write databases open at the same time (it would
-	// be too easy to update the refcounts in the wrong one by mistake), and temporary
-	// databases are always read-write, so if a temporary database is already open
+	// be too easy to update the refcounts in the wrong one by mistake), and potential
+	// databases are always read-write, so if a potential database is already open
 	// then we should only allow a read-only permanent database to be opened.
 	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
 
@@ -1368,18 +1367,18 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 		return *mapPotentialRefCountDatabase;
 	}
 
-	// Creating the "official" temporary refcount DB is actually a change
-	// to the cache, even if you don't commit it, because it's in the same
-	// directory and would conflict with another process trying to do the
-	// same thing, so it requires that you hold the write lock.
-	GetCacheLock();
-
 	// It's dangerous to have two read-write databases open at the same time (it would
 	// be too easy to update the refcounts in the wrong one by mistake), and temporary
 	// databases are always read-write, so if a permanent database is already open
 	// then it must be a read-only one.
 	ASSERT(!mapPermanentRefCountDatabase.get() ||
 		mapPermanentRefCountDatabase->IsReadOnly());
+
+	// Creating the "official" temporary refcount DB is actually a change
+	// to the cache, even if you don't commit it, because it's in the same
+	// directory and would conflict with another process trying to do the
+	// same thing, so it requires that you hold the cache lock.
+	GetCacheLock();
 
 	// The temporary database cannot be on the remote server, so there is no need to
 	// download it into the cache. Just create one and return it.
@@ -1416,6 +1415,11 @@ void S3BackupFileSystem::SaveRefCountDatabase(BackupStoreRefCountDatabase& refco
 
 //! Returns whether an object (a file or directory) exists with this object ID, and its
 //! revision ID, which for a RaidFile is based on its timestamp and file size.
+//!
+//! TODO FIXME: we should probably return a hint of whether the object is a file or a
+//! directory (because we know), as BackupStoreCheck could use this to avoid repeated
+//! wasted requests for the object as a file or a directory, when it's already known that
+//! it has a different type. We should also use a cache for directory listings!
 bool S3BackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 {
 	std::string uri = GetDirectoryURI(ObjectID);
@@ -1688,6 +1692,20 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetFile(int64_t ObjectID)
 }
 
 
+void S3BackupFileSystem::ReleaseLock()
+{
+	BackupFileSystem::ReleaseLock();
+
+	// It's possible that neither the temporary nor the permanent refcount DB was
+	// requested while we had the write lock, so the cache lock may not have been
+	// acquired.
+	if(mCacheLock.GotLock())
+	{
+		mCacheLock.ReleaseLock();
+	}
+}
+
+
 S3BackupFileSystem::~S3BackupFileSystem()
 {
 	// Close any open refcount DBs before partially destroying the
@@ -1700,10 +1718,7 @@ S3BackupFileSystem::~S3BackupFileSystem()
 
 	// This needs to be in the source file, not inline, as long as we don't include
 	// the whole of SimpleDBClient.h in BackupFileSystem.h.
-	if(mHaveLock)
-	{
-		ReleaseLock();
-	}
+	ReleaseLock();
 }
 
 

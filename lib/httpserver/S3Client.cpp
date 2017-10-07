@@ -443,8 +443,19 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 
 	if (pStreamToSend)
 	{
-		rRequest.SendWithStream(*mapClientSocket, mNetworkTimeout,
-			pStreamToSend, response);
+		try
+		{
+			rRequest.SendWithStream(*mapClientSocket, mNetworkTimeout,
+				pStreamToSend, response);
+		}
+		catch(BoxException &e)
+		{
+			// If we encounter a read error from the stream while sending, then
+			// the client socket is unsafe (because we have sent a request, and
+			// possibly some data) so we need to close it.
+			mapClientSocket.reset();
+			throw;
+		}
 	}
 	else
 	{

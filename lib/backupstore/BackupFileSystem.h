@@ -322,9 +322,9 @@ public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
 		const std::string& CacheDirectory, S3Client& rClient);
 	virtual ~S3BackupFileSystem();
-
 	virtual void TryGetLock() { }
 	virtual bool HaveLock() { return false; }
+	virtual void ReleaseLock();
 	virtual int GetBlockSize();
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();

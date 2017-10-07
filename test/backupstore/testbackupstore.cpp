@@ -13,8 +13,10 @@
 #include <string.h>
 
 #include "Archive.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
@@ -58,6 +60,10 @@
 #define ATTR3_SIZE	122
 
 #define SHORT_TIMEOUT 5000
+
+#define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
+#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
 
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
@@ -141,6 +147,34 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 #define UNLINK_IF_EXISTS(filename) \
 	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
 
+int s3simulator_pid = 0;
+
+bool StartSimulator()
+{
+	s3simulator_pid = StartDaemon(s3simulator_pid,
+		"../../bin/s3simulator/s3simulator " + bbstored_args +
+		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
+	return s3simulator_pid != 0;
+}
+
+bool StopSimulator()
+{
+	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
+		"s3simulator.memleaks", true);
+	s3simulator_pid = 0;
+	return result;
+}
+
+bool kill_running_daemons()
+{
+#ifndef WIN32
+	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
+		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
+	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
+#endif
+	return true;
+}
+
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \
 	SETUP(); \
@@ -149,6 +183,43 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1); \
 	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1); \
 	TEST_THAT_OR(create_account(10000, 20000), FAIL);
+
+bool setup_test_backupstore_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	if(spec_name == "s3")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<S3BackupAccountControl&>(control).
+			CreateAccount("test", 10000, 20000) == 0, FAIL);
+	}
+	else if(spec_name == "store")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<BackupStoreAccountControl&>(control).
+			CreateAccount(0, 10000, 20000) == 0, FAIL);
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Don't know how to create accounts for store type: " <<
+			spec_name);
+	}
+
+	return true;
+}
+
+#define SETUP_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+	SETUP_SPECIALISED(name); \
+	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL);
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_backupstore()
@@ -168,6 +239,32 @@ bool teardown_test_backupstore()
 	if (ServerIsAlive(bbstored_pid)) \
 		StopServer(); \
 	TEST_THAT(teardown_test_backupstore()); \
+	TEARDOWN();
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_backupstore_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	bool status = true;
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	TEST_THAT_OR(check_reference_counts(
+		fs.GetPermanentRefCountDatabase(true)), // ReadOnly
+		status = false);
+	TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
+	control.GetFileSystem().ReleaseLock();
+
+	return status;
+}
+
+#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+	if (ServerIsAlive(bbstored_pid)) \
+		StopServer(); \
+	if(control.GetCurrentFileSystem() != NULL) \
+	{ \
+		control.GetCurrentFileSystem()->ReleaseLock(); \
+	} \
+	TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
 	TEARDOWN();
 
 // Nice random data for testing written files
@@ -267,6 +364,36 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	// Got them all?
 	TEST_THAT(en == 0);
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
+}
+
+std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
+{
+	std::string filename;
+	StoreStructure::MakeObjectFilename(ObjectID,
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
+		filename, false /* EnsureDirectoryExists */);
+	return RaidFileRead::Open(0, filename);
+}
+
+int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
+	const std::string& SpecialisationName, BackupAccountControl& control)
+{
+	if(SpecialisationName == "s3")
+	{
+		S3BackupFileSystem& fs
+			(dynamic_cast<S3BackupFileSystem&>(control.GetFileSystem()));
+		std::string local_path = "testfiles/store" +
+			(IsDirectory ? fs.GetDirectoryURI(ObjectID) :
+			 fs.GetFileURI(ObjectID));
+		int size = TestGetFileSize(local_path);
+		TEST_LINE(size != -1, "File does not exist: " << local_path);
+		return fs.GetSizeInBlocks(size);
+	}
+	else
+	{
+		// TODO: merge get_raid_file() into here
+		return get_raid_file(ObjectID)->GetDiscUsageInBlocks();
+	}
 }
 
 bool test_filename_encoding()
@@ -772,15 +899,6 @@ bool check_files_same(const char *f1, const char *f2)
 	}
 
 	return same;
-}
-
-std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
-{
-	std::string filename;
-	StoreStructure::MakeObjectFilename(ObjectID,
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
-		filename, false /* EnsureDirectoryExists */);
-	return RaidFileRead::Open(0, filename);
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol,
@@ -1511,13 +1629,23 @@ bool test_multiple_uploads()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_server_commands()
+bool test_server_commands(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	// Write the test file for create_file to upload:
+	write_test_file(0);
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
 	std::auto_ptr<BackupProtocolLocal2> apProtocol(
-		new BackupProtocolLocal2(0x01234567, "test",
-			"backup/01234567/", 0, false));
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	BackupProtocolLocal2 protocolReadOnly(roContext, 0x01234567, true); // ReadOnly
 
 	// Try retrieving an object that doesn't exist. That used to return
 	// BackupProtocolSuccess(NoObject) for no apparent reason.
@@ -1547,6 +1675,16 @@ bool test_server_commands()
 			Err_FileDoesNotVerify);
 	}
 
+	// TODO FIXME: in the case of S3 stores, we will have sent the request (but no data) before
+	// the client realises that the stream is invalid, and aborts. The S3 server will receive a
+	// PUT request for a zero-byte file, and have no idea that it's not a valid file, so it will
+	// store it. We should send a checksum (if possible) and a content-length (at least) to
+	// prevent this, and test that no file is stored instead of unlinking it here.
+	if(specialisation_name == "s3")
+	{
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/0x2.file"));
+	}
+
 	// Try uploading a file referencing another file which doesn't exist.
 	// This used to not consume the stream, leaving it unusable.
 	{
@@ -1566,11 +1704,9 @@ bool test_server_commands()
 	{
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
-		// BackupStoreInfo flush should have been deferred, so counts not updated yet:
-		TEST_THAT(check_num_files(0, 0, 0, 1));
-		// Flush updated BackupStoreInfo to disk now, so that we can check it:
-		apProtocol->GetContext().SaveStoreInfo(false); // !AllowDelay
-		TEST_THAT(check_num_files(0, 0, 0, 2));
+		// Ensure that store info is flushed out to disk, so we can check it:
+		rwContext.SaveStoreInfo(false); // !AllowDelay
+		TEST_THAT(check_num_files(fs, 0, 0, 0, 2));
 
 		// Try using GetFile on the directory
 		{
@@ -1582,10 +1718,7 @@ bool test_server_commands()
 
 		// Stick a file in it
 		int64_t subdirfileid = create_file(*apProtocol, subdirid);
-		TEST_THAT(check_num_files(1, 0, 0, 2));
-
-		BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-			"backup/01234567/", 0, true); // read-only
+		TEST_THAT(check_num_files(fs, 1, 0, 0, 2));
 
 		BOX_TRACE("Checking root directory using read-only connection");
 		{
@@ -1619,10 +1752,12 @@ bool test_server_commands()
 			}
 
 			// Check that the last entry looks right
+			TEST_THAT_OR(en != NULL, FAIL);
 			TEST_EQUAL(subdirid, en->GetObjectID());
 			TEST_THAT(en->GetName() == dirname);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_Dir, en->GetFlags());
-			int64_t actual_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+			int64_t actual_size = get_disc_usage_in_blocks(true, // IsDirectory
+				subdirid, specialisation_name, control);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_EQUAL(FAKE_MODIFICATION_TIME, en->GetModificationTime());
 		}
@@ -1649,7 +1784,8 @@ bool test_server_commands()
 			TEST_EQUAL(subdirfileid, en->GetObjectID());
 			TEST_THAT(en->GetName() == uploads[0].name);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_File, en->GetFlags());
-			int64_t actual_size = get_raid_file(subdirfileid)->GetDiscUsageInBlocks();
+			int64_t actual_size = get_disc_usage_in_blocks(false, // !IsDirectory
+				subdirfileid, specialisation_name, control);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetModificationTime() != 0);
 
@@ -1692,6 +1828,26 @@ bool test_server_commands()
 			TEST_THAT(changereply->GetObjectID() == subdirid);
 		}
 
+		// Check the new attributes using the read-write connection
+		{
+			// Command
+			apProtocol->QueryListDirectory(
+				subdirid,
+				0,	// no flags
+				BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING,
+				true /* get attributes */);
+			// Stream
+			BackupStoreDirectory dir(apProtocol->ReceiveStream(),
+				SHORT_TIMEOUT);
+			TEST_THAT(dir.GetNumberOfEntries() == 0);
+
+			// Attributes
+			TEST_THAT(dir.HasAttributes());
+			TEST_EQUAL(329483209443598LL, dir.GetAttributesModTime());
+			StreamableMemBlock attrtest(attr2, sizeof(attr2));
+			TEST_THAT(dir.GetAttributes() == attrtest);
+		}
+
 		// Check the new attributes using the read-only connection
 		{
 			// Command
@@ -1714,7 +1870,7 @@ bool test_server_commands()
 
 		BackupStoreFilenameClear& oldName(uploads[0].name);
 		int64_t root_file_id = create_file(*apProtocol, BACKUPSTORE_ROOT_DIRECTORY_ID);
-		TEST_THAT(check_num_files(2, 0, 0, 2));
+		TEST_THAT(check_num_files(fs, 2, 0, 0, 2));
 
 		// Upload a new version of the file as well, to ensure that the
 		// old version is moved along with the current version.
@@ -1724,7 +1880,7 @@ bool test_server_commands()
 			0, // AttributesHash
 			oldName);
 		set_refcount(root_file_id, 1);
-		TEST_THAT(check_num_files(2, 1, 0, 2));
+		TEST_THAT(check_num_files(fs, 2, 1, 0, 2));
 
 		// Check that it's in the root directory (it won't be for long)
 		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -1880,11 +2036,11 @@ bool test_server_commands()
 
 		set_refcount(subsubdirid, 1);
 		set_refcount(subsubfileid, 1);
-		TEST_THAT(check_num_files(3, 1, 0, 3));
+		TEST_THAT(check_num_files(fs, 3, 1, 0, 3));
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
 		apProtocol->Reopen();
 		protocolReadOnly.Reopen();
 
@@ -1940,31 +2096,43 @@ bool test_server_commands()
 			}
 		}
 
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		// Create some nice recursive directories
 		write_test_file(1);
 		int64_t dirtodelete;
 
 		{
-			std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-				BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-			std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
-				BackupStoreRefCountDatabase::Load(
-					apAccounts->GetEntry(0x1234567), true));
-
-
+			BackupStoreRefCountDatabase& rRefCount(
+				fs.GetPermanentRefCountDatabase(true)); // ReadOnly
 	 		dirtodelete = create_test_data_subdirs(*apProtocol,
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				"test_delete", 6 /* depth */, apRefCount.get());
+				"test_delete", 6 /* depth */, &rRefCount);
 		}
 
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+
+		// Close the refcount database and reopen it, check that the counts are
+		// still the same.
+		fs.CloseRefCountDatabase(
+			&fs.GetPermanentRefCountDatabase(true)); // ReadOnly
+
+		{
+			BackupStoreRefCountDatabase* pRefCount =
+				fs.GetCurrentRefCountDatabase();
+			TEST_EQUAL((BackupStoreRefCountDatabase *)NULL, pRefCount);
+			pRefCount = &fs.GetPermanentRefCountDatabase(true); // ReadOnly
+			TEST_EQUAL(pRefCount, fs.GetCurrentRefCountDatabase());
+			TEST_THAT(check_reference_counts(*pRefCount));
+		}
 
 		// And delete them
 		apProtocol->Reopen();
@@ -1978,8 +2146,9 @@ bool test_server_commands()
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(fs));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 		protocolReadOnly.Reopen();
 
 		// Get the root dir, checking for deleted items
@@ -2021,11 +2190,12 @@ bool test_server_commands()
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(fs));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -3299,6 +3469,33 @@ int test(int argc, const char *argv[])
 		for(int l = 0; l < ATTR3_SIZE; ++l) {attr3[l] = r.next();}
 	}
 
+	context.Initialise(false /* client */,
+			"testfiles/clientCerts.pem",
+			"testfiles/clientPrivKey.pem",
+			"testfiles/clientTrustedCAs.pem");
+
+	std::auto_ptr<Configuration> s3config = load_config_file(
+		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
+	// Use an auto_ptr so we can release it, and thus the lock, before stopping the
+	// daemon on which locking relies:
+	std::auto_ptr<S3BackupAccountControl> ap_s3control(
+		new S3BackupAccountControl(*s3config));
+
+	std::auto_ptr<Configuration> storeconfig = load_config_file(
+		DEFAULT_BBSTORED_CONFIG_FILE, BackupConfigFileVerify);
+	BackupStoreAccountControl storecontrol(*storeconfig, 0x01234567);
+
+	TEST_THAT(kill_running_daemons());
+	TEST_THAT(StartSimulator());
+
+	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
+	test_specialisation specialisations;
+	specialisations["s3"] = ap_s3control.get();
+	specialisations["store"] = &storecontrol;
+
+#define RUN_SPECIALISED_TEST(name, pControl, function) \
+	TEST_THAT(function(name, *(pControl)));
+
 	TEST_THAT(test_filename_encoding());
 	TEST_THAT(test_temporary_refcount_db_is_independent());
 	TEST_THAT(test_bbstoreaccounts_create());
@@ -3310,20 +3507,25 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_store_info());
 
-	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
-
 	TEST_THAT(test_login_without_account());
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 	TEST_THAT(test_server_housekeeping());
-	TEST_THAT(test_server_commands());
 	TEST_THAT(test_account_limits_respected());
 	TEST_THAT(test_multiple_uploads());
+
+	for(test_specialisation::iterator i = specialisations.begin();
+		i != specialisations.end(); i++)
+	{
+		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
+	}
+
 	TEST_THAT(test_housekeeping_deletes_files());
 	TEST_THAT(test_read_write_attr_streamformat());
+
+	// Release lock before shutting down the simulator:
+	ap_s3control.reset();
+	TEST_THAT(StopSimulator());
 
 	return finish_test_suite();
 }
