@@ -1618,7 +1618,8 @@ void BackupStoreFile::ResetStats()
 //		Created: 21/1/04
 //
 // --------------------------------------------------------------------------
-bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename, IOStream &rBlockIndex, int Timeout)
+bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(
+	const char *Filename, IOStream &rBlockIndex, int Timeout)
 {
 	// is it a symlink?
 	bool sourceIsSymlink = false;
@@ -1635,12 +1636,33 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 	}
 
 	// Open file, if it's not a symlink
-	std::auto_ptr<FileStream> in;
+	std::auto_ptr<IOStream> in;
 	if(!sourceIsSymlink)
 	{
 		in.reset(new FileStream(Filename));
 	}
 
+	return CompareFileContentsAgainstBlockIndex(in, rBlockIndex, sourceIsSymlink, Timeout);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreFile::CompareFileContentsAgainstBlockIndex(
+//		         IOStream&, IOStream &)
+//		Purpose: Compares the contents of an open stream against the
+//		         checksums contained in the block index. Returns true
+//		         if the checksums match, meaning the file is extremely
+//		         likely to match the original. Will always consume the
+//		         entire index.
+//		Created: 2017-10-08
+//
+// --------------------------------------------------------------------------
+bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(
+	std::auto_ptr<IOStream> apSourceFile, IOStream &rBlockIndex,
+	bool sourceIsSymlink, int Timeout)
+{
 	// Read header
 	file_BlockIndexHeader hdr;
 	if(!rBlockIndex.ReadFullBuffer(&hdr, sizeof(hdr), 0 /* not interested in bytes read if this fails */, Timeout))
@@ -1738,7 +1760,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 			// Load in the block from the file, if it's not a symlink
 			if(!sourceIsSymlink)
 			{
-				if(in->Read(data, blockClearSize) != blockClearSize)
+				if(apSourceFile->Read(data, blockClearSize) != blockClearSize)
 				{
 					// Not enough data left in the file, can't possibly match
 					matches = false;
@@ -1783,7 +1805,7 @@ bool BackupStoreFile::CompareFileContentsAgainstBlockIndex(const char *Filename,
 	if(!sourceIsSymlink)
 	{
 		// Anything left to read in the file?
-		if(in->BytesLeftToRead() != 0)
+		if(apSourceFile->BytesLeftToRead() != 0)
 		{
 			// File has extra data at the end
 			matches = false;

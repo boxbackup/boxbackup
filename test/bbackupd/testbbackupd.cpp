@@ -84,6 +84,7 @@
 #include "Test.h"
 #include "Timer.h"
 #include "Utils.h"
+#include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
 
@@ -3492,6 +3493,112 @@ bool test_restore_files_and_directories()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+class IoErrorFileStream : public FileStream
+{
+public:
+	IoErrorFileStream(const std::string& rFilename,
+		int flags = (O_RDONLY | O_BINARY),
+		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH))
+	: FileStream(rFilename, flags, mode)
+	{ }
+	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, OSFileReadError,
+			"IoErrorFileStream simulated error on " << GetFileName());
+	}
+};
+
+class BackupQueriesIoError : public BackupQueries
+{
+public:
+	bool mTriggeredIoError;
+
+	BackupQueriesIoError(BackupProtocolCallable &rConnection,
+		const Configuration &rConfiguration,
+		bool readWrite)
+	: BackupQueries(rConnection, rConfiguration, readWrite),
+	  mTriggeredIoError(false)
+	{ }
+
+	virtual bool CompareFileContentsAgainstBlockIndex(const char *local_path,
+		IOStream &rBlockIndex, int Timeout)
+	{
+		if(strcmp(local_path, "testfiles/TestDir1/f1.dat") == 0)
+		{
+			mTriggeredIoError = true;
+			std::auto_ptr<IOStream> in(new IoErrorFileStream(local_path));
+			return BackupStoreFile::CompareFileContentsAgainstBlockIndex(in,
+				rBlockIndex, false, Timeout);
+		}
+		else
+		{
+			return BackupQueries::CompareFileContentsAgainstBlockIndex(local_path,
+				rBlockIndex, Timeout);
+		}
+	}
+
+	std::auto_ptr<FileStream> GetLocalFile(const std::string& local_path)
+	{
+		if(local_path == "testfiles/TestDir1/f1.dat")
+		{
+			mTriggeredIoError = true;
+			return std::auto_ptr<FileStream>(new IoErrorFileStream(local_path));
+		}
+		else
+		{
+			return std::auto_ptr<FileStream>(new FileStream(local_path));
+		}
+	}
+};
+
+bool test_compare_with_local_io_error()
+{
+	SETUP_WITH_FILES();
+
+	// We need to make one file larger so that its block index is not completely read
+	// at once, so that if an I/O error occurs while reading it (which we force to happen)
+	// then unread data will be left in the stream (which was the bug).
+	{
+		FileStream fs("testfiles/TestDir1/f1.dat", O_WRONLY);
+		ZeroStream(10*1000).CopyStreamTo(fs);
+	}
+
+	safe_sleep(4);
+	bbackupd.RunSyncNow();
+
+	std::auto_ptr<Configuration> config =
+		load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
+	TEST_THAT_OR(config.get(), return false);
+
+	for(int quick_compare_int = 0; quick_compare_int < 2; quick_compare_int++)
+	{
+		// Parameters, including count of differences
+		BackupQueries::CompareParams params(bool(quick_compare_int),
+			false, // ignore excludes
+			false, // ignore attributes
+			0);
+
+		params.mQuietCompare = false;
+
+		// We need to use a network protocol here, not a local one, to reproduce the protocol
+		// synchronisation error:
+		std::auto_ptr<BackupProtocolCallable> conn =
+			connect_and_login(sTlsContext,
+				BackupProtocolLogin::Flags_ReadOnly);
+		BackupProtocolClient& client(dynamic_cast<BackupProtocolClient&>(*conn));
+		BackupQueriesIoError bbackupquery(client, *config, false);
+
+		bbackupquery.CompareLocation("Test1", params);
+		TEST_THAT(bbackupquery.mTriggeredIoError);
+		TEST_EQUAL(0, params.mDifferences);
+		TEST_EQUAL(1, params.mUncheckedFiles);
+		TEST_EQUAL(quick_compare_int ? 2092 : 24322, client.GetBytesRead());
+	}
+
+	TEARDOWN_TEST_BBACKUPD();
+}
+
+
 bool test_compare_detects_attribute_changes()
 {
 	SETUP_WITH_FILES();
@@ -4093,6 +4200,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_continuously_updated_file());
 	TEST_THAT(test_delete_dir_change_attribute());
 	TEST_THAT(test_restore_files_and_directories());
+	TEST_THAT(test_compare_with_local_io_error());
 	TEST_THAT(test_compare_detects_attribute_changes());
 	TEST_THAT(test_sync_new_files());
 	TEST_THAT(test_rename_operations());

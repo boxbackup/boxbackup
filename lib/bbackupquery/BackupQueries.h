@@ -384,8 +384,13 @@ public:
 		bool AllowOldVersion = false, bool AllowDeletedDirs = false,
 		std::vector<std::pair<std::string, int64_t> > *pStack = 0);
 
-private:
+protected:
+	// Made available for subclasses to override for testing
+	virtual bool CompareFileContentsAgainstBlockIndex(const char *Filename,
+		IOStream &rBlockIndex, int Timeout);
+	virtual std::auto_ptr<FileStream> GetLocalFile(const std::string& local_path);
 
+private:
 	// Utility functions
 	int64_t FindFileID(const std::string& rNameOrIdString,
 		const bool *opts, int64_t *pDirIdOut,
@@ -394,7 +399,6 @@ private:
 	std::string GetCurrentDirectoryName();
 	void SetReturnCode(int code) {mReturnCode = code;}
 
-private:
 	bool mReadWrite;
 	BackupProtocolCallable &mrConnection;
 	const Configuration &mrConfiguration;

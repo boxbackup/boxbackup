@@ -220,7 +220,10 @@ public:
 	static void ReverseDiffFile(IOStream &rDiff, IOStream &rFrom, IOStream &rFrom2, IOStream &rOut, int64_t ObjectIDOfFrom, bool *pIsCompletelyDifferent = 0);
 	static void DecodeFile(IOStream &rEncodedFile, const char *DecodedFilename, int Timeout, const BackupClientFileAttributes *pAlterativeAttr = 0);
 	static std::auto_ptr<BackupStoreFile::DecodedStream> DecodeFileStream(IOStream &rEncodedFile, int Timeout, const BackupClientFileAttributes *pAlterativeAttr = 0);
-	static bool CompareFileContentsAgainstBlockIndex(const char *Filename, IOStream &rBlockIndex, int Timeout);
+	static bool CompareFileContentsAgainstBlockIndex(const char *Filename,
+		IOStream &rBlockIndex, int Timeout);
+	static bool CompareFileContentsAgainstBlockIndex(std::auto_ptr<IOStream> apSourceFile,
+		IOStream &rBlockIndex, bool sourceIsSymlink, int Timeout);
 	static std::auto_ptr<IOStream> CombineFileIndices(IOStream &rDiff, IOStream &rFrom, bool DiffIsIndexOnly = false, bool FromIsIndexOnly = false);
 
 	// Stream manipulation

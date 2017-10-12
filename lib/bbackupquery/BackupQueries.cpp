@@ -1526,7 +1526,7 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 			std::auto_ptr<IOStream> blockIndexStream(mrConnection.ReceiveStream());
 			
 			// Compare
-			equal = BackupStoreFile::CompareFileContentsAgainstBlockIndex(
+			equal = CompareFileContentsAgainstBlockIndex(
 				rLocalPath.c_str(), *blockIndexStream,
 				mrConnection.GetTimeout());
 		}
@@ -1590,18 +1590,14 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 			}
 
 			// Compare contents, if it's a regular file not a link
-			// Remember, we MUST read the entire stream from the server.
-			SelfFlushingStream flushObject(*objectStream);
-
 			if(!fileOnServerStream->IsSymLink())
 			{
-				SelfFlushingStream flushFile(*fileOnServerStream);
 				// Open the local file
 				std::auto_ptr<FileStream> apLocalFile;
 
 				try
 				{
-					apLocalFile.reset(new FileStream(rLocalPath.c_str()));
+					apLocalFile = GetLocalFile(rLocalPath);
 				}
 				catch(std::exception &e)
 				{
@@ -1642,6 +1638,19 @@ void BackupQueries::CompareOneFile(int64_t DirID,
 	{	
 		rParams.NotifyDownloadFailed(rLocalPath, rStorePath, fileSize);
 	}
+}
+
+// Made available for subclasses to override for testing
+bool BackupQueries::CompareFileContentsAgainstBlockIndex(
+	const char *Filename, IOStream &rBlockIndex, int Timeout)
+{
+	return BackupStoreFile::CompareFileContentsAgainstBlockIndex(Filename,
+		rBlockIndex, Timeout);
+}
+
+std::auto_ptr<FileStream> BackupQueries::GetLocalFile(const std::string& local_path)
+{
+	return std::auto_ptr<FileStream>(new FileStream(local_path));
 }
 
 // --------------------------------------------------------------------------

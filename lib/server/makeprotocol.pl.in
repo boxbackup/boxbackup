@@ -913,7 +913,10 @@ std::auto_ptr<IOStream> $server_or_client_class\::ReceiveStream()
 {
 	try
 	{
-		return $custom_protocol_subclass\::ReceiveStream();
+		return std::auto_ptr<IOStream>(
+			new SelfFlushingStream(
+				$custom_protocol_subclass\::ReceiveStream(),
+				GetTimeout()));
 	}
 	catch(ConnectionException &e)
 	{
