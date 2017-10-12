@@ -123,26 +123,6 @@ void Timers::Cleanup(bool throw_exception_if_not_initialised)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    static void Timers::AssertInitialised()
-//		Purpose: Throw an assertion error if timers are not ready
-//			 NOW. It's a common mistake (for me) when writing
-//			 tests to forget to initialise timers first.
-//		Created: 15/05/2014
-//
-// --------------------------------------------------------------------------
-
-void Timers::AssertInitialised()
-{
-	if (!spTimers)
-	{
-		THROW_EXCEPTION(CommonException, TimersNotInitialised);
-	}
-	ASSERT(spTimers);
-}
-
-// --------------------------------------------------------------------------
-//
-// Function
 //		Name:    static void Timers::Add(Timer&)
 //		Purpose: Add a new timer to the set, and reschedule next wakeup
 //		Created: 5/11/2006
@@ -340,7 +320,6 @@ void Timers::Reschedule()
 // --------------------------------------------------------------------------
 void Timers::SignalHandler(int unused)
 {
-	// ASSERT(spTimers);
 	Timers::RequestReschedule();
 }
 

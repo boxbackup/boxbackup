@@ -453,6 +453,8 @@ bool test_timers()
 
 	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
 	#ifndef BOX_RELEASE_BUILD
+		TEST_CHECK_THROWS(Timer t1(900, "t1"), CommonException,
+			AssertFailed);
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
 	#endif
