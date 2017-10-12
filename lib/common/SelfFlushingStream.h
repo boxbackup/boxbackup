@@ -25,12 +25,17 @@
 class SelfFlushingStream : public IOStream
 {
 public:
-	SelfFlushingStream(IOStream &rSource)
-	: mrSource(rSource) { }
+	SelfFlushingStream(IOStream &rSource, int timeout = IOStream::TimeOutInfinite)
+	: mrSource(rSource),
+	  mTimeout(timeout)
+	{ }
 
-	SelfFlushingStream(const SelfFlushingStream &rToCopy)
-	: mrSource(rToCopy.mrSource) { }
-	
+	SelfFlushingStream(std::auto_ptr<IOStream> apSource, int timeout = IOStream::TimeOutInfinite)
+	: mrSource(*apSource),
+	  mapOwnSource(apSource),
+	  mTimeout(timeout)
+	{ }
+
 	~SelfFlushingStream()
 	{
 		if(StreamDataLeft())
@@ -39,7 +44,7 @@ public:
 				"discarding the rest");
 		}
 
-		Flush();
+		Flush(mTimeout);
 	}
 
 private:
@@ -72,6 +77,9 @@ public:
 
 private:
 	IOStream &mrSource;
+	// This one, if set, will be destroyed automatically along with this object:
+	std::auto_ptr<IOStream> mapOwnSource;
+	int mTimeout;
 };
 
 #endif // SELFFLUSHINGSTREAM__H
