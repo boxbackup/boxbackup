@@ -489,7 +489,7 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
 	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 
-#define SETUP_WITH_BBSTORED() \
+#define SETUP_WITH_FILES() \
 	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
 	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
@@ -1179,7 +1179,7 @@ public:
 
 bool test_readdirectory_on_nonexistent_dir()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	{
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
@@ -1201,7 +1201,7 @@ bool test_readdirectory_on_nonexistent_dir()
 
 bool test_bbackupquery_parser_escape_slashes()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	BackupProtocolLocal2 connection(0x01234567, "test",
 		"backup/01234567/", 0, false);
@@ -1242,7 +1242,7 @@ bool test_bbackupquery_parser_escape_slashes()
 
 bool test_getobject_on_nonexistent_file()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	{
 		std::auto_ptr<Configuration> config =
@@ -1311,7 +1311,7 @@ bool test_replace_zero_byte_file_with_nonzero_byte_file()
 // to the server, which is illegal.
 bool test_backup_disappearing_directory()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	class BackupClientDirectoryRecordHooked : public BackupClientDirectoryRecord
 	{
@@ -1555,7 +1555,7 @@ bool test_ssl_keepalives()
 
 bool test_backup_hardlinked_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
@@ -1968,7 +1968,7 @@ bool test_bbackupd_exclusions()
 
 bool test_bbackupd_uploads_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	// TODO FIXME dedent
 	{
@@ -2085,7 +2085,7 @@ bool test_bbackupd_responds_to_connection_failure()
 
 bool test_absolute_symlinks_not_followed_during_restore()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifdef WIN32
 	BOX_NOTICE("skipping test on this platform"); // requires symlinks
@@ -2169,7 +2169,7 @@ bool test_absolute_symlinks_not_followed_during_restore()
 // Testing that nonexistent locations are backed up if they are created later
 bool test_initially_missing_locations_are_not_forgotten()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	// ensure that the directory does not exist at the start
 	TEST_THAT(!FileExists("testfiles/TestDir2"));
@@ -2224,7 +2224,7 @@ bool test_initially_missing_locations_are_not_forgotten()
 
 bool test_redundant_locations_deleted_on_time()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	// create the location directory and unpack some files into it
 	TEST_THAT(::mkdir("testfiles/TestDir2", 0777) == 0);
@@ -2271,7 +2271,7 @@ bool test_redundant_locations_deleted_on_time()
 // Check that read-only directories and their contents can be restored.
 bool test_read_only_dirs_can_be_restored()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	// TODO FIXME dedent
 	{
@@ -2325,7 +2325,7 @@ bool test_read_only_dirs_can_be_restored()
 // Check that filenames in UTF-8 can be backed up
 bool test_unicode_filenames_can_be_backed_up()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifndef WIN32
 	BOX_NOTICE("skipping test on this platform");
@@ -2561,7 +2561,7 @@ bool test_unicode_filenames_can_be_backed_up()
 
 bool test_sync_allow_script_can_pause_backup()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	TEST_THAT(StartClient());
 
 	// TODO FIXME dedent
@@ -2664,7 +2664,7 @@ bool test_sync_allow_script_can_pause_backup()
 // Delete file and update another, create symlink.
 bool test_delete_update_and_symlink_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	bbackupd.RunSyncNow();
 
@@ -2716,7 +2716,7 @@ bool test_delete_update_and_symlink_files()
 // --bbackupd-args=-kTtbbackupd
 bool test_store_error_reporting()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	TEST_THAT(StartClient());
 	wait_for_sync_end();
 
@@ -2909,7 +2909,7 @@ bool test_store_error_reporting()
 
 bool test_change_file_to_symlink_and_back()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	#ifndef WIN32
 		// New symlink
@@ -3013,7 +3013,7 @@ bool test_change_file_to_symlink_and_back()
 
 bool test_file_rename_tracking()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3112,7 +3112,7 @@ bool test_file_rename_tracking()
 // though they look old.
 bool test_upload_very_old_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3187,7 +3187,7 @@ bool test_upload_very_old_files()
 
 bool test_excluded_files_are_not_backed_up()
 {
-	// SETUP_WITH_BBSTORED();
+	// SETUP_WITH_FILES();
 	SETUP_TEST_BBACKUPD();
 
 	BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/",
@@ -3257,7 +3257,7 @@ bool test_excluded_files_are_not_backed_up()
 
 bool test_read_error_reporting()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifdef WIN32
 	BOX_NOTICE("skipping test on this platform");
@@ -3317,7 +3317,7 @@ bool test_read_error_reporting()
 
 bool test_continuously_updated_file()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	TEST_THAT(StartClient());
 
 	// TODO FIXME dedent
@@ -3376,7 +3376,7 @@ bool test_continuously_updated_file()
 
 bool test_delete_dir_change_attribute()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3405,7 +3405,7 @@ bool test_delete_dir_change_attribute()
 
 bool test_restore_files_and_directories()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3494,7 +3494,7 @@ bool test_restore_files_and_directories()
 
 bool test_compare_detects_attribute_changes()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifndef WIN32
 	BOX_NOTICE("skipping test on this platform");
@@ -3562,7 +3562,7 @@ bool test_compare_detects_attribute_changes()
 
 bool test_sync_new_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3597,7 +3597,7 @@ bool test_sync_new_files()
 
 bool test_rename_operations()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	TEST_THAT(unpack_files("test2"));
 	TEST_THAT(unpack_files("test3"));
@@ -3632,7 +3632,7 @@ bool test_rename_operations()
 // Check that modifying files with madly in the future timestamps still get added
 bool test_sync_files_with_timestamps_in_future()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	bbackupd.RunSyncNow();
 
 	// TODO FIXME dedent
@@ -3667,7 +3667,7 @@ bool test_sync_files_with_timestamps_in_future()
 // Check change of store marker pauses daemon
 bool test_changing_client_store_marker_pauses_daemon()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 	TEST_THAT(StartClient());
 
 	// Wait for the client to upload all current files. We also time
@@ -3787,7 +3787,7 @@ bool test_changing_client_store_marker_pauses_daemon()
 
 bool test_interrupted_restore_can_be_recovered()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifdef WIN32
 	BOX_NOTICE("skipping test on this platform");
@@ -3868,7 +3868,7 @@ bool assert_x1_deleted_or_not(bool expected_deleted)
 
 bool test_restore_deleted_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
@@ -3931,7 +3931,7 @@ bool test_restore_deleted_files()
 
 bool test_locked_file_behaviour()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 #ifndef WIN32
 	// There are no tests for mandatory locks on non-Windows platforms yet.
@@ -3990,7 +3990,7 @@ bool test_locked_file_behaviour()
 
 bool test_backup_many_files()
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_WITH_FILES();
 
 	unpack_files("test2");
 	unpack_files("test3");
