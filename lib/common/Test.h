@@ -132,11 +132,11 @@ extern std::map<std::string, std::string> s_test_status;
 #define TEST_EQUAL_OR(_expected, _found, or_command) \
 { \
 	std::ostringstream _oss1; \
-	_oss1 << _expected; \
+	_oss1 << (_expected); \
 	std::string _exp_str = _oss1.str(); \
 	\
 	std::ostringstream _oss2; \
-	_oss2 << _found; \
+	_oss2 << (_found); \
 	std::string _found_str = _oss2.str(); \
 	\
 	if(_exp_str != _found_str) \
