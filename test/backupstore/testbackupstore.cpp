@@ -3733,13 +3733,13 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 	TEST_THAT(test_server_housekeeping());
+	TEST_THAT(test_multiple_uploads("store", *specialisations["store"]));
 
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
 		RUN_TEST(i->first, i->second, test_server_commands);
 		RUN_TEST(i->first, i->second, test_account_limits_respected);
-		RUN_TEST(i->first, i->second, test_multiple_uploads);
 	}
 
 	TEST_THAT(test_housekeeping_deletes_files());
