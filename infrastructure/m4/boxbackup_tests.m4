@@ -329,7 +329,7 @@ AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid getpwuid gettimeofday lchown])
-AC_CHECK_FUNCS([setproctitle utimensat __lxstat __lxstat64])
+AC_CHECK_FUNCS([setproctitle utimensat stat64 lstat64 __lxstat __lxstat64])
 AC_SEARCH_LIBS([setproctitle], [bsd])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
