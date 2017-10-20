@@ -450,7 +450,9 @@ class RaidPutFileCompleteTransaction : public BackupFileSystem::Transaction
 private:
 	RaidFileWrite mStoreFile;
 	std::string mFileName;
+#ifndef BOX_RELEASE_BUILD
 	int mDiscSet;
+#endif
 	bool mCommitted;
 
 public:
@@ -458,7 +460,9 @@ public:
 		BackupStoreRefCountDatabase::refcount_t refcount)
 	: mStoreFile(StoreDiscSet, filename, refcount),
 	  mFileName(filename),
+#ifndef BOX_RELEASE_BUILD
 	  mDiscSet(StoreDiscSet),
+#endif
 	  mCommitted(false),
 	  mNumBlocks(-1)
 	{ }
@@ -485,7 +489,7 @@ void RaidPutFileCompleteTransaction::Commit()
 	ASSERT(!mCommitted);
 	mStoreFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 
-#ifndef NDEBUG
+#ifndef BOX_RELEASE_BUILD
 	// Verify the file -- only necessary for non-diffed versions.
 	//
 	// We cannot use VerifyEncodedFileFormat() until the file is committed. We already
@@ -499,7 +503,7 @@ void RaidPutFileCompleteTransaction::Commit()
 			"Newly saved file does not verify after write: this should not "
 			"happen: " << mFileName);
 	}
-#endif // !NDEBUG
+#endif // !BOX_RELEASE_BUILD
 
 	mCommitted = true;
 }
