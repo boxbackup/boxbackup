@@ -467,7 +467,7 @@ bool test_timers()
 	// be safe.
 
 	{
-		Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::Level::TRACE);
+		Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::TRACE);
 		Console::SettingsGuard save_old_settings;
 		Console::SetShowTime(true);
 		Console::SetShowTimeMicros(true);
