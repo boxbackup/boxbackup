@@ -531,6 +531,10 @@ void RaidFileWrite::TransformToRaidStorage()
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe1(stripe1FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe2(stripe2FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> parity(parityFilenameW.c_str());
+#elif defined BOX_OPEN_LOCK
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> stripe1(stripe1FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> stripe2(stripe2FilenameW.c_str());
+		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> parity(parityFilenameW.c_str());
 #else
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe1(stripe1FilenameW.c_str());
 		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe2(stripe2FilenameW.c_str());
