@@ -1607,13 +1607,19 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 					NULL, // pointer to DiffTimer impl
 					&modtime, &isCompletelyDifferent));
 			TEST_THAT(isCompletelyDifferent == false);
+
 			// Sent this to a file, so we can check the size, rather than uploading it directly
 			{
 				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT);
 				patchstream->CopyStreamTo(patch);
 			}
+
+			// Release blockIndexStream to close the RaidFile, so that we can rename over it
+			blockIndexStream.reset();
+
 			// Make sure the stream is a plausible size for a patch containing only one new block
 			TEST_THAT(TestGetFileSize(TEST_FILE_FOR_PATCHING ".patch") < (8*1024));
+
 			// Upload it
 			int64_t patchedID = 0;
 			{
@@ -1639,6 +1645,7 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream,
 				TEST_FILE_FOR_PATCHING ".downloaded", SHORT_TIMEOUT);
+
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
 			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 4, 2, 1));
