@@ -13,7 +13,6 @@
 #	include <dirent.h>
 #endif
 
-#include <openssl/hmac.h>
 #include <sys/types.h>
 
 #include <algorithm>
@@ -22,6 +21,7 @@
 #include <string>
 
 #include <boost/version.hpp>
+#include <openssl/hmac.h>
 
 #include "Database.h"
 #include "HTTPRequest.h"
@@ -69,6 +69,7 @@ std::string PtreeToXmlString(const ptree& pt)
 	write_xml(buf, pt, settings);
 	return buf.str();
 }
+
 
 S3Simulator::S3Simulator()
 // Increase timeout to 5 minutes, from HTTPServer default of 1 minute,
@@ -829,8 +830,7 @@ std::string ItemKey(const std::string& domain, std::string item_name)
 	return key_stream.str();
 }
 
-void
-SimpleDBSimulator::DeleteItem(const std::string& domain_name,
+void SimpleDBSimulator::DeleteItem(const std::string& domain_name,
 	const std::string& item_name, bool throw_if_not_found)
 {
 	std::string key = ItemKey(domain_name, item_name);
@@ -1260,6 +1260,7 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
 }
 
+
 std::vector<std::string> SimpleDBSimulator::ListDomains()
 {
 	if(!dpiterinit(mpDomains))
@@ -1300,6 +1301,7 @@ void SimpleDBSimulator::CreateDomain(const std::string& domain_name)
 	domain_props.add(PTREE_DOMAIN_NEXT_ID_SEQ, 1);
 	PutDomainProps(domain_name, domain_props);
 }
+
 
 void SimpleDBSimulator::PutAttributes(const std::string& domain_name,
 	const std::string& item_name,
@@ -1376,4 +1378,3 @@ std::multimap<std::string, std::string> SimpleDBSimulator::GetAttributes(
 
 	return attributes;
 }
-

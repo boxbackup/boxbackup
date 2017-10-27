@@ -2091,10 +2091,10 @@ bool test_server_commands(const std::string& specialisation_name,
 			}
 		}
 
-		// Create some nice recursive directories
 		TEST_THAT(check_reference_counts(
 			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
+		// Create some nice recursive directories
 		write_test_file(1);
 		int64_t dirtodelete;
 
@@ -2896,11 +2896,8 @@ bool test_login_with_no_refcount_db()
 	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 
 	// And that we can log in afterwards
-	{
-		BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/", 0,
-			false); // Not read-only
-		client.QueryFinished();
-	}
+	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
+		false).QueryFinished(); // Not read-only
 
 	// Check that housekeeping fixed the ref counts
 	TEST_THAT(check_reference_counts());
@@ -3226,7 +3223,7 @@ bool test_read_old_backupstoreinfo_files()
 		compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
 			*apInfoReadOnly, "" /* no name by default */,
 			true /* enabled by default */));
-	
+
 	BackupStoreInfo* pInfoReadWrite =
 		&(fs.GetBackupStoreInfo(false, true)); // !ReadOnly, Refresh
 	TEST_THAT(

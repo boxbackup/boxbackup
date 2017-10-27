@@ -59,9 +59,11 @@ bool change_account_limits(BackupAccountControl& control, const char* soft,
 	const char* hard);
 
 //! Checks an account for errors, returning the number of errors found and fixed.
+//! Old interface, only works with RaidBackupFileSystem, deprecated.
 int check_account_for_errors(Log::Level log_level = Log::WARNING);
 
 //! Checks an account for errors, returning number of errors found.
+//! New interface, takes a BackupFileSystem.
 int check_account_for_errors(BackupFileSystem& filesystem,
 	Log::Level log_level = Log::WARNING);
 

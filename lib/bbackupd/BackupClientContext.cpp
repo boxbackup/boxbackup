@@ -582,4 +582,3 @@ int BackupClientContext::GetMaximumDiffingTime()
 {
 	return mMaximumDiffingTime;
 }
-

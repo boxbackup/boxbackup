@@ -197,4 +197,3 @@ std::string HTTPQueryDecoder::URLEncode(const std::string& value)
 	}
 	return out.str();
 }
-

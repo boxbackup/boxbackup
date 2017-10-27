@@ -237,7 +237,7 @@ void DumpStackBacktrace(const std::string& filename)
 	output << "Obtained " << size << " stack frames.";
 	Logging::Log(Log::TRACE, filename, 0, // line
 		__FUNCTION__, BACKTRACE, output.str());
-	
+
 	DumpStackBacktrace(filename, size, array);
 }
 

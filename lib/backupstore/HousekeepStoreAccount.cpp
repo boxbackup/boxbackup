@@ -38,7 +38,7 @@
 //
 // Function
 //		Name:    HousekeepStoreAccount::HousekeepStoreAccount(
-//		         BackupFileSystem&, HousekeepingCallback*)
+//			 BackupFileSystem&, HousekeepingCallback*)
 //		Purpose: Constructor
 //		Created: 11/12/03
 //
@@ -271,7 +271,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	mpNewRefs->Commit();
 	mpNewRefs = NULL;
 
-	// Explicity release the lock (would happen automatically on going out of scope,
+	// Explicitly release the lock (would happen automatically on going out of scope,
 	// included for code clarity)
 	mrFileSystem.ReleaseLock();
 
@@ -921,8 +921,7 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 
 	if(new_size_in_blocks == old_size_in_blocks)
 	{
-		// The root directory has no parent, so no entry for it that might need
-		// updating.
+		// No need to update the entry for this directory in its parent directory.
 		return;
 	}
 

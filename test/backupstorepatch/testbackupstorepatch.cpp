@@ -649,7 +649,7 @@ int test(int argc, const char *argv[])
 			BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/", 0, true);
 #else
 			// Open a connection to the server (need to do this each time, otherwise
-			// housekeeping won't run on Windows, and thus won't delete any files.
+			// housekeeping won't run on Windows, and thus won't delete any files).
 			SocketStreamTLS *pConn = new SocketStreamTLS;
 			std::auto_ptr<SocketStream> apConn(pConn);
 			pConn->Open(context, Socket::TypeINET, "localhost",

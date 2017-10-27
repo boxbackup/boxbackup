@@ -272,7 +272,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStre
 		request.GetMethod() == HTTPRequest::Method_GET ||
 		request.GetMethod() == HTTPRequest::Method_HEAD);
 	BOX_TRACE("S3Client: " << mHostName << " > " << request.GetMethodName() <<
-	" " << request.GetRequestURI(with_parameters_for_get_request));
+		" " << request.GetRequestURI(with_parameters_for_get_request));
 
 	std::ostringstream date;
 	time_t tt = time(NULL);

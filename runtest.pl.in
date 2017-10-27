@@ -21,8 +21,8 @@ my $cmake_build = $opts{'c'};
 # Don't actually run the test, just prepare for it:
 my $prepare_only = $opts{'n'};
 my $timestamp_tests = $opts{'T'};
-my $verbose_build = $opts{'v'};
 my $extra_options = $opts{'O'} || '';
+my $verbose_build = $opts{'v'};
 
 my $test_name = shift @ARGV;
 my $test_mode = shift @ARGV;

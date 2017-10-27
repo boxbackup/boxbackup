@@ -422,7 +422,7 @@ void RaidBackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 	// Create the containing directory if it doesn't exist.
 	std::string filename = GetObjectFileName(rDir.GetObjectID(), true);
 	RaidFileWrite writeDir(mStoreDiscSet, filename);
-	writeDir.Open(true /* allow overwriting */);
+	writeDir.Open(true); // allow overwriting
 
 	BufferedWriteStream buffer(writeDir);
 	rDir.WriteToStream(buffer);
@@ -533,7 +533,7 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());
-	rStoreFile.Open(false /* no overwriting */);
+	rStoreFile.Open(false); // no overwriting
 
 	BackupStoreFile::VerifyStream validator(rFileData);
 
@@ -632,13 +632,13 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 	RaidFileWrite& rNewCompleteFile(pTrans->GetNewCompleteFile());
 	RaidFileWrite& rReversedPatchFile(pTrans->GetReversedPatchFile());
 
-	rNewCompleteFile.Open(false /* no overwriting */);
+	rNewCompleteFile.Open(false); // no overwriting
 
 	// Diff file, needs to be recreated.
 	// Choose a temporary filename.
 	std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(mStoreDiscSet,
 		newVersionFilename + ".difftemp",
-		1 /* NOT the same disc as the write file, to avoid using lots of space on the same disc unnecessarily */));
+		1)); // NOT the same disc as the write file, to avoid using lots of space on the same disc unnecessarily
 
 	try
 	{
@@ -679,7 +679,7 @@ RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 
 		// Then... reverse the patch back (open the from file again, and create a write file to overwrite it)
 		std::auto_ptr<RaidFileRead> from2(RaidFileRead::Open(mStoreDiscSet, oldVersionFilename));
-		rReversedPatchFile.Open(true /* allow overwriting */);
+		rReversedPatchFile.Open(true); // allow overwriting
 		from->Seek(0, IOStream::SeekType_Absolute);
 		diff.Seek(0, IOStream::SeekType_Absolute);
 
@@ -774,7 +774,7 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetFilePatch(int64_t ObjectID,
 
 	std::auto_ptr<IOStream> stream(
 		BackupStoreFile::ReorderFileToStreamOrder(from.get(),
-			true /* take ownership */));
+			true)); // take ownership
 
 	// Release from file to avoid double deletion
 	from.release();
@@ -1334,8 +1334,8 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 	}
 
 	// It's dangerous to have two read-write databases open at the same time (it would
-	// be too easy to update the refcounts in the wrong one by mistake), and temporary
-	// databases are always read-write, so if a temporary database is already open
+	// be too easy to update the refcounts in the wrong one by mistake), and potential
+	// databases are always read-write, so if a potential database is already open
 	// then we should only allow a read-only permanent database to be opened.
 	ASSERT(!mapPotentialRefCountDatabase.get() || ReadOnly);
 
@@ -2285,4 +2285,3 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 		}
 	}
 }
-

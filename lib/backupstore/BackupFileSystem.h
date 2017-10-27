@@ -186,8 +186,7 @@ private:
 	NamedLock mWriteLock;
 
 public:
-	RaidBackupFileSystem(int64_t AccountID, const std::string &AccountRootDir,
-		int discSet)
+	RaidBackupFileSystem(int64_t AccountID, const std::string &AccountRootDir, int discSet)
 	: BackupFileSystem(),
 	  mAccountID(AccountID),
 	  mAccountRootDir(AccountRootDir),

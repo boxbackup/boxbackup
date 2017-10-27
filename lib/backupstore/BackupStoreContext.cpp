@@ -27,8 +27,6 @@
 
 // Maximum number of directories to keep in the cache When the cache is bigger
 // than this, everything gets deleted.
-// to ensure that it's always flushed, which is very inefficient but helps to
-// catch programming errors (use of freed data).
 #define	MAX_CACHE_SIZE	32
 
 // Allow the housekeeping process 4 seconds to release an account
@@ -38,9 +36,10 @@
 #define STORE_INFO_SAVE_DELAY	96
 
 #define CHECK_FILESYSTEM_INITIALISED() \
-if(!mpFileSystem) { \
-	THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised); \
-}
+	if(!mpFileSystem) \
+	{ \
+		THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised); \
+	}
 
 // --------------------------------------------------------------------------
 //
@@ -270,6 +269,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 					}
 					else
 					{
+						// We don't know what this error is.
 						throw;
 					}
 				}
@@ -281,6 +281,7 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	{
 		// Got the lock, mark as not read only
 		mReadOnly = false;
+
 		// GetDirectoryInternal assumes that if we have the write lock, everything in the
 		// cache was loaded with that lock, and cannot be stale. That would be violated if
 		// we had anything in the cache already when the lock was obtained, so clear it now.
@@ -419,6 +420,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	if(item != mDirectoryCache.end())
 	{
 #ifndef BOX_RELEASE_BUILD
+		// Uninvalidate this one entry (we invalidated them all above):
 		item->second->mDir.Invalidate(false);
 #endif
 		oldRevID = item->second->mDir.GetRevisionID();
@@ -598,7 +600,10 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	if(DiffFromFileID == 0)
 	{
 		apTransaction = mpFileSystem->PutFileComplete(id, rFile,
-			0); // refcount
+			0); // refcount: BackupStoreFile requires us to pass 0 to assert that
+			// the file doesn't already exist, because it will refuse to overwrite an
+			// existing file. The refcount will increase to 1 when we commit the change
+			// to the directory, dir.
 	}
 	else
 	{
@@ -958,6 +963,10 @@ void BackupStoreContext::SaveDirectoryLater(BackupStoreDirectory &rDir)
 //		Purpose: Write directory to filesystem now, and mark as clean
 //		         in the cache. Returns the size of the saved
 //		         directory in blocks.
+//		         Since this updates the parent directory, it needs to
+//		         fetch it, which invalidates rDir along with the rest
+//		         of the cache. But since it's usually the last thing
+//		         we do to rDir, that should be fine.
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
@@ -1091,7 +1100,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	BackupStoreDirectory& emptyDir(apEntry->mDir);
 
 	{
-		// add the atttribues
+		// Add the attributes:
 		emptyDir.SetAttributes(Attributes, AttributesModTime);
 
 		// Write, but not using SaveDirectoryNow because that tries to update the entry
@@ -1125,19 +1134,19 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		// Save the directory back (or actually just mark it dirty)
 		SaveDirectoryLater(dir);
 
-		// Increment reference count on the new directory to one
+		// Increment reference count on the new directory to one:
 		mpRefCount->AddReference(id);
 	}
 	catch(...)
 	{
-		// Back out on adding that directory
+		// Back out on adding that directory:
 		mpFileSystem->DeleteDirectory(id);
 
-		// Remove this entry from the cache
+		// Remove the newly created directory from the cache:
 		RemoveDirectoryFromCache(InDirectory);
 		RemoveDirectoryFromCache(id);
 
-		// Don't worry about the incremented number in the store info
+		// Don't worry about the incremented number in the store info.
 		throw;
 	}
 
@@ -1467,7 +1476,6 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 		return false;
 	}
 
-	// We don't try to check this any more.
 	if (!mpFileSystem->ObjectExists(ObjectID))
 	{
 		return false;

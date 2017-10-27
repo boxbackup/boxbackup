@@ -47,6 +47,7 @@ void BackupAccountControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLi
 	}
 }
 
+
 int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSize)
 {
 	// Get number
@@ -88,11 +89,13 @@ int64_t BackupAccountControl::SizeStringToBlocks(const char *string, int blockSi
 	}
 }
 
+
 std::string BackupAccountControl::BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize)
 {
 	return FormatUsageBar(Blocks, Blocks * BlockSize, MaxBlocks * BlockSize,
 		mMachineReadableOutput);
 }
+
 
 int BackupAccountControl::PrintAccountInfo()
 {
@@ -209,6 +212,7 @@ int BackupAccountControl::SetAccountEnabled(bool enabled)
 	return 0;
 }
 
+
 int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	int32_t HardLimit, const std::string& AccountName)
 {
@@ -246,9 +250,11 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	return 0;
 }
 
+
 int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
 	// Obtain a write lock, as the daemon user
+	// We definitely need a lock to do something this destructive!
 	OpenAccount(true); // readWrite
 
 	// Check user really wants to do this
@@ -352,6 +358,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	return retcode;
 }
 
+
 void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
 	if(mapFileSystem.get())
@@ -364,7 +371,7 @@ void BackupStoreAccountControl::OpenAccount(bool readWrite)
 			mapFileSystem->GetLock();
 		}
 
-			return;
+		return;
 	}
 
 	// Load in the account database
@@ -411,6 +418,7 @@ void BackupStoreAccountControl::OpenAccount(bool readWrite)
 	}
 }
 
+
 int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
@@ -430,6 +438,7 @@ int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 		return check.ErrorsFound() ? 1 : 0;
 	}
 }
+
 
 int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLimit,
 	int32_t HardLimit)
@@ -513,6 +522,7 @@ int BackupStoreAccountControl::HousekeepAccountNow()
 	}
 }
 
+
 S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 	bool machineReadableOutput)
 : BackupAccountControl(config, machineReadableOutput)
@@ -547,6 +557,7 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 	mapFileSystem.reset(new S3BackupFileSystem(mConfig, base_path, cache_dir,
 		*mapS3Client));
 }
+
 
 int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftLimit,
 	int32_t HardLimit)
@@ -585,4 +596,3 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 
 	return 0;
 }
-

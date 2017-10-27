@@ -184,12 +184,15 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 void BackupStoreDaemon::OnIdle()
 {
-	if (!IsSingleProcess())
+	if(!IsSingleProcess())
 	{
+		// Housekeeping will be done by a specialised child process.
 		return;
 	}
 
-	if (!mHousekeepingInited)
+	// Housekeeping will be done in the main process, in idle time.
+
+	if(!mHousekeepingInited)
 	{
 		HousekeepingInit();
 		mHousekeepingInited = true;

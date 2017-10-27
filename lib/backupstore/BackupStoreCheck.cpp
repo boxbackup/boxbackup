@@ -87,7 +87,7 @@ BackupStoreCheck::~BackupStoreCheck()
 	FreeInfo();
 
 	// Avoid an exception if we forget to discard mapNewRefs
-	if (mpNewRefs)
+	if(mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
 		// just catch and log them.
