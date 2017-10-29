@@ -302,7 +302,21 @@ public:
 						#endif // !WIN32
 							// Just handle in this process
 							SetProcessTitle("handling");
-							HandleConnection(connection);
+
+							try
+							{
+								HandleConnection(connection);
+							}
+							catch(BoxException &e)
+							{
+								// When only a single process is handling requests, then don't rethrow the
+								// exception, since that would kill the entire server process. Instead,
+								// just log it and keep going. Otherwise, allow the uncaught exception to
+								// kill the worker process.
+								BOX_ERROR("Failed to process a request in single-process mode: "
+									"caught exception: " << e.what());
+							}
+
 							SetProcessTitle("idle");										
 						#ifndef WIN32
 						}
@@ -321,7 +335,7 @@ public:
 				#endif // !WIN32
 			}
 		}
-		catch(...)
+		catch(std::exception &e)
 		{
 			DeleteSockets();
 			throw;
