@@ -1718,7 +1718,20 @@ S3BackupFileSystem::~S3BackupFileSystem()
 
 	// This needs to be in the source file, not inline, as long as we don't include
 	// the whole of SimpleDBClient.h in BackupFileSystem.h.
-	ReleaseLock();
+	if(true)
+	{
+		try
+		{
+			ReleaseLock();
+		}
+		catch(BoxException& e)
+		{
+			// Destructors aren't supposed to throw exceptions, so it's too late
+			// for us to do much except log a warning
+			BOX_WARNING("Failed to release a lock while destroying "
+				"S3BackupFileSystem: " << e.what());
+		}
+	}
 }
 
 
