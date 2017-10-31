@@ -308,8 +308,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		else
 		{
 			// Other error
-			BOX_LOG_SYS_ERROR("Failed to read from socket");
-			THROW_EXCEPTION(ConnectionException,
+			THROW_SOCKET_ERROR("Failed to read from socket", ConnectionException,
 				SocketReadError);
 		}
 	}
@@ -394,7 +393,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 		{
 			// Error.
 			mWriteClosed = true;	// assume can't write again
-			THROW_SYS_ERROR("Failed to write to socket",
+			THROW_SOCKET_ERROR("Failed to write to socket",
 				ConnectionException, SocketWriteError);
 		}
 
