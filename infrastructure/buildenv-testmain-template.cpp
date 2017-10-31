@@ -257,6 +257,7 @@ int main(int argc, char * const * argv)
 	// Initialise sockets, start memory leak monitoring, catch exceptions:
 	MAINHELPER_START
 
+	Logging::ToSyslog(false);
 	Logging::SetProgramName(BOX_MODULE);
 
 	struct option longopts[] = 
@@ -333,7 +334,6 @@ int main(int argc, char * const * argv)
 		}
 	}
 
-	Logging::FilterSyslog(Log::NOTHING);
 	Logging::FilterConsole(LogLevel.GetCurrentLevel());
 
 	argc -= optind - 1;
