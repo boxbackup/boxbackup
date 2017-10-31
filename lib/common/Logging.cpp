@@ -623,11 +623,24 @@ int Logging::OptionParser::ProcessOption(signed int option)
 			std::string::size_type equals_pos = arg_value.find('=');
 			if(equals_pos == std::string::npos)
 			{
-				BOX_FATAL("Option -L argument should be 'filename=level'");
+				BOX_FATAL("Option -L argument should be 'filename[/category]=level'");
 				return 2;
 			}
 
-			std::string filename = arg_value.substr(0, equals_pos);
+			std::string key = arg_value.substr(0, equals_pos);
+			std::string filename, category;
+			std::string::size_type slash_pos = key.find('/');
+			if(slash_pos == std::string::npos)
+			{
+				// If no category is supplied, assume that the entire key is the filename
+				filename = key;
+			}
+			else
+			{
+				filename = key.substr(0, slash_pos);
+				category = key.substr(slash_pos + 1);
+			}
+
 			std::string level_name = arg_value.substr(equals_pos + 1);
 			Log::Level level = Logging::GetNamedLevel(level_name);
 			if (level == Log::INVALID)
@@ -637,7 +650,7 @@ int Logging::OptionParser::ProcessOption(signed int option)
 			}
 
 			sLogLevelOverrideByFileGuards.push_back(
-				LogLevelOverrideByFileGuard(filename, level, false) // !OverrideAllButSelected
+				LogLevelOverrideByFileGuard(filename, category, level, false) // !OverrideAllButSelected
 			);
 		}
 		break;
@@ -762,8 +775,10 @@ std::string Logging::OptionParser::GetUsageString()
 
 	std::ostringstream buf;
 	buf <<
-	"  -L <file>=<level>  Override log level for specified file, can repeat\n"
+	"  -L <file>[/<category>]=<level>  Override log level for specified file\n"
 	"             (for example, -L '" << current_file << "=trace')\n"
+	"             <category> can be one of: {Uncategorised, Backtrace,\n"
+	"             Configuration, RaidFileRead}\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -795,15 +810,22 @@ bool LogLevelOverrideByFileGuard::IsOverridden(Log::Level level, const std::stri
 {
 	std::list<std::string>::iterator i = std::find(mFileNames.begin(),
 		mFileNames.end(), file);
-	if(!mOverrideAllButSelected)
+
+	// Return true if filename is in our list, i.e. its level is overridden, or if there
+	// are no filenames in the list (which corresponds to a wildcard match on filename):
+	bool override_matches = (i != mFileNames.end()) || mFileNames.empty();
+
+	// If we have a category, then that must match as well:
+	if(override_matches && !mCategoryNamePrefix.empty())
 	{
-		// Return true if filename is in our list, i.e. its level is overridden.
-		return (i != mFileNames.end());
+		override_matches = StartsWith(mCategoryNamePrefix, category.ToString());
 	}
-	else
+
+	if(mOverrideAllButSelected)
 	{
-		// Return true if filename is not in our list, i.e. its level is overridden.
-		return (i == mFileNames.end());
+		override_matches = !override_matches;
 	}
+
+	return override_matches;
 }
 
