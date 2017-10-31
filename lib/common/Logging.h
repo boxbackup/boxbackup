@@ -209,7 +209,7 @@ namespace Log
 		Category(const std::string& name)
 		: mName(name)
 		{ }
-		const std::string& ToString() { return mName; }
+		const std::string& ToString() const { return mName; }
 		bool operator==(const Category& other) { return mName == other.mName; }
 	};
 }
@@ -420,15 +420,22 @@ class LogLevelOverrideByFileGuard
 {
 	private:
 	std::list<std::string> mFileNames;
+	std::string mCategoryNamePrefix;
 	Log::Level mNewLevel;
 	bool mOverrideAllButSelected;
 
 	public:
-	LogLevelOverrideByFileGuard(const std::string& rFileName, Log::Level NewLevel,
+	LogLevelOverrideByFileGuard(const std::string& rFileName,
+		const std::string& rCategoryNamePrefix, Log::Level NewLevel,
 		bool OverrideAllButSelected = false)
-	: mNewLevel(NewLevel), mOverrideAllButSelected(OverrideAllButSelected)
+	: mCategoryNamePrefix(rCategoryNamePrefix),
+	  mNewLevel(NewLevel),
+	  mOverrideAllButSelected(OverrideAllButSelected)
 	{
-		mFileNames.push_back(rFileName);
+		if(rFileName.size() > 0)
+		{
+			mFileNames.push_back(rFileName);
+		}
 	}
 	virtual ~LogLevelOverrideByFileGuard()
 	{
