@@ -1531,7 +1531,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	assert(len >= 0);
 	if (len < 0) 
 	{
-		printf("%s\r\n", buffer);
+		printf("<syslog(): message too long> %s\r\n", buffer);
 		fflush(stdout);
 		return;
 	}
@@ -1543,7 +1543,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	if (gSyslogH == INVALID_HANDLE_VALUE)
 	{
-		printf("%s\r\n", buffer);
+		printf("<syslog(): invalid handle> %s\r\n", buffer);
 		fflush(stdout);
 		return;
 	}
