@@ -39,7 +39,7 @@ class S3Client
 	  mHostName(rHostName),
 	  mAccessKey(rAccessKey),
 	  mSecretKey(rSecretKey),
-	  mNetworkTimeout(30000)
+	  mNetworkTimeout(600000)
 	{ }
 
 	// Constructor with a specific hostname, virtualhost name, port etc:
@@ -51,7 +51,7 @@ class S3Client
 	  mVirtualHostName(VirtualHostName),
 	  mAccessKey(rAccessKey),
 	  mSecretKey(rSecretKey),
-	  mNetworkTimeout(30000)
+	  mNetworkTimeout(600000)
 	{ }
 
 	// Constructor with a Configuration (file):
@@ -62,7 +62,7 @@ class S3Client
 	  mVirtualHostName(s3config.GetKeyValue("S3VirtualHostName")),
 	  mAccessKey(s3config.GetKeyValue("AccessKey")),
 	  mSecretKey(s3config.GetKeyValue("SecretKey")),
-	  mNetworkTimeout(30000)
+	  mNetworkTimeout(600000)
 	{ }
 
 	class BucketEntry {
