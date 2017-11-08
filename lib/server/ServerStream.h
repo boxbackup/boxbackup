@@ -254,8 +254,8 @@ public:
 					// Was there one (there should be...)
 					if(connection.get())
 					{
-						// Since this is a template parameter, the if() will be optimised out by the compiler
 						#ifndef WIN32 // no fork on Win32
+						// Since this is a template parameter, the if() will be optimised out by the compiler
 						if(ForkToHandleRequests && !IsSingleProcess())
 						{
 							pid_t pid = ::fork();

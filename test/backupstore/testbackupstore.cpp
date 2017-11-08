@@ -1679,7 +1679,9 @@ bool test_server_commands(const std::string& specialisation_name,
 	// the client realises that the stream is invalid, and aborts. The S3 server will receive a
 	// PUT request for a zero-byte file, and have no idea that it's not a valid file, so it will
 	// store it. We should send a checksum (if possible) and a content-length (at least) to
-	// prevent this, and test that no file is stored instead of unlinking it here.
+	// prevent this, and test that no file is stored instead of unlinking it here. Alternatively,
+	// the server could notice that the client closed the connection and didn't read the 200 OK
+	// response (but sent back an RST instead), and delete the file that it just created.
 	if(specialisation_name == "s3")
 	{
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/0x2.file"));
@@ -2106,7 +2108,7 @@ bool test_server_commands(const std::string& specialisation_name,
 		{
 			BackupStoreRefCountDatabase& rRefCount(
 				fs.GetPermanentRefCountDatabase(true)); // ReadOnly
-	 		dirtodelete = create_test_data_subdirs(*apProtocol,
+			dirtodelete = create_test_data_subdirs(*apProtocol,
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				"test_delete", 6 /* depth */, &rRefCount);
 		}
