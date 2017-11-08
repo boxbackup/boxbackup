@@ -1235,10 +1235,12 @@ void S3Simulator::HandlePut(HTTPRequest &rRequest, HTTPResponse &rResponse)
 
 	if (rRequest.IsExpectingContinue())
 	{
+		BOX_TRACE("S3Simulator::HandlePut: sending Continue response");
 		rResponse.SendContinue();
 	}
 
 	rRequest.ReadContent(*apFile, GetTimeout());
+	BOX_TRACE("S3Simulator::HandlePut: read request data");
 	apFile->Seek(0, IOStream::SeekType_Absolute);
 
 	std::string digest;
