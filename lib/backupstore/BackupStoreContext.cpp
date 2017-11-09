@@ -431,9 +431,9 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 		if(!mReadOnly)
 		{
 			// Looks good... return the cached object
-			BOX_TRACE("Returning locked object " <<
+			BOX_TRACE("Returning directory " <<
 				BOX_FORMAT_OBJECTID(ObjectID) <<
-				" from cache, modtime = " << oldRevID)
+				" from cache (locked), modtime = " << oldRevID)
 			return item->second->mDir;
 		}
 
@@ -447,9 +447,9 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 		if(newRevID == oldRevID)
 		{
 			// Looks good... return the cached object
-			BOX_TRACE("Returning object " <<
+			BOX_TRACE("Returning directory " <<
 				BOX_FORMAT_OBJECTID(ObjectID) <<
-				" from cache, modtime = " << newRevID)
+				" from cache (validated), modtime = " << newRevID)
 			return item->second->mDir;
 		}
 
@@ -485,14 +485,14 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 
 	if (oldRevID == 0)
 	{
-		BOX_TRACE("Loading object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+		BOX_TRACE("Loading directory " << BOX_FORMAT_OBJECTID(ObjectID) <<
 			" with modtime " << newRevID);
 	}
 	else
 	{
-		BOX_TRACE("Refreshing object " << BOX_FORMAT_OBJECTID(ObjectID) <<
-			" in cache, modtime changed from " << oldRevID <<
-			" to " << newRevID);
+		BOX_TRACE("Refreshing directory " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in cache (modtime changed from " << oldRevID <<
+			" to " << newRevID << ")");
 	}
 
 	// Read it from the stream, then set it's revision ID

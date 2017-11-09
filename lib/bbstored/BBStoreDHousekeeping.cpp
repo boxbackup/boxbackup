@@ -184,7 +184,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 void BackupStoreDaemon::OnIdle()
 {
-	if(!IsSingleProcess())
+	if(IsForkPerClient())
 	{
 		// Housekeeping will be done by a specialised child process.
 		return;
