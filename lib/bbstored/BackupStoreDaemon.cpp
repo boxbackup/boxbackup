@@ -178,8 +178,10 @@ void BackupStoreDaemon::Run()
 	// because IsSingleProcess() is always true
 	
 #ifndef WIN32
-	if(!IsSingleProcess() && !mHaveForkedHousekeeping)
+	if(IsForkPerClient() && !mHaveForkedHousekeeping)
 	{
+		// Housekeeping will be done by a specialised child process.
+
 		// Open a socket pair for communication
 		int sv[2] = {-1,-1};
 		if(::socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, sv) != 0)

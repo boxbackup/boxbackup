@@ -70,19 +70,26 @@ public:
 	virtual void EnterChild();
 	
 	static void SetProcessTitle(const char *format, ...);
-	void SetRunInForeground(bool foreground)
+	bool IsForkPerClient()
 	{
-		mRunInForeground = foreground;
+		return mForkPerClient;
 	}
-	void SetSingleProcess(bool value)
+	void SetForkPerClient(bool fork_per_client)
 	{
-		mSingleProcess = value;
+		mForkPerClient = fork_per_client;
+	}
+	bool IsDaemonize()
+	{
+		return mDaemonize;
+	}
+	void SetDaemonize(bool daemonize)
+	{
+		mDaemonize = daemonize;
 	}
 
 protected:
 	virtual void SetupInInitialProcess();
 	box_time_t GetLoadedConfigModifiedTime() const;
-	bool IsSingleProcess() { return mSingleProcess; }
 	virtual std::string GetOptionString();
 	virtual int ProcessOption(signed int option);
 	void ResetLogFile()
@@ -104,8 +111,8 @@ private:
 	box_time_t mLoadedConfigModifiedTime;
 	bool mReloadConfigWanted;
 	bool mTerminateWanted;
-	bool mSingleProcess;
-	bool mRunInForeground;
+	bool mDaemonize;
+	bool mForkPerClient;
 	bool mKeepConsoleOpenAfterFork;
 	bool mHaveConfigFile;
 	Logging::OptionParser mLogLevel;
