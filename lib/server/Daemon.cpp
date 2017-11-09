@@ -67,12 +67,12 @@ Daemon::Daemon()
 	: mReloadConfigWanted(false),
 	  mTerminateWanted(false),
 	#ifdef WIN32
-	  mSingleProcess(true),
-	  mRunInForeground(true),
+	  mDaemonize(false),
+	  mForkPerClient(false),
 	  mKeepConsoleOpenAfterFork(true),
 	#else
-	  mSingleProcess(false),
-	  mRunInForeground(false),
+	  mDaemonize(true),
+	  mForkPerClient(true),
 	  mKeepConsoleOpenAfterFork(false),
 	#endif
 	  mHaveConfigFile(false),
@@ -108,9 +108,9 @@ Daemon::~Daemon()
 std::string Daemon::GetOptionString()
 {
 	return std::string("c:"
-	#ifndef WIN32
+#ifndef WIN32
 		"DF"
-	#endif
+#endif
 		"hkKo:O:") + Logging::OptionParser::GetOptionString();
 }
 
@@ -127,8 +127,8 @@ void Daemon::Usage()
 	"             argument is the configuration file, or else the default \n"
 	"             [" << GetConfigFileName() << "]\n"
 #ifndef WIN32
-	"  -D         Debugging mode, do not fork, one process only, one client only\n"
-	"  -F         Do not fork into background, but fork to serve multiple clients\n"
+	"  -D         Do not daemonize (fork into background)\n"
+	"  -F         Do not fork a new process for each client\n"
 #endif
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
 	"  -K         Stop writing log messages to console while daemon is running\n"
@@ -162,13 +162,13 @@ int Daemon::ProcessOption(signed int option)
 #ifndef WIN32
 		case 'D':
 		{
-			mSingleProcess = true;
+			mDaemonize = false;
 		}
 		break;
 
 		case 'F':
 		{
-			mRunInForeground = true;
+			mForkPerClient = false;
 		}
 		break;
 #endif // !WIN32
@@ -293,11 +293,6 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 	{
 		mConfigFileName = argv[optind]; optind++;
 		mHaveConfigFile = true;
-	}
-
-	if (argc > optind && ::strcmp(argv[optind], "SINGLEPROCESS") == 0)
-	{
-		mSingleProcess = true; optind++;
 	}
 
 	if (argc > optind)
@@ -443,8 +438,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	std::string pidFileName;
 
-	bool asDaemon = !mSingleProcess && !mRunInForeground;
-
 	try
 	{
 		if (!Configure(rConfigFileName))
@@ -486,7 +479,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			daemonUser.ChangeProcessUser();
 		}
 
-		if(asDaemon)
+		if(mDaemonize)
 		{
 			// Let's go... Daemonise...
 			switch(::fork())
@@ -583,7 +576,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	
-		if(asDaemon && !mKeepConsoleOpenAfterFork)
+		if(mDaemonize && !mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
 			// Close standard streams
@@ -704,7 +697,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 #else
 	// Should clean up here, but it breaks memory leak tests.
 	/*
-	if(asDaemon)
+	if(mDaemonize)
 	{
 		// we are running in the child by now, and should not return
 		mapConfiguration.reset();

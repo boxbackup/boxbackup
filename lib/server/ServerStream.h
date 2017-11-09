@@ -256,7 +256,7 @@ public:
 					{
 						#ifndef WIN32 // no fork on Win32
 						// Since this is a template parameter, the if() will be optimised out by the compiler
-						if(ForkToHandleRequests && !IsSingleProcess())
+						if(IsForkPerClient())
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -311,8 +311,7 @@ public:
 							{
 								// When only a single process is handling requests, then don't rethrow the
 								// exception, since that would kill the entire server process. Instead,
-								// just log it and keep going. Otherwise, allow the uncaught exception to
-								// kill the worker process.
+								// just log it and keep going.
 								BOX_ERROR("Failed to process a request in single-process mode: "
 									"caught exception: " << e.what());
 							}
@@ -328,7 +327,7 @@ public:
 
 				#ifndef WIN32
 				// Clean up child processes (if forking daemon)
-				if(ForkToHandleRequests && !IsSingleProcess())
+				if(IsForkPerClient())
 				{
 					WaitForChildren();
 				}
@@ -338,6 +337,7 @@ public:
 		catch(std::exception &e)
 		{
 			DeleteSockets();
+			// Allow the exception to kill the worker process, if uncaught higher up:
 			throw;
 		}
 		
@@ -410,11 +410,7 @@ protected:
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
-		#ifdef WIN32
-		return false;
-		#else
-		return ForkToHandleRequests && !IsSingleProcess();
-		#endif // WIN32
+		return IsForkPerClient();
 	}
 
 private:
