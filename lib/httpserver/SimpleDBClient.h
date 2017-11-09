@@ -50,7 +50,7 @@ public:
 		const std::string& hostname = "sdb.eu-west-1.amazonaws.com", int port = 0,
 		const std::string& endpoint = "",
 		// Set a default timeout of 300 seconds to make debugging easier
-		int timeout = 300)
+		int timeout = 300000)
 	: mHostName(hostname),
 	  mEndpoint(endpoint),
 	  mAccessKey(access_key),
@@ -70,7 +70,7 @@ public:
 	  mOffsetMinutes(0),
 	  mPort(s3config.GetKeyValueInt("SimpleDBPort")),
 	  // Set a default timeout of 300 seconds to make debugging easier
-	  mTimeout(300)
+	  mTimeout(300000)
 	{ }
 
 	typedef std::vector<std::string> list_t;
