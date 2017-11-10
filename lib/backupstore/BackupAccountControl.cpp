@@ -115,6 +115,59 @@ std::string BackupAccountControl::BlockSizeToString(int64_t Blocks, int64_t MaxB
 }
 
 
+int BackupAccountControl::PrintAccountInfo()
+{
+	OPEN_ACCOUNT(false); // !readWrite
+
+	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(true)); // ReadOnly
+	int BlockSize = GetBlockSize();
+
+	// Then print out lots of info
+	std::cout << FormatUsageLineStart("Account ID", mMachineReadableOutput) <<
+		BOX_FORMAT_ACCOUNT(info.GetAccountID()) << std::endl;
+	std::cout << FormatUsageLineStart("Account Name", mMachineReadableOutput) <<
+		info.GetAccountName() << std::endl;
+	std::cout << FormatUsageLineStart("Last object ID", mMachineReadableOutput) <<
+		BOX_FORMAT_OBJECTID(info.GetLastObjectIDUsed()) << std::endl;
+	std::cout << FormatUsageLineStart("Used", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksUsed(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Current files",
+			mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksInCurrentFiles(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Old files", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksInOldFiles(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Deleted files", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksInDeletedFiles(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksInDirectories(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Soft limit", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksSoftLimit(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Hard limit", mMachineReadableOutput) <<
+		BlockSizeToString(info.GetBlocksHardLimit(),
+			info.GetBlocksHardLimit(), BlockSize) << std::endl;
+	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
+		info.GetClientStoreMarker() << std::endl;
+	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
+		info.GetNumCurrentFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
+		info.GetNumOldFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Deleted Files", mMachineReadableOutput) <<
+		info.GetNumDeletedFiles() << std::endl;
+	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
+		info.GetNumDirectories() << std::endl;
+	std::cout << FormatUsageLineStart("Enabled", mMachineReadableOutput) <<
+		(info.IsAccountEnabled() ? "yes" : "no") << std::endl;
+
+	return 0;
+}
+
+
 int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 {
 	// Get controller, check disc set number
@@ -165,59 +218,6 @@ int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 
 	BOX_NOTICE("Name of account " << mapFileSystem->GetAccountIdentifier() << " "
 		"changed to " << rNewAccountName);
-
-	return 0;
-}
-
-
-int BackupAccountControl::PrintAccountInfo()
-{
-	OPEN_ACCOUNT(false); // !readWrite
-
-	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(true)); // ReadOnly
-	int BlockSize = GetBlockSize();
-
-	// Then print out lots of info
-	std::cout << FormatUsageLineStart("Account ID", mMachineReadableOutput) <<
-		BOX_FORMAT_ACCOUNT(info.GetAccountID()) << std::endl;
-	std::cout << FormatUsageLineStart("Account Name", mMachineReadableOutput) <<
-		info.GetAccountName() << std::endl;
-	std::cout << FormatUsageLineStart("Last object ID", mMachineReadableOutput) <<
-		BOX_FORMAT_OBJECTID(info.GetLastObjectIDUsed()) << std::endl;
-	std::cout << FormatUsageLineStart("Used", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksUsed(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Current files",
-			mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksInCurrentFiles(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Old files", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksInOldFiles(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Deleted files", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksInDeletedFiles(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksInDirectories(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Soft limit", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksSoftLimit(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Hard limit", mMachineReadableOutput) <<
-		BlockSizeToString(info.GetBlocksHardLimit(),
-			info.GetBlocksHardLimit(), BlockSize) << std::endl;
-	std::cout << FormatUsageLineStart("Client store marker", mMachineReadableOutput) <<
-		info.GetClientStoreMarker() << std::endl;
-	std::cout << FormatUsageLineStart("Current Files", mMachineReadableOutput) <<
-		info.GetNumCurrentFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Old Files", mMachineReadableOutput) <<
-		info.GetNumOldFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Deleted Files", mMachineReadableOutput) <<
-		info.GetNumDeletedFiles() << std::endl;
-	std::cout << FormatUsageLineStart("Directories", mMachineReadableOutput) <<
-		info.GetNumDirectories() << std::endl;
-	std::cout << FormatUsageLineStart("Enabled", mMachineReadableOutput) <<
-		(info.IsAccountEnabled() ? "yes" : "no") << std::endl;
 
 	return 0;
 }
