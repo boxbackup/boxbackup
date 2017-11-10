@@ -94,7 +94,6 @@ public:
 class S3BackupAccountControl : public BackupAccountControl
 {
 private:
-	std::string mBasePath;
 	std::auto_ptr<S3Client> mapS3Client;
 	// mapFileSystem is inherited from BackupAccountControl
 
