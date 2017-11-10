@@ -560,14 +560,14 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 	}
 	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
 
-	mBasePath = s3config.GetKeyValue("BasePath");
-	if(mBasePath.size() == 0)
+	std::string base_path = s3config.GetKeyValue("BasePath");
+	if(base_path.size() == 0)
 	{
-		mBasePath = "/";
+		base_path = "/";
 	}
 	else
 	{
-		if(mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
+		if(base_path[0] != '/' || base_path[base_path.size() - 1] != '/')
 		{
 			THROW_EXCEPTION_MESSAGE(CommonException,
 				InvalidConfiguration,
@@ -576,9 +576,9 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 		}
 	}
 
-	mapS3Client.reset(new S3Client(s3config));
 	std::string cache_dir = s3config.GetKeyValue("CacheDirectory");
-	mapFileSystem.reset(new S3BackupFileSystem(mConfig, mBasePath, cache_dir,
+	mapS3Client.reset(new S3Client(s3config));
+	mapFileSystem.reset(new S3BackupFileSystem(mConfig, base_path, cache_dir,
 		*mapS3Client));
 }
 
