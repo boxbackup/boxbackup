@@ -509,13 +509,15 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 			foreach(function_name ${function_names})
 				list(APPEND detect_functions ${function_name})
 			endforeach()
-		elseif(m4_function MATCHES "^ *AC_CHECK_DECLS\\(\\[([A-Za-z._/ ]+)\\](,,, ..#include <([^>]+)>..)?\\)$")
+		elseif(m4_function MATCHES "^ *AC_CHECK_DECLS\\(\\[([A-Za-z._/ ,]+)\\](,,, ..#include <([^>]+)>..)?\\)$")
 			if(DEBUG)
 				message(STATUS "Processing ac_check_decls: ${CMAKE_MATCH_1} in ${CMAKE_MATCH_3}")
 			endif()
 
+			# Multiple declarations to check are comma-separated, which is unusual.
 			# http://stackoverflow.com/questions/5272781/what-is-common-way-to-split-string-into-list-with-cmake
-			string(REPLACE " " ";" decl_names "${CMAKE_MATCH_1}")
+			string(REPLACE "," ";" decl_names "${CMAKE_MATCH_1}")
+			string(REPLACE " " ""  decl_names "${decl_names}")
 			string(REPLACE " " ";" header_files "${CMAKE_MATCH_3}")
 
 			foreach(decl_name ${decl_names})
