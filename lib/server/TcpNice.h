@@ -18,6 +18,16 @@
 #include "SocketStream.h"
 #include "Timer.h"
 
+#if HAVE_DECL_SO_SNDBUF
+#	if HAVE_DECL_SOL_TCP && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
+#		define ENABLE_TCP_NICE
+#	elif HAVE_DECL_IPPROTO_TCP && HAVE_DECL_TCP_CONNECTION_INFO
+// https://stackoverflow.com/a/40478874/648162
+#		define ENABLE_TCP_NICE
+#	endif
+#endif
+
+#ifdef ENABLE_TCP_NICE
 // --------------------------------------------------------------------------
 //
 // Class
@@ -176,5 +186,6 @@ private:
 	NiceSocketStream(const NiceSocketStream &rToCopy) 
 	{ /* do not call */ }
 };
+#endif // ENABLE_TCP_NICE
 
 #endif // TCPNICE__H
