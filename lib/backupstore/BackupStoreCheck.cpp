@@ -119,8 +119,9 @@ void BackupStoreCheck::Check()
 {
 	if(mFixErrors)
 	{
-		// Will throw an exception if it doesn't manage to get a lock:
-		mrFileSystem.TryGetLock();
+		// Will throw an exception if it doesn't manage to get a lock
+		// within about 8 seconds:
+		mrFileSystem.GetLock();
 	}
 
 	if(!mQuiet && mFixErrors)

@@ -50,15 +50,9 @@ public:
 
 	BackupFileSystem() { }
 	virtual ~BackupFileSystem() { }
-	virtual void TryGetLock() = 0;
-	virtual void GetLock();
-	virtual void ReleaseLock()
-	{
-		mapBackupStoreInfo.reset();
-		mapPotentialRefCountDatabase.reset();
-		mapPermanentRefCountDatabase.reset();
-	}
-
+	static const int KEEP_TRYING_FOREVER = -1;
+	virtual void GetLock(int max_tries = 8);
+	virtual void ReleaseLock();
 	virtual bool HaveLock() = 0;
 	virtual int GetBlockSize() = 0;
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
@@ -158,6 +152,7 @@ public:
 	}
 
 protected:
+	virtual void TryGetLock() = 0;
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
 	std::auto_ptr<BackupStoreInfo> mapBackupStoreInfo;
 	// You can have one temporary and one permanent refcound DB open at any time,
@@ -166,7 +161,6 @@ protected:
 	std::auto_ptr<BackupStoreRefCountDatabase> mapPotentialRefCountDatabase;
 	std::auto_ptr<BackupStoreRefCountDatabase> mapPermanentRefCountDatabase;
 
-protected:
 	friend class BackupStoreRefCountDatabaseWrapper;
 	// These should only be called by BackupStoreRefCountDatabaseWrapper::Commit():
 	virtual void RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db);
@@ -221,7 +215,6 @@ public:
 			ReleaseLock();
 		}
 	}
-	virtual void TryGetLock();
 	virtual void ReleaseLock()
 	{
 		BackupFileSystem::ReleaseLock();
@@ -280,6 +273,7 @@ public:
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors);
 
 protected:
+	virtual void TryGetLock();
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
@@ -332,7 +326,6 @@ public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
 		const std::string& CacheDirectory, S3Client& rClient);
 	~S3BackupFileSystem();
-	virtual void TryGetLock();
 	virtual void ReleaseLock();
 	virtual bool HaveLock()
 	{
@@ -434,6 +427,10 @@ public:
 		// Filesystem is not transactional, so nothing to do here.
 	}
 
+protected:
+	virtual void TryGetLock();
+	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
+
 private:
 	std::string GetObjectURI(int64_t ObjectID, int Type) const;
 	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
@@ -443,9 +440,6 @@ private:
 	void CheckObjectsDir(int64_t start_id,
 		BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
 		const start_id_to_files_t& start_id_to_files);
-
-protected:
-	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 };
 

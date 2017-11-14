@@ -110,39 +110,25 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	BOX_TRACE("Starting housekeeping on account " <<
 		mrFileSystem.GetAccountIdentifier());
 
-	// Attempt to lock the account
-	bool first_pass = true;
-	do
+	// Attempt to lock the account. If KeepTryingForever is false, then only
+	// try once, and return false if that fails.
+	try
 	{
-		try
+		mrFileSystem.GetLock(KeepTryingForever ? BackupFileSystem::KEEP_TRYING_FOREVER : 1);
+	}
+	catch(BackupStoreException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount))
 		{
-			mrFileSystem.TryGetLock();
-			break;
+			// Couldn't lock the account -- just stop now
+			return false;
 		}
-		catch(BackupStoreException &e)
+		else
 		{
-			if(!EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount))
-			{
-				// something unexpected went wrong
-				throw;
-			}
-			else if(!KeepTryingForever)
-			{
-				// Couldn't lock the account -- just stop now
-				return false;
-			}
-			else if(first_pass)
-			{
-				BOX_INFO("Failed to lock account for housekeeping, "
-					"still trying...");
-				first_pass = false;
-			}
-
-			// Sleep a bit and try again
-			sleep(1);
+			// something unexpected went wrong
+			throw;
 		}
 	}
-	while(true);
 
 	// Load the store info to find necessary info for the housekeeping
 	BackupStoreInfo* pInfo = &(mrFileSystem.GetBackupStoreInfo(false)); // !ReadOnly

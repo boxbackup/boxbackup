@@ -225,54 +225,37 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 	// Request the lock
 	bool gotLock = false;
 
-	try
+	for(int i = 0; i < (mpHousekeeping ? 2 : 1); i++)
 	{
-		mpFileSystem->TryGetLock();
-		// If we got to here, then it worked!
-		gotLock = true;
-	}
-	catch(BackupStoreException &e)
-	{
-		if(!EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount))
+		try
 		{
-			// We don't know what this error is.
-			throw;
+			// On the first pass, only try once. If it fails, and we have a
+			// housekeeping process, then we'll notify it and try again,
+			// with more retries.
+			mpFileSystem->GetLock((i == 0) ? 1 :
+				MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT);
+
+			// If we got to here, then it worked!
+			gotLock = true;
 		}
-
-		if(mpHousekeeping)
+		catch(BackupStoreException &e)
 		{
-			// The housekeeping process might have the thing open -- ask it to stop
-			char msg[256];
-			int msgLen = snprintf(msg, sizeof(msg), "r%x\n", mClientID);
-
-			// Send message
-			mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
-
-			// Then try again a few times
-			for(int tries = MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT;
-				tries >= 0; tries--)
+			if(!EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount))
 			{
-				try
-				{
-					::sleep(1 /* second */);
-					mpFileSystem->TryGetLock();
-					// If we got to here, then it worked!
-					gotLock = true;
-					break;
-				}
-				catch(BackupStoreException &e)
-				{
-					if(EXCEPTION_IS_TYPE(e, BackupStoreException,
-						CouldNotLockStoreAccount))
-					{
-						// keep trying
-					}
-					else
-					{
-						// We don't know what this error is.
-						throw;
-					}
-				}
+				// We don't know what this error is.
+				throw;
+			}
+
+			if(mpHousekeeping)
+			{
+				// The housekeeping process might have the account locked. Ask it to stop.
+				char msg[256];
+				int msgLen = snprintf(msg, sizeof(msg), "r%x\n", mClientID);
+
+				// Send message
+				mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
+
+				// Then loop again, with more retries this time
 			}
 		}
 	}

@@ -524,7 +524,7 @@ int test(int argc, const char *argv[])
 			{
 				// Take a lock before actually reading files from disk,
 				// to avoid them changing under our feet.
-				filesystem.TryGetLock();
+				filesystem.GetLock(30); // try for up to 30 seconds
 
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
