@@ -40,33 +40,60 @@
 
 #include "MemLeakFindOn.h"
 
-void BackupFileSystem::GetLock()
+void BackupFileSystem::GetLock(int max_tries)
 {
-	for(int triesLeft = 8; triesLeft >= 0; triesLeft--)
+	if(HaveLock())
+	{
+		// Account already locked, nothing to do
+		return;
+	}
+
+	int i = 0;
+	for(; i < max_tries || max_tries == KEEP_TRYING_FOREVER; i++)
 	{
 		try
 		{
 			TryGetLock();
+
+			// If that didn't throw an exception, then we should have successfully
+			// got a lock!
+			ASSERT(HaveLock());
+			break;
 		}
 		catch(BackupStoreException &e)
 		{
-			if(EXCEPTION_IS_TYPE(e, BackupStoreException,
-				CouldNotLockStoreAccount) && triesLeft)
+			if(EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount) &&
+				((i < max_tries - 1) || max_tries == KEEP_TRYING_FOREVER))
 			{
 				// Sleep a bit, and try again, as long as we have retries left.
 				ShortSleep(MilliSecondsToBoxTime(1000), true);
+				// Will try again
 			}
 			else
 			{
 				throw;
 			}
 		}
-
-		// Success!
-		break;
 	}
+
+	// If that didn't throw an exception, then we should have successfully got a lock!
+	ASSERT(HaveLock());
+	BOX_TRACE("Successfully locked account " <<
+		GetAccountIdentifier() << " after " << (i + 1) << " attempts");
 }
 
+void BackupFileSystem::ReleaseLock()
+{
+	mapBackupStoreInfo.reset();
+
+	if(mapPotentialRefCountDatabase.get())
+	{
+		mapPotentialRefCountDatabase->Discard();
+		mapPotentialRefCountDatabase.reset();
+	}
+
+	mapPermanentRefCountDatabase.reset();
+}
 
 // Refresh forces the any current BackupStoreInfo to be discarded and reloaded from the
 // store. This would be dangerous if anyone was holding onto a reference to it!
@@ -1716,6 +1743,18 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetFile(int64_t ObjectID)
 }
 
 
+void S3BackupFileSystem::TryGetLock()
+{
+	if(mHaveLock)
+	{
+		return;
+	}
+
+	// Now we have the lock!
+	mHaveLock = true;
+}
+
+
 void S3BackupFileSystem::ReleaseLock()
 {
 	BackupFileSystem::ReleaseLock();
@@ -1727,6 +1766,9 @@ void S3BackupFileSystem::ReleaseLock()
 	{
 		mCacheLock.ReleaseLock();
 	}
+
+	// Now we no longer have the lock!
+	mHaveLock = false;
 }
 
 
@@ -1742,7 +1784,7 @@ S3BackupFileSystem::~S3BackupFileSystem()
 
 	// This needs to be in the source file, not inline, as long as we don't include
 	// the whole of SimpleDBClient.h in BackupFileSystem.h.
-	if(true)
+	if(mHaveLock)
 	{
 		try
 		{
