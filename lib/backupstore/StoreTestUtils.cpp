@@ -214,7 +214,6 @@ int check_account_for_errors(BackupFileSystem& filesystem, Log::Level log_level)
 		filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 	}
 
-	filesystem.TryGetLock();
 	BackupStoreCheck check(filesystem,
 		true, // FixErrors
 		false); // Quiet
@@ -237,7 +236,11 @@ int64_t run_housekeeping(BackupFileSystem& filesystem)
 {
 	// Do housekeeping on this account
 	HousekeepStoreAccount housekeeping(filesystem, NULL);
-	TEST_THAT(housekeeping.DoHousekeeping(true /* keep trying forever */));
+	// Take a lock before calling DoHousekeeping, because although it does try to get a lock
+	// itself, it doesn't give us much control over how long it retries for. We want to retry
+	// for ~30 seconds, but not forever, because we don't want tests to hang.
+	// filesystem.GetLock(30);
+	TEST_THAT(housekeeping.DoHousekeeping(true)); // keep trying forever
 	return housekeeping.GetErrorCount();
 }
 
