@@ -423,6 +423,7 @@ class LogLevelOverrideByFileGuard
 	std::string mCategoryNamePrefix;
 	Log::Level mNewLevel;
 	bool mOverrideAllButSelected;
+	bool mInstalled;
 
 	public:
 	LogLevelOverrideByFileGuard(const std::string& rFileName,
@@ -430,24 +431,31 @@ class LogLevelOverrideByFileGuard
 		bool OverrideAllButSelected = false)
 	: mCategoryNamePrefix(rCategoryNamePrefix),
 	  mNewLevel(NewLevel),
-	  mOverrideAllButSelected(OverrideAllButSelected)
+	  mOverrideAllButSelected(OverrideAllButSelected),
+	  mInstalled(false)
 	{
 		if(rFileName.size() > 0)
 		{
 			mFileNames.push_back(rFileName);
 		}
 	}
-	virtual ~LogLevelOverrideByFileGuard()
-	{
-	}
+	virtual ~LogLevelOverrideByFileGuard();
 	void Add(const std::string& rFileName)
 	{
 		mFileNames.push_back(rFileName);
 	}
+	void Install();
 	bool IsOverridden(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	Log::Level GetNewLevel() { return mNewLevel; }
+	bool operator==(const LogLevelOverrideByFileGuard& rOther)
+	{
+		return (mFileNames == rOther.mFileNames) &&
+			(mCategoryNamePrefix == rOther.mCategoryNamePrefix) &&
+			(mNewLevel == rOther.mNewLevel) &&
+			(mOverrideAllButSelected == rOther.mOverrideAllButSelected);
+	}
 };
 
 
@@ -473,6 +481,7 @@ class Logging
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
 	static std::vector<LogLevelOverrideByFileGuard> sLogLevelOverrideByFileGuards;
+	friend class LogLevelOverrideByFileGuard;
 
 	public:
 	Logging ();

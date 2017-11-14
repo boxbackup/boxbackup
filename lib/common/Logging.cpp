@@ -775,10 +775,10 @@ std::string Logging::OptionParser::GetUsageString()
 
 	std::ostringstream buf;
 	buf <<
-	"  -L <file>[/<category>]=<level>  Override log level for specified file\n"
-	"             (for example, -L '" << current_file << "=trace')\n"
+	"  -L [<file>][/<category>]=<level>  Override log level for specified file or\n"
+	"             category (for example, -L '" << current_file << "/Configuration=trace').\n"
 	"             <category> can be one of: {Uncategorised, Backtrace,\n"
-	"             Configuration, RaidFileRead}\n"
+	"             Configuration, RaidFileRead, FileSystem/Locking}\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -802,6 +802,24 @@ bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
 	// logging (thus, return true if it's not in our list, i.e. we
 	// found nothing, to allow it).
 	return (i == mCategories.end());
+}
+
+LogLevelOverrideByFileGuard::~LogLevelOverrideByFileGuard()
+{
+	if(mInstalled)
+	{
+		auto this_pos = std::find(Logging::sLogLevelOverrideByFileGuards.begin(),
+			Logging::sLogLevelOverrideByFileGuards.end(), *this);
+		ASSERT(this_pos != Logging::sLogLevelOverrideByFileGuards.end());
+		Logging::sLogLevelOverrideByFileGuards.erase(this_pos);
+	}
+}
+
+void LogLevelOverrideByFileGuard::Install()
+{
+	ASSERT(!mInstalled);
+	Logging::sLogLevelOverrideByFileGuards.push_back(*this);
+	mInstalled = true;
 }
 
 bool LogLevelOverrideByFileGuard::IsOverridden(Log::Level level, const std::string& file, int line,
