@@ -76,10 +76,11 @@ std::map<std::string, int32_t> nameToID;
 std::map<int32_t, bool> objectIsDir;
 
 #define RUN_CHECK \
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
-		"check 01234567"); \
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Ttbbstoreaccounts " \
-		"check 01234567 fix");
+	BOX_INFO("Running bbstoreaccounts to check and then repair the account"); \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Utbbstoreaccounts " \
+		"-L/FileSystem/Locking=trace check 01234567"); \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Utbbstoreaccounts " \
+		"-L/FileSystem/Locking=trace check 01234567 fix");
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
@@ -449,6 +450,9 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 
 int test(int argc, const char *argv[])
 {
+	// Enable logging timestamps to help debug race conditions on AppVeyor
+	Console::SetShowTimeMicros(true);
+
 	{
 		MEMLEAKFINDER_NO_LEAKS;
 		fnames[0].SetAsClearFilename("x1");
@@ -551,7 +555,7 @@ int test(int argc, const char *argv[])
 	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
 	// locked when we try to check or query it (race conditions):
 	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
-		"-kT -Winfo -tbbstored");
+		"-kT -Winfo -tbbstored -L/FileSystem/Locking=trace");
 	TEST_THAT_OR(StartServer(daemon_args), return 1);
 
 	// Instead of starting a client, read the file listing file created by
@@ -982,6 +986,11 @@ int test(int argc, const char *argv[])
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
 	{
+		// Increase log level for locking errors to help debug random failures on AppVeyor
+		LogLevelOverrideByFileGuard increase_lock_logging("", // rFileName
+			BackupFileSystem::LOCKING.ToString(), Log::TRACE); // NewLevel
+		increase_lock_logging.Install();
+
 		// Wait for the server to finish housekeeping (if any) and then lock the account
 		// before damaging it, to avoid a race condition where bbstored runs housekeeping
 		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
