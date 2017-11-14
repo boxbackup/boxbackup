@@ -40,6 +40,8 @@
 
 #include "MemLeakFindOn.h"
 
+const FileSystemCategory BackupFileSystem::LOCKING("Locking");
+
 void BackupFileSystem::GetLock(int max_tries)
 {
 	if(HaveLock())
@@ -66,11 +68,36 @@ void BackupFileSystem::GetLock(int max_tries)
 				((i < max_tries - 1) || max_tries == KEEP_TRYING_FOREVER))
 			{
 				// Sleep a bit, and try again, as long as we have retries left.
+
+				if(i == 0)
+				{
+					BOX_LOG_CATEGORY(Log::INFO, LOCKING, "Failed to lock "
+						"account " << GetAccountIdentifier() << ", "
+						"still trying...");
+				}
+				else if(i == 30)
+				{
+					BOX_LOG_CATEGORY(Log::WARNING, LOCKING, "Failed to lock "
+						"account " << GetAccountIdentifier() << " for "
+						"30 seconds, still trying...");
+				}
+
 				ShortSleep(MilliSecondsToBoxTime(1000), true);
 				// Will try again
 			}
+			else if(EXCEPTION_IS_TYPE(e, BackupStoreException,
+				CouldNotLockStoreAccount))
+			{
+				BOX_LOG_CATEGORY(Log::INFO, LOCKING, "Failed to lock account " <<
+					GetAccountIdentifier() << " after " << (i + 1) << " "
+					"attempts, giving up");
+				throw;
+			}
 			else
 			{
+				BOX_LOG_CATEGORY(Log::INFO, LOCKING, "Failed to lock account " <<
+					GetAccountIdentifier() << " " "with unexpected error: " <<
+					e.what());
 				throw;
 			}
 		}
@@ -78,12 +105,18 @@ void BackupFileSystem::GetLock(int max_tries)
 
 	// If that didn't throw an exception, then we should have successfully got a lock!
 	ASSERT(HaveLock());
-	BOX_TRACE("Successfully locked account " <<
+	BOX_LOG_CATEGORY(Log::TRACE, LOCKING, "Successfully locked account " <<
 		GetAccountIdentifier() << " after " << (i + 1) << " attempts");
 }
 
 void BackupFileSystem::ReleaseLock()
 {
+	if(HaveLock())
+	{
+		BOX_LOG_CATEGORY(Log::TRACE, LOCKING, "Releasing lock on account " <<
+			GetAccountIdentifier());
+	}
+
 	mapBackupStoreInfo.reset();
 
 	if(mapPotentialRefCountDatabase.get())

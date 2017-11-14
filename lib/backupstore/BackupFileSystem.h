@@ -25,6 +25,15 @@ class BackupStoreInfo;
 class Configuration;
 class IOStream;
 
+class FileSystemCategory : public Log::Category
+{
+	public:
+		FileSystemCategory(const std::string& name)
+		: Log::Category(std::string("FileSystem/") + name)
+		{ }
+};
+
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -149,6 +158,8 @@ public:
 	{
 		return mapPermanentRefCountDatabase.get();
 	}
+
+	static const FileSystemCategory LOCKING;
 
 protected:
 	virtual void TryGetLock() = 0;
