@@ -219,6 +219,7 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 
 	try
 	{
+		HideExceptionMessageGuard hide_exceptions;
 		line = mInterProcessComms.GetLine(false /* no pre-processing */,
 			MaximumWaitTime);
 	}
