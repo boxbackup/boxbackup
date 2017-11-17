@@ -2162,8 +2162,12 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		std::string command;
 		while(mapCommandSocketInfo->mapGetLine.get() != 0)
 		{
-			command = mapCommandSocketInfo->mapGetLine->GetLine(
-				false /* no preprocessing */, timeout);
+			{
+				HideExceptionMessageGuard hide_exceptions;
+				command = mapCommandSocketInfo->mapGetLine->GetLine(
+					false /* no preprocessing */, timeout);
+			}
+
 			BOX_TRACE("Received command '" << command << "' over command socket");
 			
 			bool sendOK = false;
