@@ -1281,8 +1281,28 @@ int S3BackupFileSystem::GetBlockSize()
 
 std::string S3BackupFileSystem::GetAccountIdentifier()
 {
+	std::string name;
+
+	try
+	{
+		name = GetBackupStoreInfo(true).GetAccountName();
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, FileNotFound))
+		{
+			std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
+			std::string info_url = GetObjectURL(info_uri);
+			return "unknown (BackupStoreInfo file not found) at " + info_url;
+		}
+		else
+		{
+			throw;
+		}
+	}
+
 	std::ostringstream oss;
-	oss << "'" << GetBackupStoreInfo(true).GetAccountName() << "'";
+	oss << "'" << name << "'";
 	return oss.str();
 }
 
