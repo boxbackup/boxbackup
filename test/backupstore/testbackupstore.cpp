@@ -225,7 +225,9 @@ bool setup_test_backupstore_specialised(const std::string& spec_name,
 
 #define SETUP_TEST_BACKUPSTORE_SPECIALISED(name, control) \
 	SETUP_SPECIALISED(name); \
-	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL);
+	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL); \
+	try \
+	{ // left open for TEARDOWN_TEST_BACKUPSTORE_SPECIALISED()
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_backupstore()
@@ -264,13 +266,25 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 }
 
 #define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
-	if (ServerIsAlive(bbstored_pid)) \
-		StopServer(); \
-	if(control.GetCurrentFileSystem() != NULL) \
-	{ \
-		control.GetCurrentFileSystem()->ReleaseLock(); \
+		if (ServerIsAlive(bbstored_pid)) \
+			StopServer(); \
+		if(control.GetCurrentFileSystem() != NULL) \
+		{ \
+			control.GetCurrentFileSystem()->ReleaseLock(); \
+		} \
+		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
 	} \
-	TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
+	catch (BoxException &e) \
+	{ \
+		if (ServerIsAlive(bbstored_pid)) \
+			StopServer(); \
+		if(control.GetCurrentFileSystem() != NULL) \
+		{ \
+			control.GetCurrentFileSystem()->ReleaseLock(); \
+		} \
+		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
+		throw; \
+	} \
 	TEARDOWN();
 
 // Nice random data for testing written files
