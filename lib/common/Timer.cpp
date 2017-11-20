@@ -151,7 +151,6 @@ void Timers::AssertInitialised()
 void Timers::Add(Timer& rTimer)
 {
 	ASSERT(spTimers);
-	ASSERT(&rTimer);
 	BOX_TRACE(TIMER_ID_OF(rTimer) " added to global queue, rescheduling");
 	spTimers->push_back(&rTimer);
 	Reschedule();
@@ -168,8 +167,6 @@ void Timers::Add(Timer& rTimer)
 // --------------------------------------------------------------------------
 void Timers::Remove(Timer& rTimer)
 {
-	ASSERT(&rTimer);
-
 	if(!spTimers)
 	{
 		BOX_WARNING(TIMER_ID_OF(rTimer) " was still active after "
