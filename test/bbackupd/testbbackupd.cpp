@@ -2707,8 +2707,10 @@ bool test_store_error_reporting()
 		// Should not have backed up, should still get errors
 		TEST_COMPARE(Compare_Different);
 
-		// wait another 2 seconds, bbackup should have run
-		wait_for_operation(2, "bbackupd to recover");
+		// Wait another 4 seconds, bbackup should have run. Ideally 2 seconds would be
+		// enough, and it usually is, but sometimes Travis is heavily loaded and the backup
+		// takes ~4 seconds to run!
+		wait_for_operation(4, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 
@@ -2782,8 +2784,8 @@ bool test_store_error_reporting()
 		// Should not have backed up, should still get errors
 		TEST_COMPARE(Compare_Different);
 
-		// wait another 3 seconds, bbackup should have run
-		wait_for_operation(3, "bbackupd to recover");
+		// wait another 4 seconds, bbackup should have run
+		wait_for_operation(4, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-automatic.1"));
 
