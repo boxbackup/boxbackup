@@ -16,8 +16,6 @@
 #include "autogen_BackupStoreException.h"
 #include "autogen_CommonException.h"
 #include "BackupAccountControl.h"
-#include "BackupFileSystem.h"
-#include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
@@ -32,22 +30,6 @@
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
-
-#define OPEN_ACCOUNT(read_write) \
-	try \
-	{ \
-		OpenAccount(read_write); \
-	} \
-	catch(BoxException &e) \
-	{ \
-		if(EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount)) \
-		{ \
-			BOX_ERROR("Failed to open account: " << e.what()); \
-			return 1; \
-		} \
-		throw; \
-	}
-
 
 void BackupAccountControl::CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit)
 {
@@ -117,8 +99,7 @@ std::string BackupAccountControl::BlockSizeToString(int64_t Blocks, int64_t MaxB
 
 int BackupAccountControl::PrintAccountInfo()
 {
-	OPEN_ACCOUNT(false); // !readWrite
-
+	OpenAccount(false); // !readWrite
 	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(true)); // ReadOnly
 	int BlockSize = GetBlockSize();
 
@@ -191,13 +172,12 @@ int BackupAccountControl::SetLimit(const char *SoftLimitStr,
 	return BackupAccountControl::SetLimit(softlimit, hardlimit);
 }
 
-
 int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
 {
 	CheckSoftHardLimits(softlimit, hardlimit);
 
 	// Change the limits
-	OPEN_ACCOUNT(true); // readWrite
+	OpenAccount(true); // readWrite
 	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
 	info.ChangeLimits(softlimit, hardlimit);
 	mapFileSystem->PutBackupStoreInfo(info);
@@ -211,7 +191,7 @@ int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
 
 int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 {
-	OPEN_ACCOUNT(true); // readWrite
+	OpenAccount(true); // readWrite
 	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
 	info.SetAccountName(rNewAccountName);
 	mapFileSystem->PutBackupStoreInfo(info);
@@ -225,7 +205,7 @@ int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 
 int BackupAccountControl::SetAccountEnabled(bool enabled)
 {
-	OPEN_ACCOUNT(true); // readWrite
+	OpenAccount(true); // readWrite
 	BackupStoreInfo &info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
 	info.SetAccountEnabled(enabled);
 	mapFileSystem->PutBackupStoreInfo(info);
@@ -279,7 +259,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
 	// Obtain a write lock, as the daemon user
 	// We definitely need a lock to do something this destructive!
-	OPEN_ACCOUNT(true); // readWrite
+	OpenAccount(true); // readWrite
 
 	// Check user really wants to do this
 	if(AskForConfirmation)
@@ -447,7 +427,7 @@ int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
 	// Don't need a write lock if not making changes.
-	OPEN_ACCOUNT(FixErrors); // readWrite
+	OpenAccount(FixErrors); // readWrite
 
 	// Check it
 	BackupStoreCheck check(*mapFileSystem, FixErrors, Quiet);
@@ -526,7 +506,7 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 int BackupStoreAccountControl::HousekeepAccountNow()
 {
 	// Housekeeping locks the account itself, so we can't.
-	OPEN_ACCOUNT(false); // readWrite
+	OpenAccount(false); // readWrite
 
 	HousekeepStoreAccount housekeeping(*mapFileSystem, NULL);
 	bool success = housekeeping.DoHousekeeping();
