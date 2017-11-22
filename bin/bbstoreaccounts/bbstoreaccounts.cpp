@@ -176,125 +176,133 @@ int main(int argc, const char *argv[])
 	argc--;
 
 	BackupStoreAccountControl control(*config, id, machineReadableOutput);
-	
+
 	// Now do the command.
-	if(command == "create")
+	try
 	{
-		// which disc?
-		int32_t discnum;
-		int32_t softlimit;
-		int32_t hardlimit;
-		if(argc < 3
-			|| ::sscanf(argv[0], "%d", &discnum) != 1)
+		if(command == "create")
 		{
-			BOX_ERROR("create requires raid file disc number, "
-				"soft and hard limits.");
-			return 1;
-		}
-		
-		// Decode limits
-		int blocksize = control.BlockSizeOfDiscSet(discnum);
-		softlimit = control.SizeStringToBlocks(argv[1], blocksize);
-		hardlimit = control.SizeStringToBlocks(argv[2], blocksize);
-		control.CheckSoftHardLimits(softlimit, hardlimit);
-	
-		// Create the account...
-		return control.CreateAccount(discnum, softlimit, hardlimit);
-	}
-	else if(command == "info")
-	{
-		// Print information on this account
-		return control.PrintAccountInfo();
-	}
-	else if(command == "enabled")
-	{
-		// Change the AccountEnabled flag on this account
-		if(argc != 1)
-		{
-			return PrintUsage();
-		}
-		
-		bool enabled = true;
-		std::string enabled_string = argv[0];
-		if(enabled_string == "yes")
-		{
-			enabled = true;
-		}
-		else if(enabled_string == "no")
-		{
-			enabled = false;
-		}
-		else
-		{
-			return PrintUsage();
-		}		
-		
-		return control.SetAccountEnabled(enabled);
-	}
-	else if(command == "setlimit")
-	{
-		// Change the limits on this account
-		if(argc < 2)
-		{
-			BOX_ERROR("setlimit requires soft and hard limits.");
-			return 1;
-		}
-		
-		return control.SetLimit(argv[0], argv[1]);
-	}
-	else if(command == "name")
-	{
-		// Change the limits on this account
-		if(argc != 1)
-		{
-			BOX_ERROR("name command requires a new name.");
-			return 1;
-		}
-		return control.SetAccountName(argv[0]);
-	}
-	else if(command == "delete")
-	{
-		// Delete an account
-		bool askForConfirmation = true;
-		if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
-		{
-			askForConfirmation = false;
-		}
-		return control.DeleteAccount(askForConfirmation);
-	}
-	else if(command == "check")
-	{
-		bool fixErrors = false;
-		bool quiet = false;
-		
-		// Look at other options
-		for(int o = 0; o < argc; ++o)
-		{
-			if(::strcmp(argv[o], "fix") == 0)
+			// which disc?
+			int32_t discnum;
+			int32_t softlimit;
+			int32_t hardlimit;
+			if(argc < 3
+				|| ::sscanf(argv[0], "%d", &discnum) != 1)
 			{
-				fixErrors = true;
+				BOX_ERROR("create requires raid file disc number, "
+					"soft and hard limits.");
+				return 1;
 			}
-			else if(::strcmp(argv[o], "quiet") == 0)
+
+			// Decode limits
+			int blocksize = control.BlockSizeOfDiscSet(discnum);
+			softlimit = control.SizeStringToBlocks(argv[1], blocksize);
+			hardlimit = control.SizeStringToBlocks(argv[2], blocksize);
+			control.CheckSoftHardLimits(softlimit, hardlimit);
+
+			// Create the account...
+			return control.CreateAccount(discnum, softlimit, hardlimit);
+		}
+		else if(command == "info")
+		{
+			// Print information on this account
+			return control.PrintAccountInfo();
+		}
+		else if(command == "enabled")
+		{
+			// Change the AccountEnabled flag on this account
+			if(argc != 1)
 			{
-				quiet = true;
+				return PrintUsage();
+			}
+
+			bool enabled = true;
+			std::string enabled_string = argv[0];
+			if(enabled_string == "yes")
+			{
+				enabled = true;
+			}
+			else if(enabled_string == "no")
+			{
+				enabled = false;
 			}
 			else
 			{
-				BOX_ERROR("Unknown option " << argv[o] << ".");
+				return PrintUsage();
+			}
+
+			return control.SetAccountEnabled(enabled);
+		}
+		else if(command == "setlimit")
+		{
+			// Change the limits on this account
+			if(argc != 2)
+			{
+				BOX_ERROR("setlimit requires soft and hard limits.");
 				return 2;
 			}
+
+			return control.SetLimit(argv[0], argv[1]);
 		}
-	
-		// Check the account
-		return control.CheckAccount(fixErrors, quiet);
+		else if(command == "name")
+		{
+			// Change the limits on this account
+			if(argc != 1)
+			{
+				BOX_ERROR("name command requires a new name.");
+				return 1;
+			}
+			return control.SetAccountName(argv[0]);
+		}
+		else if(command == "delete")
+		{
+			// Delete an account
+			bool askForConfirmation = true;
+			if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
+			{
+				askForConfirmation = false;
+			}
+			return control.DeleteAccount(askForConfirmation);
+		}
+		else if(command == "check")
+		{
+			bool fixErrors = false;
+			bool quiet = false;
+
+			// Look at other options
+			for(int o = 0; o < argc; ++o)
+			{
+				if(::strcmp(argv[o], "fix") == 0)
+				{
+					fixErrors = true;
+				}
+				else if(::strcmp(argv[o], "quiet") == 0)
+				{
+					quiet = true;
+				}
+				else
+				{
+					BOX_ERROR("Unknown option " << argv[o] << ".");
+					return 2;
+				}
+			}
+
+			// Check the account
+			return control.CheckAccount(fixErrors, quiet);
+		}
+		else if(command == "housekeep")
+		{
+			return control.HousekeepAccountNow();
+		}
+		else
+		{
+			BOX_ERROR("Unknown command '" << command << "'.");
+			return 2;
+		}
 	}
-	else if(command == "housekeep")
+	catch(BoxException &e)
 	{
-		return control.HousekeepAccountNow();
-	}
-	else
-	{
-		BOX_ERROR("Unknown command '" << command << "'.");
+		BOX_ERROR("Failed command: " << command << ": " << e.what());
 		return 1;
 	}
 
