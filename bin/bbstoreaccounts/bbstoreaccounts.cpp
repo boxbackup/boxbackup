@@ -161,47 +161,45 @@ int main(int argc, const char *argv[])
 			":" << errs);
 	}
 
-	// Initialise the raid file controller
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+	std::auto_ptr<BackupStoreAccountControl> apStoreControl;
+	BackupAccountControl* pControl;
 
-	// Get the Account ID (in hex without the leading 0x).
-	int32_t id;
-	if(argc == 0 || ::sscanf(argv[0], "%x", &id) != 1)
 	{
-		BOX_FATAL("All commands require an account ID, in hex without 0x");
-		return PrintUsage();
-	}
-	argv++;
-	argc--;
+		// Initialise the raid file controller
+		RaidFileController &rcontroller(RaidFileController::GetController());
+		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 
-	BackupStoreAccountControl control(*config, id, machineReadableOutput);
+		// Get the Account ID (in hex without the leading 0x).
+		int32_t id;
+		if(argc == 0 || ::sscanf(argv[0], "%x", &id) != 1)
+		{
+			BOX_FATAL("All commands require an account ID, in hex without 0x");
+			return PrintUsage();
+		}
+		argv++;
+		argc--;
+
+		apStoreControl.reset(new BackupStoreAccountControl(*config, id,
+			machineReadableOutput));
+		pControl = apStoreControl.get();
+	}
+
+	BackupAccountControl& control(*pControl);
 
 	// Now do the command.
 	try
 	{
 		if(command == "create")
 		{
-			// which disc?
-			int32_t discnum;
-			int32_t softlimit;
-			int32_t hardlimit;
-			if(argc < 3
-				|| ::sscanf(argv[0], "%d", &discnum) != 1)
-			{
-				BOX_ERROR("create requires raid file disc number, "
-					"soft and hard limits.");
-				return 1;
-			}
-
-			// Decode limits
-			int blocksize = control.BlockSizeOfDiscSet(discnum);
-			softlimit = control.SizeStringToBlocks(argv[1], blocksize);
-			hardlimit = control.SizeStringToBlocks(argv[2], blocksize);
-			control.CheckSoftHardLimits(softlimit, hardlimit);
-
 			// Create the account...
-			return control.CreateAccount(discnum, softlimit, hardlimit);
+			{
+				int32_t discnum = 0;
+				int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
+				// Decode limits
+				int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+				int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+				return apStoreControl->CreateAccount(discnum, softlimit, hardlimit);
+			}
 		}
 		else if(command == "info")
 		{
@@ -262,7 +260,7 @@ int main(int argc, const char *argv[])
 			{
 				askForConfirmation = false;
 			}
-			return control.DeleteAccount(askForConfirmation);
+			return apStoreControl->DeleteAccount(askForConfirmation);
 		}
 		else if(command == "check")
 		{
@@ -288,11 +286,11 @@ int main(int argc, const char *argv[])
 			}
 
 			// Check the account
-			return control.CheckAccount(fixErrors, quiet);
+			return apStoreControl->CheckAccount(fixErrors, quiet);
 		}
 		else if(command == "housekeep")
 		{
-			return control.HousekeepAccountNow();
+			return apStoreControl->HousekeepAccountNow();
 		}
 		else
 		{
