@@ -71,7 +71,6 @@ public:
 	
 	private:
 		BackupStoreFileCreation::BlocksAvailableEntry *mpBlockIndex;
-		int64_t mNumBlocksInIndex;
 		int64_t mOtherFileID;
 	};
 	
