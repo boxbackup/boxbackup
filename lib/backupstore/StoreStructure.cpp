@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include "BackupConstants.h"
 #include "StoreStructure.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
@@ -86,7 +87,8 @@ void StoreStructure::MakeWriteLockFilename(const std::string &rStoreRoot, int Di
 	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(DiscSet));
 	
 	// Make the filename
-	std::string writeLockFile(rdiscSet[0] + DIRECTORY_SEPARATOR + rStoreRoot + "write.lock");
+	std::string writeLockFile(rdiscSet[0] + DIRECTORY_SEPARATOR + rStoreRoot +
+		WRITE_LOCK_FILENAME);
 
 	// Return it to the caller
 	rFilenameOut = writeLockFile;

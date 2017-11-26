@@ -19,6 +19,7 @@
 // Should the store daemon convert files to Raid immediately?
 #define BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY	true
 
-#endif // BACKUPCONSTANTS__H
+#define WRITE_LOCK_FILENAME "write.lock"
 
+#endif // BACKUPCONSTANTS__H
 
