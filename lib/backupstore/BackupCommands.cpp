@@ -21,11 +21,7 @@
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreInfo.h"
-#include "BufferedStream.h"
 #include "CollectInBufferStream.h"
-#include "FileStream.h"
-#include "InvisibleTempFileStream.h"
-#include "RaidFileController.h"
 #include "StreamableMemBlock.h"
 
 #include "MemLeakFindOn.h"
