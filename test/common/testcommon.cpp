@@ -316,13 +316,14 @@ int test(int argc, const char *argv[])
 		Timer tim(0, "tim");
 		TEST_CHECK_THROWS(Timers::Add(tim), CommonException, AssertFailed);
 		Timers::Remove(tim);
-	}
-	#endif
 
-	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
-	#ifndef BOX_RELEASE_BUILD
+		TEST_CHECK_THROWS(Timer t1(900, "t1"), CommonException,
+			AssertFailed);
+
+		// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
+	}
 	#endif
 	
 	// Check that we can initialise the timers
