@@ -288,7 +288,7 @@ sub get_csr_common_name
 	my $subject;
 	while(<CSRTEXT>)
 	{
-		$subject = $1 if m/Subject:.+?CN=([-\.\w]+)/
+		$subject = $1 if m/Subject:.+?CN\s?=\s?([-\.\w]+)/;
 	}	
 	close CSRTEXT;
 
