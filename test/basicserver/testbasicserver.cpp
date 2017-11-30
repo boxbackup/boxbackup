@@ -10,6 +10,10 @@
 
 #include "Box.h"
 
+#ifdef HAVE_SIGNAL_H
+#	include <signal.h>
+#endif
+
 #include <stdio.h>
 #include <time.h>
 
@@ -524,6 +528,11 @@ int test(int argc, const char *argv[])
 		}
 	}
 
+#ifndef WIN32
+	// Don't die quietly if the server dies while we're communicating with it
+	signal(SIGPIPE, SIG_IGN);
+#endif
+
 	//printf("SKIPPING TESTS------------------------\n");
 	//goto protocolserver;
 
@@ -801,11 +810,35 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetNumber8() == 22);
 				TEST_THAT(reply->GetText() == "Hello world!");
 			}
+
+			// Try to trigger a deliberate and an unexpected error (the latter
+			// by throwing an exception that isn't caught and handled by
+			// HandleException):
+			{
+				TEST_CHECK_THROWS(protocol.QueryDeliberateError(),
+					ConnectionException, Protocol_UnexpectedReply);
+				int type, subtype;
+				protocol.GetLastError(type, subtype);
+				TEST_EQUAL(TestProtocolError::ErrorType, type);
+				TEST_EQUAL(TestProtocolError::Err_DeliberateError, subtype);
+			}
+
+			{
+				TEST_CHECK_THROWS(protocol.QueryUnexpectedError(),
+					ConnectionException, Protocol_UnexpectedReply);
+				int type, subtype;
+				protocol.GetLastError(type, subtype);
+				TEST_EQUAL(TestProtocolError::ErrorType, type);
+				TEST_EQUAL(-1, subtype);
+			}
+
+			// The unexpected exception should kill the server child process that we
+			// connected to (except on Windows where the server does not fork a child),
+			// so we cannot communicate with it any more:
+			TEST_CHECK_THROWS(protocol.QueryQuit(),
+				ConnectionException, SocketWriteError);
 		
-			// Quit query to finish
-			protocol.QueryQuit();
-		
-			// Kill it
+			// Kill the main server process:
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
 			TEST_THAT(!ServerIsAlive(pid));
