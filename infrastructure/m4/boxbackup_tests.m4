@@ -31,6 +31,7 @@ BOX_CHECK_CXX_FLAG(-Werror=parentheses)
 BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
 BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
 BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
+BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
