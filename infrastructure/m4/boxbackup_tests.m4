@@ -42,6 +42,7 @@ BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
 dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
 dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
 BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
+BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
