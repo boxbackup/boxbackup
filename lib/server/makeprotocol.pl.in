@@ -118,11 +118,11 @@ while(<IN>)
 		my ($type,$name,$value) = split /\s+/,$l;
 		if($type eq 'CONSTANT')
 		{
-			push @{$cmd_constants{$current_cmd}},"$name = $value"
+			push @{$cmd_constants{$current_cmd}}, [$name, $value];
 		}
 		else
 		{
-			push @{$cmd_contents{$current_cmd}},$type,$name;
+			push @{$cmd_contents{$current_cmd}}, $type, $name;
 		}
 	}
 	else
@@ -317,8 +317,11 @@ __E
 	# constants
 	if(exists $cmd_constants{$cmd})
 	{
-		print H "\tenum\n\t{\n\t\t";
-		print H join(",\n\t\t",@{$cmd_constants{$cmd}});
+		print H "\tenum\n\t{\n";
+		foreach my $constant (@{$cmd_constants{$cmd}})
+		{
+			print H "\t\t", $constant->[0], " = ", $constant->[1], ",\n";
+		}
 		print H "\n\t};\n";
 	}
 	
@@ -332,9 +335,19 @@ __E
 	{
 		$error_message = $cmd;
 		my ($mem_type,$mem_subtype) = split /,/,obj_get_type_params($cmd,'IsError');
-		my $error_type = $cmd_constants{"ErrorType"};
+		my %constants_hash;
+		my $error_type_value = "";
+
+		foreach my $constant (@{$cmd_constants{$cmd}})
+		{
+			if($constant->[0] eq "ErrorType")
+			{
+				$error_type_value = $constant->[0];
+			}
+		}
+
 		print H <<__E;
-	$cmd_class(int SubType) : m$mem_type($error_type), m$mem_subtype(SubType) { }
+	$cmd_class(int SubType) : m$mem_type($error_type_value), m$mem_subtype(SubType) { }
 	bool IsError(int &rTypeOut, int &rSubTypeOut) const;
 	std::string GetMessage() const { return GetMessage(m$mem_subtype); };
 	static std::string GetMessage(int subtype);
@@ -515,13 +528,13 @@ std::string $cmd_class\::GetMessage(int subtype)
 	switch(subtype)
 	{
 __E
-		foreach my $const (@{$cmd_constants{$cmd}})
+		foreach my $constant (@{$cmd_constants{$cmd}})
 		{
-			next unless $const =~ /^Err_(.*)/;
+			my $enum_name = $constant->[0];
+			next unless $enum_name =~ /^Err_(.*)/;
 			my $shortname = $1;
-			$const =~ s/ = .*//;
 			print CPP <<__E;
-		case $const: return "$shortname";
+		case $enum_name: return "$shortname";
 __E
 		}
 		print CPP <<__E;

@@ -9,6 +9,8 @@ BEGIN_OBJECTS
 Error		0	IsError(Type,SubType)	Reply
 	int32	Type
 	int32	SubType
+	CONSTANT	ErrorType		1000
+	CONSTANT	Err_DeliberateError	1
 
 Hello		1	Command(Hello)	Reply
 	int32	Number32
@@ -40,3 +42,6 @@ SendStream	8	Command(GetStream)	StreamWithCommand
 String		9	Command(String)	Reply
 	string	Test
 
+DeliberateError		10	Command(String)
+
+UnexpectedError		11	Command(String)
