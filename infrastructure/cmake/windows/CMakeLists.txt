@@ -35,7 +35,7 @@ ExternalProject_Add(zlib
 	URL "http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
 	URL_HASH ${ZLIB_HASH}
 	DOWNLOAD_NO_PROGRESS 1
-	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
+	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	# We need to build both versions, debug and release, because cmake requires both to be
 	# present to generate its multi-configuration project files for Visual Studio/MSBuild.
 	INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
@@ -86,7 +86,7 @@ ExternalProject_Add(pcre
 	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
 	SVN_REVISION -r 1677
 	DOWNLOAD_NO_PROGRESS 1
-	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir}
+	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	-DPCRE_SUPPORT_LIBREADLINE=OFF
 	-DPCRE_SUPPORT_LIBBZ2=OFF
 	# We need to build both versions, debug and release, because cmake requires both to be
@@ -100,9 +100,9 @@ ExternalProject_Add(boost
 	URL "http://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORES}.tar.bz2"
 	URL_HASH ${BOOST_HASH}
 	# DOWNLOAD_NO_PROGRESS 1
-	CONFIGURE_COMMAND "" # none needed
-	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed" # none needed
-	INSTALL_COMMAND "" # none needed
+	CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "No configure step needed"
+	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed"
+	INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "No install step needed"
 )
 
 if(BOXBACKUP_VERSION)
@@ -119,8 +119,10 @@ ExternalProject_Add(boxbackup
 		-DPCRE_ROOT=${install_dir}
 		-DBOOST_ROOT=${CMAKE_BINARY_DIR}/Source/boost
 		-DBOX_SUPPORT_READLINE=OFF
+		-DCMAKE_INSTALL_PREFIX=${install_dir}
 		-DAPPVEYOR_MODE=1
 		-DDEBUG=${DEBUG}
 		${boxbackup_cmake_args}
+		${SUB_CMAKE_EXTRA_ARGS}
 	STEP_TARGETS configure build install
 )

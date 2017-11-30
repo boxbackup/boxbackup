@@ -312,10 +312,19 @@ int test(int argc, const char *argv[])
 	// Check that using timer methods without initialisation
 	// throws an assertion failure. Can only do this in debug mode
 	#ifndef BOX_RELEASE_BUILD
-		TEST_CHECK_THROWS(Timer t1(900, "t1"), CommonException,
-			AssertFailed);
+	{
 		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
 			AssertFailed);
+
+		Timer tim(0, "tim");
+		TEST_CHECK_THROWS(Timers::Add(tim), CommonException, AssertFailed);
+		Timers::Remove(tim);
+
+		TEST_CHECK_THROWS(Timer t1(900, "t1"), CommonException,
+			AssertFailed);
+	
+		// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
+	}
 	#endif
 	
 	// Check that we can initialise the timers
