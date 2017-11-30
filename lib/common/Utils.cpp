@@ -384,7 +384,7 @@ std::string GetTempDirPath()
 	}
 	return std::string(buffer);
 #else
-	char* result = getenv("TMPDIR");
+	const char* result = getenv("TMPDIR");
 	if(result == NULL)
 	{
 		result = getenv("TEMP");
