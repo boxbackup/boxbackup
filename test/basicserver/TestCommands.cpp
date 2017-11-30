@@ -106,3 +106,16 @@ std::auto_ptr<TestProtocolMessage> TestProtocolString::DoCommand(TestProtocolRep
 	return std::auto_ptr<TestProtocolMessage>(new TestProtocolString(mTest));
 }
 
+std::auto_ptr<TestProtocolMessage> TestProtocolDeliberateError::DoCommand(
+	TestProtocolReplyable &rProtocol, TestContext &rContext) const
+{
+	return std::auto_ptr<TestProtocolMessage>(new TestProtocolError(
+		TestProtocolError::ErrorType,
+		TestProtocolError::Err_DeliberateError));
+}
+
+std::auto_ptr<TestProtocolMessage> TestProtocolUnexpectedError::DoCommand(
+	TestProtocolReplyable &rProtocol, TestContext &rContext) const
+{
+	THROW_EXCEPTION_MESSAGE(CommonException, Internal, "unexpected error");
+}
