@@ -861,8 +861,15 @@ __E
 	{
 		my $make;
 
-		# then... do the cpp files...
+		# Then, do the cpp files. Ensure that @objs_extra (from Makefile.extra) are listed
+		# first in the output dependencies (@objs), since any changed to their own
+		# dependencies (e.g. a Protocol.txt file) must cause them to be rebuilt before we
+		# attempt to compile any other source files, otherwise those other files might not
+		# compile (due to newly defined Commands not existing in the autogen_Protocol.h
+		# file yet) which could cause us to fail to even try to build the later dependencies
+		# that would fix the problem.
 		my @objs = @objs_extra;
+
 		for my $file (@items)
 		{
 			my $is_c   = $file =~ m@(([^/]+)\.c)\Z@i;
@@ -928,7 +935,7 @@ __E
 		}
 
 		my $prefixed_end_target = "\$(${var_prefix}_OUTBASE)/$mod/$end_target_file";
-		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} sort @objs);
+		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} @objs);
 		my @prefixed_lib_files = map {"\$(${var_prefix}_OUTBASE)/$_"} @lib_files;
 		my @prefixed_dep_targets = map {"\$(${var_prefix}_OUTBASE)/$_"} @dep_targets;
 
