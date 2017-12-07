@@ -835,9 +835,32 @@ int test(int argc, const char *argv[])
 			// The unexpected exception should kill the server child process that we
 			// connected to (except on Windows where the server does not fork a child),
 			// so we cannot communicate with it any more:
-			TEST_CHECK_THROWS(protocol.QueryQuit(),
-				ConnectionException, SocketWriteError);
-		
+
+			{
+				bool didthrow = false;
+				HideExceptionMessageGuard hide;
+				try
+				{
+					protocol.QueryQuit();
+				}
+				catch(ConnectionException &e)
+				{
+					if(e.GetSubType() == ConnectionException::SocketReadError ||
+						e.GetSubType() == ConnectionException::SocketWriteError)
+					{
+						didthrow = true;
+					}
+					else
+					{
+						throw;
+					}
+				}
+				if(!didthrow)
+				{
+					TEST_FAIL_WITH_MESSAGE("Didn't throw expected exception");
+				}
+			}
+
 			// Kill the main server process:
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
