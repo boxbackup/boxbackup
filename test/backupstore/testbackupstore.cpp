@@ -967,6 +967,7 @@ bool test_temporary_refcount_db_is_independent()
 bool test_server_housekeeping()
 {
 	SETUP_TEST_BACKUPSTORE();
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
 	int encfile[ENCFILE_SIZE];
 	{
@@ -989,10 +990,9 @@ bool test_server_housekeeping()
 		0, false);
 
 	int root_dir_blocks = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID)->GetDiscUsageInBlocks();
-	TEST_THAT(check_num_files(0, 0, 0, 1));
+	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
 		root_dir_blocks));
-	TEST_THAT(check_reference_counts());
 
 	// Store a file -- first make the encoded file
 	BackupStoreFilenameClear store1name("file1");
@@ -1122,10 +1122,9 @@ bool test_server_housekeeping()
 	}
 
 	int file1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
-	TEST_THAT(check_num_files(1, 0, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
 		file1_blocks + root_dir_blocks));
-	TEST_THAT(check_reference_counts());
 
 	// Upload again, as a patch to the original file.
 	int64_t patch1_id = BackupStoreFile::QueryStoreFileDiff(protocol,
@@ -1148,7 +1147,7 @@ bool test_server_housekeeping()
 	// the server code is not smart enough to realise that the file
 	// contents are identical, so it will create an empty patch.
 
-	TEST_THAT(check_num_files(1, 1, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
 	TEST_THAT(check_reference_counts());
@@ -1177,7 +1176,7 @@ bool test_server_housekeeping()
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
 	int patch2_blocks = get_raid_file(patch1_id)->GetDiscUsageInBlocks();
 
-	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
@@ -1188,7 +1187,7 @@ bool test_server_housekeeping()
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
-	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
@@ -1212,7 +1211,7 @@ bool test_server_housekeeping()
 	// the new file, because it's not a patch.
 	int replaced_blocks = get_raid_file(replaced_id)->GetDiscUsageInBlocks();
 
-	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
@@ -1226,7 +1225,7 @@ bool test_server_housekeeping()
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
-	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
@@ -1247,7 +1246,7 @@ bool test_server_housekeeping()
 	set_refcount(store1objid, 0);
 	set_refcount(patch1_id, 0);
 
-	TEST_THAT(check_num_files(1, 1, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks, // old
 		0, // deleted
@@ -1261,7 +1260,7 @@ bool test_server_housekeeping()
 		store1name); // Filename
 
 	// The old version file is deleted as well!
-	TEST_THAT(check_num_files(0, 1, 2, 1));
+	TEST_THAT(check_num_files(fs, 0, 1, 2, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, // current
 		file1_blocks, // old
 		replaced_blocks + file1_blocks, // deleted
@@ -1275,13 +1274,14 @@ bool test_server_housekeeping()
 	TEST_THAT(change_account_limits("0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
+	set_refcount(store1objid, 0);
 
 	// We expect housekeeping to have removed the two most recent versions
 	// of the now-deleted file:
 	set_refcount(patch2_id, 0);
 	set_refcount(replaced_id, 0);
 
-	TEST_THAT(check_num_files(0, 0, 0, 1));
+	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
 	TEST_THAT(check_reference_counts());
 
