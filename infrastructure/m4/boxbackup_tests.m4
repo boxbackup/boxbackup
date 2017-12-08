@@ -16,7 +16,11 @@ AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
 
 # Reduce compiler flag checking to a one-liner, needed for CMake to parse them
 AC_DEFUN([BOX_CHECK_CXX_FLAG],
-	AX_CHECK_COMPILE_FLAG($1,
+	# GCC suppresses warnings for -Wno-* flags unless another error occurs,
+	# so we need to use the opposite flag for detection purpose
+	_ac_detect_flag="$2"
+	_ac_detect_flag=${_ac_detect_flag:-$1}
+	AX_CHECK_COMPILE_FLAG($_ac_detect_flag,
 		[cxxflags_strict="$cxxflags_strict $1"],,
 		$cxxflags_force_error)
 )
@@ -41,10 +45,10 @@ BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
 AX_CHECK_COMPILE_FLAG(-std=c++0x,
 	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
 # And if we're going to do that, we don't want warnings about std::auto_ptr being deprecated:
-BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations, -Wdeprecated-declarations)
 # We also get copious warnings from the 'register' storage class specifier in the system
 # headers (ntohl and friends) which we can't do much about, so disable it:
-BOX_CHECK_CXX_FLAG(-Wno-deprecated-register)
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-register, -Wdeprecated-register)
 BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
