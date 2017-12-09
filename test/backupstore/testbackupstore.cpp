@@ -412,6 +412,24 @@ int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
 	}
 }
 
+std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
+	const std::string& SpecialisationName, BackupFileSystem& fs)
+{
+	if(SpecialisationName == "s3")
+	{
+		S3BackupFileSystem& s3fs(dynamic_cast<S3BackupFileSystem&>(fs));
+		std::string local_path = "testfiles/store" +
+			(IsDirectory ? s3fs.GetDirectoryURI(ObjectID) :
+			 s3fs.GetFileURI(ObjectID));
+		return std::auto_ptr<IOStream>(new FileStream(local_path));
+	}
+	else
+	{
+		// TODO: merge get_raid_file() into here
+		return std::auto_ptr<IOStream>(get_raid_file(ObjectID).release());
+	}
+}
+
 bool test_filename_encoding()
 {
 	SETUP_TEST_BACKUPSTORE();
@@ -2231,33 +2249,32 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 	return en->GetSizeInBlocks();
 }
 
-bool write_dir(BackupStoreDirectory& dir)
+bool test_directory_parent_entry_tracks_directory_size(
+	const std::string& specialisation_name, BackupAccountControl& control)
 {
-	std::string rfn;
-	StoreStructure::MakeObjectFilename(dir.GetObjectID(),
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
-		rfn, false); // EnsureDirectoryExists
-	RaidFileWrite rfw(0, rfn);
-	rfw.Open(true); // AllowOverwrite
-	dir.WriteToStream(rfw);
-	rfw.Commit(/* ConvertToRaidNow */ true);
-	return true;
-}
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-bool test_directory_parent_entry_tracks_directory_size()
-{
-	SETUP_TEST_BACKUPSTORE();
+#ifdef BOX_RELEASE_BUILD
+	BOX_NOTICE("skipping test: takes too long in release mode");
+#else
+	// Write the test file for create_file to upload:
+	write_test_file(0);
 
-	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
-		0, false);
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // read only
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+
+	BackupProtocolLocal2 protocol(rwContext, 0x01234567, false); // !ReadOnly
+	BackupProtocolLocal2 protocolReadOnly(roContext, 0x01234567, true); // ReadOnly
 
 	int64_t subdirid = create_directory(protocol);
 
 	// Get the root directory cached in the read-only connection, and
 	// test that the initial size is correct.
-	int old_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+	int old_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control);
 	TEST_THAT(old_size > 0);
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2277,8 +2294,11 @@ bool test_directory_parent_entry_tracks_directory_size()
 		std::ostringstream name;
 		name << "testfile_" << i;
 		last_added_filename = name.str();
+		// No need to catch exceptions here, because we do not expect to hit the account
+		// hard limit, and if we do it should cause the test to fail.
 		last_added_file_id = create_file(protocol, subdirid, name.str());
-		new_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+		new_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+			control);
 	}
 
 	// Check that the root directory entry has been updated
@@ -2288,19 +2308,18 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
-	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("0B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	set_refcount(last_added_file_id, 0);
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
-
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	// Check that the entry in the root directory was updated too
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2308,23 +2327,26 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Push the limits back up
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("1000B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "1000B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	// Now modify the root directory to remove its entry for this one, and
-	// then add a directory inside this one. This should try to push the
-	// object size back up, which will try to modify the subdir's entry in
-	// its parent, which no longer exists, which should just return a
-	// protocol error instead of aborting/segfaulting.
-	BackupStoreDirectory root(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+	// Now modify the root directory to remove its entry for this one
+	BackupStoreDirectory root(
+		*get_object_stream(true, // IsDirectory
+			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en, return false);
 	BackupStoreDirectory::Entry enCopy(*en);
 	root.DeleteEntry(subdirid);
-	TEST_THAT(write_dir(root));
+	fs.PutDirectory(root);
+
+	// Add a directory, this should try to push the object size back up, which will try to
+	// modify the subdir's entry in its parent, which no longer exists, which should return
+	// an error, but only when the cache is flushed (which could be much later):
 	TEST_CHECK_THROWS(
 		create_directory(protocol, subdirid),
 		ConnectionException,
@@ -2333,15 +2355,17 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
-	enCopy.SetSizeInBlocks(get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	root.AddEntry(enCopy);
-	TEST_THAT(write_dir(root));
+	fs.PutDirectory(root);
 	protocol.Reopen();
 
 	// This should have fixed the error, so we should be able to add the
 	// entry now. This should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
-	TEST_EQUAL(new_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(new_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -2352,22 +2376,25 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("0B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
 	// Check that the entry in the root directory was updated
-	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	// Check that bbstoreaccounts check fix will detect and repair when
 	// a directory's parent entry has the wrong size for the directory.
-
 	protocol.QueryFinished();
 
-	root.ReadFromStream(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+	root.ReadFromStream(
+		*get_object_stream(true, // IsDirectory
+			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
@@ -2376,7 +2403,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Sleep to ensure that the directory file timestamp changes, so that
 	// the read-only connection will discard its cached copy.
 	safe_sleep(1);
-	TEST_THAT(write_dir(root));
+	fs.PutDirectory(root);
 
 	TEST_EQUAL(1234, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2386,14 +2413,15 @@ bool test_directory_parent_entry_tracks_directory_size()
 	safe_sleep(1);
 
 	protocolReadOnly.QueryFinished();
-	TEST_EQUAL(1, check_account_for_errors());
+	TEST_EQUAL(1, check_account_for_errors(fs));
 
 	protocolReadOnly.Reopen();
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 	protocolReadOnly.QueryFinished();
+#endif // BOX_RELEASE_BUILD
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_cannot_open_multiple_writable_connections()
@@ -3519,7 +3547,17 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_bbstoreaccounts_create());
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
-	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
+
+	// Run all tests that take a BackupAccountControl argument twice, once with an
+	// S3BackupAccountControl and once with a BackupStoreAccountControl.
+
+	for(test_specialisation::iterator i = specialisations.begin();
+		i != specialisations.end(); i++)
+	{
+		RUN_SPECIALISED_TEST(i->first, i->second,
+			test_directory_parent_entry_tracks_directory_size);
+	}
+
 	TEST_THAT(test_cannot_open_multiple_writable_connections());
 	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
