@@ -338,15 +338,9 @@ public:
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
 	}
+	virtual void DeleteFile(int64_t ObjectID);
+	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
-	virtual void DeleteFile(int64_t ObjectID)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
-	virtual void DeleteDirectory(int64_t ObjectID)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
 
 	// And these are public to help with writing tests ONLY:
 	// The returned URI should start with mBasePath.

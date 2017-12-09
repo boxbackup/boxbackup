@@ -1505,6 +1505,7 @@ bool S3BackupFileSystem::ObjectExists(int64_t ObjectID, int64_t *pRevisionID)
 	return true;
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -1600,6 +1601,25 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 	rDir.SetUserInfo1_SizeInBlocks(GetSizeInBlocks(out.GetSize()));
 }
 
+
+void S3BackupFileSystem::DeleteDirectory(int64_t ObjectID)
+{
+	std::string uri = GetDirectoryURI(ObjectID);
+	HTTPResponse response = mrClient.DeleteObject(uri);
+	mrClient.CheckResponse(response,
+		std::string("Failed to delete directory: ") + uri,
+		true); // ExpectNoContent
+}
+
+
+void S3BackupFileSystem::DeleteFile(int64_t ObjectID)
+{
+	std::string uri = GetFileURI(ObjectID);
+	HTTPResponse response = mrClient.DeleteObject(uri);
+	mrClient.CheckResponse(response,
+		std::string("Failed to delete file: ") + uri,
+		true); // ExpectNoContent
+}
 
 void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
 {
