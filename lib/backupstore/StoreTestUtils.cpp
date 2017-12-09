@@ -187,6 +187,12 @@ bool change_account_limits(const char* soft, const char* hard)
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
 	BackupStoreAccountControl control(*config, 0x01234567);
+	return change_account_limits(control, soft, hard);
+}
+
+bool change_account_limits(BackupAccountControl& control, const char* soft,
+	const char* hard)
+{
 	int result = control.SetLimit(soft, hard);
 	TEST_EQUAL(0, result);
 	return (result == 0);

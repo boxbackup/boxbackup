@@ -12,6 +12,7 @@
 
 #include "Test.h"
 
+class BackupAccountControl;
 class BackupProtocolCallable;
 class BackupProtocolClient;
 class BackupFileSystem;
@@ -51,7 +52,13 @@ bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
 	int Deleted, int Dirs, int Total);
 
 //! Change the soft and hard limits on the test account.
+//! Old interface, only works with RaidBackupFileSystem, deprecated.
 bool change_account_limits(const char* soft, const char* hard);
+
+//! Change the soft and hard limits on the test account.
+//! New interface, takes a BackupAccountControl.
+bool change_account_limits(BackupAccountControl& control, const char* soft,
+	const char* hard);
 
 //! Checks an account for errors, returning the number of errors found and fixed.
 //! Old interface, only works with RaidBackupFileSystem, deprecated.
