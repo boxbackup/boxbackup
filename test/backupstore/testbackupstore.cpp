@@ -270,13 +270,15 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 	} \
 	catch (BoxException &e) \
 	{ \
+		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
+			name << ": " << e.what()); \
 		if (ServerIsAlive(bbstored_pid)) \
 			StopServer(); \
 		if(control.GetCurrentFileSystem() != NULL) \
 		{ \
 			control.GetCurrentFileSystem()->ReleaseLock(); \
 		} \
-		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
+		TEST_THAT(teardown_test_backupstore_specialised(name, control)); \
 		throw; \
 	} \
 	TEARDOWN();
