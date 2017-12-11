@@ -193,14 +193,8 @@ bool change_account_limits(BackupAccountControl& control, const char* soft,
 int check_account_for_errors(Log::Level log_level)
 {
 	// TODO FIXME remove this backward-compatibility function
-	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify("testfiles/bbstored.conf",
-			&BackupConfigFileVerify, errs));
-	TEST_EQUAL(0, errs.size());
-
-	BackupStoreAccountControl control(*config, 0x01234567);
-	return check_account_for_errors(control.GetFileSystem(), log_level);
+	RaidBackupFileSystem fs(0x1234567, "backup/01234567/", 0);
+	return check_account_for_errors(fs, log_level);
 }
 
 int check_account_for_errors(BackupFileSystem& filesystem, Log::Level log_level)
@@ -256,14 +250,8 @@ int64_t run_housekeeping(BackupFileSystem& filesystem)
 bool run_housekeeping_and_check_account()
 {
 	// TODO FIXME remove this backward-compatibility function
-	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify("testfiles/bbstored.conf",
-			&BackupConfigFileVerify, errs));
-	TEST_EQUAL(0, errs.size());
-
-	BackupStoreAccountControl control(*config, 0x01234567);
-	return run_housekeeping_and_check_account(control.GetFileSystem());
+	RaidBackupFileSystem fs(0x1234567, "backup/01234567/", 0);
+	return run_housekeeping_and_check_account(fs);
 }
 
 bool run_housekeeping_and_check_account(BackupFileSystem& filesystem)
