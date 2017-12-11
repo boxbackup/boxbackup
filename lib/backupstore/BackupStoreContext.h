@@ -120,7 +120,10 @@ public:
 	{
 		if(!mpFileSystem)
 		{
-			return "Unknown";
+			// This can happen if the account doesn't exist on the server, e.g. not
+			// created yet, because BackupStoreDaemon doesn't call
+			// SetClientHasAccount(), which creates the BackupStoreFileSystem.
+			return "no such account";
 		}
 		return mpFileSystem->GetBackupStoreInfo(true).GetAccountName(); // ReadOnly
 	}

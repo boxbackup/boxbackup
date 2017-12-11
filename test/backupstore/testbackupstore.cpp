@@ -3078,6 +3078,8 @@ bool test_account_limits_respected(const std::string& specialisation_name,
 				upload),
 			Err_StorageLimitExceeded);
 
+		// This currently causes a fatal error on the server, which
+		// kills the connection. TODO FIXME return an error instead.
 		std::auto_ptr<IOStream> attr(new MemBlockStream(&modtime, sizeof(modtime)));
 		BackupStoreFilenameClear fnxd("exceed-limit-dir");
 		TEST_COMMAND_RETURNS_ERROR(*apProtocol, 

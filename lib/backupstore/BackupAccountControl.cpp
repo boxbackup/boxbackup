@@ -148,6 +148,7 @@ int BackupAccountControl::PrintAccountInfo()
 	return 0;
 }
 
+
 int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 {
 	// Get controller, check disc set number
@@ -161,6 +162,7 @@ int BackupStoreAccountControl::BlockSizeOfDiscSet(int discSetNum)
 	// Return block size
 	return controller.GetDiscSet(discSetNum).GetBlockSize();
 }
+
 
 int BackupAccountControl::SetLimit(const char *SoftLimitStr,
 	const char *HardLimitStr)
@@ -186,6 +188,7 @@ int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
 	return 0;
 }
 
+
 int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 {
 	OpenAccount(true); // readWrite
@@ -198,6 +201,7 @@ int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 
 	return 0;
 }
+
 
 int BackupAccountControl::SetAccountEnabled(bool enabled)
 {

@@ -78,6 +78,10 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount)
 		}
 		else
 		{
+			// Don't keep going back up the list, as if we found a
+			// zero-referenced file higher up, we'd end up deleting
+			// the refcounts of referenced files further down the
+			// list (higher IDs).
 			break;
 		}
 	}

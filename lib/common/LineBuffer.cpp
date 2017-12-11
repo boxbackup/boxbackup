@@ -148,7 +148,7 @@ std::string LineBuffer::GetLine(bool preprocess, int timeout)
 			mBytesInBuffer = bytes;
 			mBufferBegin = 0;
 
-			// No data returned?
+			// No data returned? This could mean that (1) we reached EOF:
 			if(bytes == 0)
 			{
 				// This could mean that (1) we reached EOF:

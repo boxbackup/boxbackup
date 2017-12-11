@@ -289,7 +289,8 @@ BackupStoreRefCountDatabase::Create(const BackupStoreAccountDatabase::Entry& rAc
 //
 // Function
 //		Name:    BackupStoreRefCountDatabase::Create(
-//			 const std::string& Filename, int64_t AccountID)
+//			 const std::string& Filename, int64_t AccountID,
+//		         bool reuse_existing_file)
 //		Purpose: Create a blank database, using a temporary file that
 //			 you must Discard() or Commit() to make permanent.
 //		         Be careful with reuse_existing_file, because it
