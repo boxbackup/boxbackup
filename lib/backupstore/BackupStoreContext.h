@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "autogen_BackupProtocol.h"
+#include "autogen_BackupStoreException.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreInfo.h"
