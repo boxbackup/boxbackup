@@ -1162,6 +1162,8 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	// Update expected reference count of this new object
+	set_refcount(patch1_id, 1);
 
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
@@ -1174,6 +1176,7 @@ bool test_server_housekeeping()
 	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Change the file and upload again, as a patch to the original file.
 	{
@@ -1192,6 +1195,7 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(4, patch2_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	set_refcount(patch2_id, 1);
 
 	// How many blocks used by the new file?
 	// We need to check the old file's size, because it's been replaced
@@ -1202,6 +1206,7 @@ bool test_server_housekeeping()
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
@@ -1212,6 +1217,7 @@ bool test_server_housekeeping()
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Upload not as a patch, but as a completely different file. This
 	// marks the previous file as old (because the filename is the same)
@@ -1225,6 +1231,7 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(5, replaced_id, "wrong ObjectID for newly uploaded "
 		"full file");
+	set_refcount(replaced_id, 1);
 
 	// How many blocks used by the new file? This time we need to check
 	// the new file, because it's not a patch.
@@ -1237,6 +1244,7 @@ bool test_server_housekeeping()
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
@@ -1250,6 +1258,7 @@ bool test_server_housekeeping()
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// But if we reduce the limits, then it will
 	protocol.QueryFinished();
@@ -1259,12 +1268,17 @@ bool test_server_housekeeping()
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
+	// We expect housekeeping to have removed the two oldest versions:
+	set_refcount(store1objid, 0);
+	set_refcount(patch1_id, 0);
+
 	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// Check that deleting files is accounted for as well
 	protocol.QueryDeleteFile(
@@ -1278,6 +1292,7 @@ bool test_server_housekeeping()
 		replaced_blocks + file1_blocks, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Reduce limits again, check that removed files are subtracted from
 	// block counts.
@@ -1287,8 +1302,14 @@ bool test_server_housekeeping()
 	protocol.Reopen();
 	set_refcount(store1objid, 0);
 
+	// We expect housekeeping to have removed the two most recent versions
+	// of the now-deleted file:
+	set_refcount(patch2_id, 0);
+	set_refcount(replaced_id, 0);
+
 	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
@@ -2307,7 +2328,6 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
-	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
