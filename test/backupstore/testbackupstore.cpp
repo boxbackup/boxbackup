@@ -3762,7 +3762,7 @@ int test(int argc, const char *argv[])
 	specialisations["s3"] = ap_s3control.get();
 	specialisations["store"] = &storecontrol;
 
-#define RUN_TEST(name, pControl, function) \
+#define RUN_SPECIALISED_TEST(name, pControl, function) \
 	TEST_THAT(function(name, *(pControl)));
 
 	TEST_THAT(test_filename_encoding());
@@ -3777,7 +3777,7 @@ int test(int argc, const char *argv[])
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
-		RUN_TEST(i->first, i->second,
+		RUN_SPECIALISED_TEST(i->first, i->second,
 			test_directory_parent_entry_tracks_directory_size);
 	}
 
@@ -3795,8 +3795,8 @@ int test(int argc, const char *argv[])
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
-		RUN_TEST(i->first, i->second, test_server_commands);
-		RUN_TEST(i->first, i->second, test_account_limits_respected);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
 	}
 
 	TEST_THAT(test_housekeeping_deletes_files());
