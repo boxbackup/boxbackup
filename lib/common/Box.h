@@ -95,32 +95,6 @@
 	#define MEMLEAKFINDER_STOP
 #endif
 
-template<class _Tp> class box_auto_ptr : public std::auto_ptr<_Tp>
-{
-#if 0 // def BOX_MEMORY_LEAK_TESTING
-	void reset(_Tp* new_value = 0) throw()
-	{
-		if (this.get() != new_value)
-		{
-			memleakfinder_delete(get());
-		}
-		std::auto_ptr<_Tp>::reset(new_value);
-	}
-	void operator=(std::auto_ptr<_Tp>& rOther)
-	{
-		reset(rOther.release());
-	}
-	box_auto_ptr(_Tp* new_value)
-	{
-		reset(new_value);
-	}
-	box_auto_ptr(std::auto_ptr<_Tp>& rOther)
-	{
-		reset(rOther.release());
-	}
-#endif
-};
-
 #define THROW_EXCEPTION(type, subtype) \
 	{ \
 		if((!HideExceptionMessageGuard::ExceptionsHidden() \
