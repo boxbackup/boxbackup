@@ -44,6 +44,7 @@ std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
 
 //! Checks the number of files of each type in the store against expectations.
 bool check_num_files(BackupFileSystem& fs, int files, int old, int deleted, int dirs);
+bool check_num_files(BackupStoreInfo& info, int files, int old, int deleted, int dirs);
 
 //! Checks the number of blocks in files of each type against expectations.
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,

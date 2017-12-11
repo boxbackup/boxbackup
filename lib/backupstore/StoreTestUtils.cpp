@@ -135,15 +135,20 @@ std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
 bool check_num_files(BackupFileSystem& fs, int files, int old, int deleted, int dirs)
 {
 	std::auto_ptr<BackupStoreInfo> apInfo = fs.GetBackupStoreInfoUncached();
-	TEST_EQUAL_LINE(files, apInfo->GetNumCurrentFiles(), "current files");
-	TEST_EQUAL_LINE(old, apInfo->GetNumOldFiles(), "old files");
-	TEST_EQUAL_LINE(deleted, apInfo->GetNumDeletedFiles(), "deleted files");
-	TEST_EQUAL_LINE(dirs, apInfo->GetNumDirectories(), "directories");
+	return check_num_files(*apInfo, files, old, deleted, dirs);
+}
 
-	return (files == apInfo->GetNumCurrentFiles() &&
-		old == apInfo->GetNumOldFiles() &&
-		deleted == apInfo->GetNumDeletedFiles() &&
-		dirs == apInfo->GetNumDirectories());
+bool check_num_files(BackupStoreInfo& info, int files, int old, int deleted, int dirs)
+{
+	TEST_EQUAL_LINE(files, info.GetNumCurrentFiles(), "current files");
+	TEST_EQUAL_LINE(old, info.GetNumOldFiles(), "old files");
+	TEST_EQUAL_LINE(deleted, info.GetNumDeletedFiles(), "deleted files");
+	TEST_EQUAL_LINE(dirs, info.GetNumDirectories(), "directories");
+
+	return (files == info.GetNumCurrentFiles() &&
+		old == info.GetNumOldFiles() &&
+		deleted == info.GetNumDeletedFiles() &&
+		dirs == info.GetNumDirectories());
 }
 
 bool check_num_blocks(BackupProtocolCallable& Client, int Current, int Old,
