@@ -2597,12 +2597,16 @@ bool test_delete_update_and_symlink_files()
 // Check that store errors are reported neatly.
 bool test_store_error_reporting()
 {
+	// Add times with milliseconds to test log messages, to help debug random test failures
+	Console::SettingsGuard save_old_settings;
+	Console::SetShowTime(true);
+	Console::SetShowTimeMicros(true);
+
 	SETUP_WITH_BBSTORED();
 
-	// Start the bbackupd client. Enable logging to help debug race
-	// conditions causing test failure:
+	// Start the bbackupd client. Also enable logging with milliseconds, for the same reason:
 	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
-		"-kT -Wnotice -tbbackupd");
+		"-kU -Wnotice -tbbackupd");
 	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
 	wait_for_sync_end();
@@ -2657,7 +2661,7 @@ bool test_store_error_reporting()
 		// snapshot mode, check that it automatically syncs after
 		// an error, without waiting for another sync command.
 		TEST_THAT(StopClient());
-		TEST_THAT(StartClient("testfiles/bbackupd-snapshot.conf"));
+		TEST_THAT(StartClient("testfiles/bbackupd-snapshot.conf", daemon_args));
 		sync_and_wait();
 
 		// Check that the error was reported once more
@@ -2736,7 +2740,7 @@ bool test_store_error_reporting()
 		}
 
 		// Restart bbackupd in automatic mode
-		TEST_THAT_OR(StartClient(), FAIL);
+		TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 		sync_and_wait();
 
 		// Fix the store again
