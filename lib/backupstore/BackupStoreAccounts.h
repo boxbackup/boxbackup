@@ -13,14 +13,15 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
-#include "BackupAccountControl.h"
-#include "NamedLock.h"
 
 // --------------------------------------------------------------------------
 //
 // Class
 //		Name:    BackupStoreAccounts
-//		Purpose: Account management for backup store server
+//		Purpose: Account management for backup store server. This
+//			 class now serves very little purpose, and it should
+//			 probably be folded into other classes, such as
+//			 BackupStoreAccountDatabase and RaidBackupFileSystem.
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
@@ -40,7 +41,6 @@ public:
 	{
 		return MakeAccountRootDir(rEntry.GetID(), rEntry.GetDiscSet());
 	}
-	void LockAccount(int32_t ID, NamedLock& rNamedLock);
 
 private:
 	static std::string MakeAccountRootDir(int32_t ID, int DiscSet);
