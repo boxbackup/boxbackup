@@ -723,20 +723,13 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
-		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
-		// on win32, where hard-killing the server can leave a lockfile in place,
-		// breaking the rest of the test.
-#ifdef WIN32
-		// Wait for the server to finish housekeeping first, by getting a lock on
-		// the account.
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccounts acc(*apAccounts);
-		NamedLock lock;
-		acc.LockAccount(0x1234567, lock);
-#else
-		TEST_THAT(StopServer());
-#endif
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to prevent housekeeping from repairing the damage in the
+		// background. We could just stop the server, but on Windows that can leave the
+		// account half-cleaned and always leaves a PID file lying around, which breaks
+		// the rest of the test, so we do it this way on all platforms instead.
+		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
+		fs.GetLock();
 
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
@@ -792,9 +785,8 @@ int test(int argc, const char *argv[])
 		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
 		// ERROR:   NumCurrentFiles changed from 114 to 113
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
-#ifdef WIN32
-		lock.ReleaseLock();
-#endif
+		fs.ReleaseLock();
+
 		TEST_EQUAL(5, check_account_for_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
@@ -807,12 +799,6 @@ int test(int argc, const char *argv[])
 			TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 226);
 			TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
 		}
-
-		// Start the server again, so testbackupstorefix.pl can run bbackupquery which
-		// connects to it. Except on win32, where we didn't stop it earlier.
-#ifndef WIN32
-		TEST_THAT(StartServer(daemon_args));
-#endif
 
 		// Check
 		TEST_THAT(::system(PERL_EXECUTABLE
@@ -995,11 +981,8 @@ int test(int argc, const char *argv[])
 		// before damaging it, to avoid a race condition where bbstored runs housekeeping
 		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
 		// bbstoreaccounts check command to time out waiting for a lock.
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccounts acc(*apAccounts);
-		NamedLock lock;
-		acc.LockAccount(0x1234567, lock);
+		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
+		fs.GetLock();
 
 		// File
 		CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge", 33,
@@ -1035,13 +1018,7 @@ int test(int argc, const char *argv[])
 
 	// ---------------------------------------------------------
 	// Stop server
-	TEST_THAT(KillServer(bbstored_pid));
-
-	#ifdef WIN32
-		TEST_THAT(EMU_UNLINK("testfiles/bbstored.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-	#endif
+	TEST_THAT(StopServer());
 
 	return 0;
 }

@@ -107,36 +107,3 @@ bool BackupStoreAccounts::AccountExists(int32_t ID)
 	return mrDatabase.EntryExists(ID);
 }
 
-void BackupStoreAccounts::LockAccount(int32_t ID, NamedLock& rNamedLock)
-{
-	const BackupStoreAccountDatabase::Entry &en(mrDatabase.GetEntry(ID));
-	std::string rootDir = MakeAccountRootDir(ID, en.GetDiscSet());
-	int discSet = en.GetDiscSet();
-
-	std::string writeLockFilename;
-	StoreStructure::MakeWriteLockFilename(rootDir, discSet, writeLockFilename);
-
-	bool gotLock = false;
-	int triesLeft = 8;
-	do
-	{
-		gotLock = rNamedLock.TryAndGetLock(writeLockFilename,
-			0600 /* restrictive file permissions */);
-		
-		if(!gotLock)
-		{
-			--triesLeft;
-			::sleep(1);
-		}
-	}
-	while (!gotLock && triesLeft > 0);
-
-	if (!gotLock)
-	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CouldNotLockStoreAccount, "Failed to get exclusive "
-			"lock on account " << BOX_FORMAT_ACCOUNT(ID));
-	}
-}
-
-
