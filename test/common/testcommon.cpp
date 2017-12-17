@@ -38,8 +38,10 @@
 
 using namespace BoxConvert;
 
-void test_conversions()
+bool test_conversions()
 {
+	SETUP();
+
 	TEST_THAT((Convert<int32_t, const std::string &>(std::string("32"))) == 32);
 	TEST_THAT((Convert<int32_t, const char *>("42")) == 42);
 	TEST_THAT((Convert<int32_t, const char *>("-42")) == -42);
@@ -53,6 +55,8 @@ void test_conversions()
 	TEST_THAT(b == "-3473463");
 	std::string c(Convert<std::string, int16_t>(344));
 	TEST_THAT(c == "344");
+
+	TEARDOWN();
 }
 
 ConfigurationVerifyKey verifykeys1_1_1[] =
@@ -176,8 +180,10 @@ class TestLogger : public Logger
 };
 
 // Test PartialReadStream and ReadGatherStream handling of files over 2GB (refs #2)
-void test_stream_large_files()
+bool test_stream_large_files()
 {
+	SETUP();
+
 	char buffer[8];
 
 	ZeroStream zero(0x80000003);
@@ -208,11 +214,15 @@ void test_stream_large_files()
 	int component = gather.AddComponent(&zero);
 	gather.AddBlock(component, 0x80000002);
 	TEST_THAT(gather.Read(buffer, 8) == 8);
+
+	TEARDOWN();
 }
 
 // Test self-deleting temporary file streams
-void test_invisible_temp_file_stream()
+bool test_invisible_temp_file_stream()
 {
+	SETUP();
+
 	std::string tempfile("testfiles/tempfile");
 	TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()),
 		CommonException, OSFileOpenError);
@@ -259,11 +269,15 @@ void test_invisible_temp_file_stream()
 
 	// now that it's closed, it should be invisible on all platforms
 	TEST_THAT(!TestFileExists(tempfile.c_str()));
+
+	TEARDOWN();
 }
 
 // Test that named locks work as expected
-void test_named_locks()
+bool test_named_locks()
 {
+	SETUP();
+
 	{
 		NamedLock lock1;
 		// Try and get a lock on a name in a directory which doesn't exist
@@ -273,7 +287,7 @@ void test_named_locks()
 				DIRECTORY_SEPARATOR "lock"),
 			CommonException, OSFileError);
 
-		// And a more resonable request
+		// And a more reasonable request
 		TEST_THAT(lock1.TryAndGetLock(
 			"testfiles" DIRECTORY_SEPARATOR "lock1") == true);
 
@@ -313,11 +327,15 @@ void test_named_locks()
 		TEST_THAT(lock4.TryAndGetLock(
 			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
 	}
+
+	TEARDOWN();
 }
 
-void test_memory_leak_detection()
+// Test that memory leak detection doesn't crash
+bool test_memory_leak_detection()
 {
-	// Test that memory leak detection doesn't crash
+	SETUP();
+
 	{
 		char *test = new char[1024];
 		delete [] test;
@@ -348,10 +366,14 @@ void test_memory_leak_detection()
 		Timers::Init();
 	}
 #endif // BOX_MEMORY_LEAK_TESTING
+
+	TEARDOWN();
 }
 
-void test_timers()
+bool test_timers()
 {
+	SETUP();
+
 	// test main() initialises timers for us, so uninitialise them
 	Timers::Cleanup();
 
@@ -448,10 +470,14 @@ void test_timers()
 
 	// Leave timers initialised for rest of test.
 	// Test main() will cleanup after test finishes.
+
+	TEARDOWN();
 }
 
-void test_getline()
+bool test_getline()
 {
+	SETUP();
+
 	static const char *testfilelines[] =
 	{
 		"First line",
@@ -575,10 +601,14 @@ void test_getline()
 
 		fclose(file2);
 	}
+
+	TEARDOWN();
 }
 
-void test_configuration()
+bool test_configuration()
 {
+	SETUP();
+
 	// Doesn't exist
 	{
 		std::string errMsg;
@@ -736,11 +766,15 @@ void test_configuration()
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse1") == false);
 		TEST_THAT(pconfig->GetKeyValueBool("BoolFalse2") == false);
 	}
+
+	TEARDOWN();
 }
 
 // Test the ReadGatherStream
-void test_read_gather_stream()
+bool test_read_gather_stream()
 {
+	SETUP();
+
 	#define GATHER_DATA1 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	#define GATHER_DATA2 "ZYZWVUTSRQPOMNOLKJIHGFEDCBA9876543210zyxwvutsrqpomno"
 
@@ -787,13 +821,18 @@ void test_read_gather_stream()
 			TEST_THAT(gather.BytesLeftToRead() == 0);
 		}
 	}
+
 	TEST_THAT(r == sizeof(GATHER_RESULT) - 1);
 	TEST_THAT(::memcmp(buffer, GATHER_RESULT, sizeof(GATHER_RESULT) - 1) == 0);
+
+	TEARDOWN();
 }
 
 // Test ExcludeList
-void test_exclude_list()
+bool test_exclude_list()
 {
+	SETUP();
+
 	ExcludeList elist;
 	// Check assumption
 	TEST_THAT(Configuration::MultiValueSeparator == '\x01');
@@ -873,12 +912,16 @@ void test_exclude_list()
 		DIRECTORY_SEPARATOR "bar\x01/foo"
 		DIRECTORY_SEPARATOR));
 	TEST_THAT(logger.IsTriggered());
+
+	TEARDOWN();
 }
 
 // Test that we can use Archive and CollectInBufferStream
 // to read and write arbitrary types to a memory buffer
-void test_archive()
+bool test_archive()
 {
+	SETUP();
+
 	CollectInBufferStream buffer;
 	ASSERT(buffer.GetPosition() == 0);
 
@@ -931,11 +974,15 @@ void test_archive()
 
 		TEST_THAT(!buf2.StreamDataLeft());
 	}
+
+	TEARDOWN();
 }
 
 // Test that box_strtoui64 works properly
-void test_box_strtoui64()
+bool test_box_strtoui64()
 {
+	SETUP();
+
 	TEST_EQUAL(1234567890123456, box_strtoui64("1234567890123456", NULL, 10));
 	TEST_EQUAL(0x1234567890123456, box_strtoui64("1234567890123456", NULL, 16));
 	TEST_EQUAL(0xd9385a13c3842ba0, box_strtoui64("d9385a13c3842ba0", NULL, 16));
@@ -945,11 +992,15 @@ void test_box_strtoui64()
 	TEST_EQUAL(input + 2, endptr);
 	TEST_EQUAL(0x12a34, box_strtoui64(input, &endptr, 16));
 	TEST_EQUAL(input + 5, endptr);
+
+	TEARDOWN();
 }
 
 // Test that RemovePrefix and RemoveSuffix work properly
-void test_remove_prefix_suffix()
+bool test_remove_prefix_suffix()
 {
+	SETUP();
+
 	TEST_EQUAL("food", RemovePrefix("", "food", false)); // !force
 	TEST_EQUAL("food", RemoveSuffix("", "food", false)); // !force
 	TEST_EQUAL("", RemovePrefix("d", "food", false)); // !force
@@ -982,6 +1033,8 @@ void test_remove_prefix_suffix()
 
 	// Test that force defaults to true:
 	TEST_CHECK_THROWS(RemovePrefix("d", "food"), CommonException, Internal);
+
+	TEARDOWN();
 }
 
 int test(int argc, const char *argv[])
@@ -1000,5 +1053,5 @@ int test(int argc, const char *argv[])
 	test_box_strtoui64();
 	test_remove_prefix_suffix();
 
-	return 0;
+	return finish_test_suite();
 }
