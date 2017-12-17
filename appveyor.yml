@@ -101,7 +101,8 @@ deploy:
     artifact: BoxBackup-$(compiled_version)
     description: "Windows client binaries auto-built by AppVeyor"
     draft: false
-    prerelease: true
+    # Master branch builds are full releases (not pre-releases), all others are pre-releases
+    prerelease: $(if ($env:APPVEYOR_REPO_BRANCH.equals('master')) {'false'} else {'true'})"
     auth_token:
       secure: WZi3MJGA5zIIAAij0if4auYeltJlyWUOePTYlCGvrNrgEVjYRkqILHzvVKDnLn43
     on:
