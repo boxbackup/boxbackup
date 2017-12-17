@@ -13,6 +13,22 @@
 #include <stdio.h>
 #include <time.h>
 
+#ifdef HAVE_SIGNAL_H
+#	include <signal.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+#	include <sys/wait.h>
+#endif
+
 #include "Archive.h"
 #include "CollectInBufferStream.h"
 #include "CommonException.h"
@@ -326,6 +342,42 @@ bool test_named_locks()
 		// And can reuse it
 		TEST_THAT(lock4.TryAndGetLock(
 			"testfiles" DIRECTORY_SEPARATOR "lock5") == true);
+	}
+
+	{
+		// Test that named locks are actually exclusive!
+#ifndef WIN32
+		int child_pid = fork();
+		if(child_pid == 0)
+		{
+			// This is the child process. Run ourselves with a special argument
+			// which will lock the lockfile until killed
+			TEST_THAT(execl(TEST_EXECUTABLE, TEST_EXECUTABLE, "lockwait", NULL) == 0);
+		}
+		else
+		{
+			sleep(1);
+		}
+#else
+		// Can't fork on win32, so take the lock in the same process. This doesn't work
+		// for most Unix lock types, but does work for BOX_OPEN_LOCK on Win32.
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
+#endif
+
+		// With a lock held, we should not be able to acquire another.
+		TEST_THAT(!NamedLock().TryAndGetLock("testfiles/locktest"));
+
+#ifndef WIN32
+		kill(child_pid, SIGTERM);
+		waitpid(child_pid, NULL, 0);
+#endif
+	}
+
+	{
+		// But with the lock released (by killing the child process), we should be able to
+		// acquire it here:
+		TEST_THAT(NamedLock().TryAndGetLock("testfiles/locktest"));
 	}
 
 	TEARDOWN();
@@ -1039,6 +1091,14 @@ bool test_remove_prefix_suffix()
 
 int test(int argc, const char *argv[])
 {
+	if(argc == 2 && strcmp(argv[1], "lockwait") == 0)
+	{
+		NamedLock lock1;
+		TEST_THAT(lock1.TryAndGetLock("testfiles/locktest"));
+		sleep(3600);
+		return 0;
+	}
+
 	test_stream_large_files();
 	test_invisible_temp_file_stream();
 	test_named_locks();
