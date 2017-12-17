@@ -78,25 +78,38 @@ foreach(file_to_configure ${files_to_configure})
 		"${base_dir}/${file_to_configure}.out")
 endforeach()
 
-# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
-# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
-execute_process(
-	COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl
-	WORKING_DIRECTORY ${base_dir}/infrastructure
-	RESULT_VARIABLE status
-	OUTPUT_VARIABLE new_version_define
-	ERROR_VARIABLE command_output)
-if(NOT status EQUAL 0)
-	message(FATAL_ERROR "Failed to execute: "
-		"${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl: "
-		"status ${status}: ${command_output}")
+# If BOXBACKUP_VERSION is defined when running CMake (as the AppVeyor config does), use it
+# as-is, since it contains the full version number, branch, and platform (Win32/Win64):
+if(BOXBACKUP_VERSION)
+	set(boxbackup_version ${BOXBACKUP_VERSION})
+	# Remove CPACK_SYSTEM_NAME from the default CPACK_PACKAGE_NAME, because it's already
+	# included in the CPACK_PACKAGE_VERSION:
+	set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}-${boxbackup_version})
+else()
+	# Work out the current Box version (requires Perl) and update lib/common/BoxVersion.h,
+	# but only if it has changed, to avoid unnecessary complete rebuilds due to timestamps.
+	execute_process(
+		COMMAND ${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl
+		WORKING_DIRECTORY ${base_dir}/infrastructure
+		RESULT_VARIABLE status
+		OUTPUT_VARIABLE boxbackup_version
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_VARIABLE command_output)
+	if(NOT status EQUAL 0)
+		message(FATAL_ERROR "Failed to execute: "
+			"${PERL_EXECUTABLE} ${base_dir}/infrastructure/cmake/getversion.pl: "
+			"status ${status}: ${command_output}")
+	endif()
 endif()
-file(WRITE "${base_dir}/lib/common/BoxVersion.h.new" "${new_version_define}")
+
+file(WRITE "${base_dir}/lib/common/BoxVersion.h.new"
+	"#define BOX_VERSION \"${boxbackup_version}\"\n")
 replace_file_if_different(
 	"${base_dir}/lib/common/BoxVersion.h"
 	"${base_dir}/lib/common/BoxVersion.h.new")
 
 add_definitions(-DBOX_CMAKE -DNEED_BOX_VERSION_H)
+
 if(WIN32)
 	add_definitions(-DWIN32)
 endif()
@@ -331,6 +344,16 @@ foreach(module_dep ${module_deps})
 	endif()
 endforeach()
 
+if(WIN32)
+	install(FILES ${base_dir}/bin/bbackupd/win32/NotifySysAdmin.vbs
+		DESTINATION "." COMPONENT Extras)
+	install(FILES ${base_dir}/bin/bbackupd/win32/bbackupd.conf
+		DESTINATION "." COMPONENT Extras)
+else()
+	install(FILES ${base_dir}/bin/bbackupd/bbackupd-config
+		DESTINATION "." COMPONENT Extras)
+endif()
+
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
 target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUILD>)
@@ -353,9 +376,6 @@ if(WIN32)
 	target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
 endif()
 
-# Link to ZLib
-# http://stackoverflow.com/a/6174604/648162
-include_directories(${base_dir}/../zlib-win32/include)
 # On Windows we want to statically link zlib to make debugging and distribution easier,
 # but FindZLIB.cmake doesn't offer that as an option, so we have to go through some
 # contortions to "find" the correct library. ZLIB_ROOT is required in this case.
@@ -410,6 +430,11 @@ else()
 	pkg_check_modules(PCRE REQUIRED libpcreposix)
 	include_directories(${PCRE_INCLUDE_DIRS})
 	target_link_libraries(lib_common PUBLIC ${PCRE_LIBRARIES})
+
+	if(NOT PCRE_FOUND)
+		# You must use pkg-config. PCRE_ROOT is not used except on Win32.
+		message(FATAL_ERROR "Please install libpcre and ensure that pkg-config --list-all can find it")
+	endif()
 
 	if(DEBUG)
 		message(STATUS "Linking PCRE libraries from ${PCRE_LIBRARY_DIRS}: ${PCRE_LIBRARIES}")
@@ -538,7 +563,7 @@ foreach(header_file ${detect_header_files})
 endforeach()
 
 if(NOT HAVE_PCREPOSIX_H)
-	message(FATAL_ERROR "pcreposix.h not found at PCRE_ROOT/include: ${PCRE_ROOT}/include")
+	message(FATAL_ERROR "pcreposix.h not found even though PCRE was apparently detected?!")
 endif()
 
 # PCRE is required, so unconditionally define this:
@@ -688,3 +713,18 @@ set_tests_properties(backupdiff PROPERTIES TIMEOUT 32)
 set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
 set_tests_properties(s3store PROPERTIES TIMEOUT 20)
 set_tests_properties(httpserver PROPERTIES TIMEOUT 40)
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Box Backup is an open source, completely automatic, on-line backup system")
+set(CPACK_PACKAGE_VENDOR "www.BoxBackup.org")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${base_dir}/README.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${base_dir}/LICENSE.txt")
+set(CPACK_PACKAGE_VERSION ${boxbackup_version})
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Box Backup")
+set(CPACK_COMPONENTS_ALL Applications Extras)
+set(CPACK_GENERATOR "ZIP;NSIS")
+set(CPACK_NSIS_DISPLAY_NAME "Box Backup")
+set(CPACK_NSIS_HELP_LINK "http://www.boxbackup.org/")
+set(CPACK_NSIS_URL_INFO_ABOUT "http://www.boxbackup.org/")
+set(CPACK_NSIS_CONTACT "boxbackup@boxbackup.org")
+set(CPACK_NSIS_MODIFY_PATH ON)
+include(CPack)
