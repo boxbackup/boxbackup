@@ -120,8 +120,6 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode)
 
 	if(mOSFileHandle == INVALID_FILE)
 	{
-		MEMLEAKFINDER_NOT_A_LEAK(this);
-
 		// Failed to open the file. What's the reason? The errno which indicates a lock
 		// conflict depends on the locking method.
 
@@ -225,7 +223,6 @@ FileStream::FileStream(tOSFileHandle FileDescriptor)
 {
 	if(mOSFileHandle == INVALID_FILE)
 	{
-		MEMLEAKFINDER_NOT_A_LEAK(this);
 		BOX_ERROR("FileStream: called with invalid file handle");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
@@ -250,7 +247,6 @@ FileStream::FileStream(const FileStream &rToCopy)
 	if(mOSFileHandle < 0)
 #endif
 	{
-		MEMLEAKFINDER_NOT_A_LEAK(this);
 		BOX_ERROR("FileStream: copying unopened file");
 		THROW_EXCEPTION(CommonException, OSFileOpenError)
 	}
