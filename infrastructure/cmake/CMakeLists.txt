@@ -431,6 +431,11 @@ else()
 	include_directories(${PCRE_INCLUDE_DIRS})
 	target_link_libraries(lib_common PUBLIC ${PCRE_LIBRARIES})
 
+	if(NOT PCRE_FOUND)
+		# You must use pkg-config. PCRE_ROOT is not used except on Win32.
+		message(FATAL_ERROR "Please install libpcre and ensure that pkg-config --list-all can find it")
+	endif()
+
 	if(DEBUG)
 		message(STATUS "Linking PCRE libraries from ${PCRE_LIBRARY_DIRS}: ${PCRE_LIBRARIES}")
 	endif()
@@ -558,7 +563,7 @@ foreach(header_file ${detect_header_files})
 endforeach()
 
 if(NOT HAVE_PCREPOSIX_H)
-	message(FATAL_ERROR "pcreposix.h not found at PCRE_ROOT/include: ${PCRE_ROOT}/include")
+	message(FATAL_ERROR "pcreposix.h not found even though PCRE was apparently detected?!")
 endif()
 
 # PCRE is required, so unconditionally define this:
