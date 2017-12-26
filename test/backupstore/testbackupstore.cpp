@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_PROCESS_H
+#	include <process.h> // for getpid() on Windows
+#endif
+
 #include "Archive.h"
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
@@ -40,8 +44,10 @@
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
+#include "S3Simulator.h"
 #include "SSLLib.h"
 #include "ServerControl.h"
+#include "SimpleDBClient.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
@@ -3473,6 +3479,110 @@ bool test_read_write_attr_streamformat()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
+
+// Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
+bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	S3Client s3client(s3config);
+	SimpleDBClient client(s3config);
+
+	// There should be no locks at the beginning. In fact the domain should not even
+	// exist: the client should create it itself.
+	std::vector<std::string> expected_domains;
+	TEST_THAT(test_equal_lists(expected_domains, client.ListDomains()));
+
+	SimpleDBClient::str_map_t expected;
+
+	// Create a client in a scope, so it will be destroyed when the scope ends.
+	{
+		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+
+		// Check that it hasn't acquired a lock yet.
+		TEST_CHECK_THROWS(
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/"),
+			HTTPException, SimpleDBItemNotFound);
+
+		box_time_t before = GetCurrentBoxTime();
+		// If this fails, it will throw an exception:
+		fs.GetLock();
+		box_time_t after = GetCurrentBoxTime();
+
+		// Check that it has now acquired a lock.
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		expected["locked"] = "true";
+
+		std::ostringstream locker_buf;
+		locker_buf << fs.GetCurrentUserName() << "@" << fs.GetCurrentHostName() <<
+			"(" << getpid() << ")";
+		TEST_EQUAL(locker_buf.str(), fs.GetSimpleDBLockValue());
+		expected["locker"] = locker_buf.str();
+
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		expected["pid"] = pid_buf.str();
+
+		char hostname_buf[1024];
+		TEST_EQUAL(0, gethostname(hostname_buf, sizeof(hostname_buf)));
+		TEST_EQUAL(hostname_buf, fs.GetCurrentHostName());
+		expected["hostname"] = hostname_buf;
+
+		TEST_THAT(fs.GetSinceTime() >= before);
+		TEST_THAT(fs.GetSinceTime() <= after);
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		TEST_THAT(test_equal_maps(expected, attributes));
+
+		// Try to acquire another one, check that it fails.
+		S3BackupFileSystem fs2(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		TEST_CHECK_THROWS(
+			fs2.GetLock(),
+			BackupStoreException, CouldNotLockStoreAccount);
+
+		// And that the lock was not disturbed
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// Check that when the S3BackupFileSystem went out of scope, it released the lock
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And that we can acquire it again:
+	{
+		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		fs.GetLock();
+
+		expected["locked"] = "true";
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And release it again:
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
+
+
 int test(int argc, const char *argv[])
 {
 	TEST_THAT(test_open_files_with_limited_win32_permissions());
@@ -3533,6 +3643,7 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(kill_running_daemons());
 	TEST_THAT(StartSimulator());
+	TEST_THAT(test_simpledb_locking(*s3config, *ap_s3control));
 
 	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
 	test_specialisation specialisations;
