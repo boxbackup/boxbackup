@@ -18,7 +18,8 @@
 #include "HTTPResponse.h"
 #include "NamedLock.h"
 #include "S3Client.h"
-#include "Utils.h"
+#include "SimpleDBClient.h"
+#include "Utils.h" // for ObjectExists_*
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
@@ -307,7 +308,12 @@ private:
 	std::string mBasePath, mCacheDirectory;
 	NamedLock mCacheLock;
 	S3Client& mrClient;
+	std::auto_ptr<SimpleDBClient> mapSimpleDBClient;
 	bool mHaveLock;
+	std::string mSimpleDBDomain, mLockName, mLockValue, mCurrentUserName,
+		mCurrentHostName;
+	SimpleDBClient::str_map_t mLockAttributes;
+	void ReportLockMismatches(str_map_diff_t mismatches);
 
 	S3BackupFileSystem(const S3BackupFileSystem& forbidden); // no copying
 	S3BackupFileSystem& operator=(const S3BackupFileSystem& forbidden); // no assignment
@@ -353,7 +359,23 @@ public:
 	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
 
+	// These should not really be APIs, but they are public to make them testable:
+	const std::string& GetSimpleDBDomain() const { return mSimpleDBDomain; }
+	const std::string& GetSimpleDBLockName() const { return mLockName; }
+	const std::string& GetSimpleDBLockValue() const { return mLockValue; }
+	const std::string& GetCurrentUserName() const { return mCurrentUserName; }
+	const std::string& GetCurrentHostName() const { return mCurrentHostName; }
+	const box_time_t GetSinceTime() const
+	{
+		// Unfortunately operator[] is not const, so use a const_iterator to
+		// get the value that we want.
+		const std::string& since(mLockAttributes.find("since")->second);
+		return box_strtoui64(since.c_str(), NULL, 10);
+	}
+
 	// And these are public to help with writing tests ONLY:
+	friend class S3BackupAccountControl;
+
 	// The returned URI should start with mBasePath.
 	std::string GetMetadataURI(const std::string& MetadataFilename) const
 	{

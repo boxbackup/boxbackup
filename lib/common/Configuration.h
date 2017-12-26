@@ -121,6 +121,15 @@ public:
 
 	bool KeyExists(const std::string& rKeyName) const;
 	const std::string &GetKeyValue(const std::string& rKeyName) const;
+	const std::string &GetKeyValueDefault(const std::string& rKeyName,
+		const std::string& rDefaultValue) const
+	{
+		// Don't call this for an item that has a default value defined,
+		// because rDefaultValue will never be used.
+		std::map<std::string, std::string>::const_iterator i =
+			mKeys.find(rKeyName);
+		return (i != mKeys.end()) ? i->second : rDefaultValue;
+	}
 	int GetKeyValueInt(const std::string& rKeyName) const;
 	uint32_t GetKeyValueUint32(const std::string& rKeyName) const;
 	bool GetKeyValueBool(const std::string& rKeyName) const;
