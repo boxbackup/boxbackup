@@ -166,8 +166,8 @@ Upgrade or read the documentation for alternatives]])
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
-AC_CHECK_HEADERS([syslog.h time.h unistd.h])
+AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h lmcons.h netdb.h process.h pwd.h])
+AC_CHECK_HEADERS([signal.h syslog.h time.h unistd.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
 AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/stat.h sys/time.h])
 AC_CHECK_HEADERS([sys/types.h sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
@@ -327,7 +327,7 @@ AX_CHECK_MALLOC_WORKAROUND
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid gettimeofday lchown])
+AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid getpwuid gettimeofday lchown])
 AC_CHECK_FUNCS([setproctitle utimensat stat64 lstat64 __lxstat __lxstat64])
 AC_SEARCH_LIBS([setproctitle], [bsd])
 
@@ -388,6 +388,8 @@ then
 fi
 ;;
 esac
+
+AC_CHECK_DECLS([GetUserNameA],,, [[#include <windows.h>]])
 
 AC_CHECK_PROGS(default_debugger, [lldb gdb])
 AC_ARG_WITH([debugger],

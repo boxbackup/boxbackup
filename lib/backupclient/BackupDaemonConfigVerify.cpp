@@ -58,6 +58,12 @@ static const ConfigurationVerifyKey verifys3keys[] =
 	// "quotes.s3.amazonaws.com". If missing or empty, HostName will be used as a
 	// default.
 	ConfigurationVerifyKey("S3VirtualHostName", 0, ""),
+	ConfigurationVerifyKey("SimpleDBHostName", 0, "sdb.amazonaws.com"),
+	ConfigurationVerifyKey("SimpleDBPort", ConfigTest_IsInt, 80),
+	ConfigurationVerifyKey("SimpleDBEndpoint", 0, ""),
+	ConfigurationVerifyKey("SimpleDBDomain", 0, "boxbackup_locks"),
+	ConfigurationVerifyKey("SimpleDBLockName", 0),
+	ConfigurationVerifyKey("SimpleDBLockValue", 0),
 	ConfigurationVerifyKey("CacheDirectory", ConfigTest_Exists | ConfigTest_LastEntry)
 };
 
