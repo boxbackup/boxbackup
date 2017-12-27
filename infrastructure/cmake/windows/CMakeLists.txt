@@ -44,13 +44,23 @@ ExternalProject_Add(zlib
 )
 
 if(WIN32)
+	if(PLATFORM STREQUAL "x64")
+		set(openssl_config debug-VC-WIN64A)
+		set(batch_config ms\\do_win64a.bat)
+	else()
+		set(openssl_config debug-VC-WIN32)
+		set(batch_config ms\\do_ms.bat)
+	endif()
 	ExternalProject_Add(openssl
 		DEPENDS zlib
 		URL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 		URL_HASH ${OPENSSL_HASH}
 		DOWNLOAD_NO_PROGRESS 1
-		CONFIGURE_COMMAND perl Configure debug-VC-WIN32 no-asm --prefix=${install_dir}
-		COMMAND cmd /c ms\\do_ms.bat
+		CONFIGURE_COMMAND perl Configure ${openssl_config} no-asm
+			--prefix=${install_dir}
+			-I${install_dir}/include
+			-L${install_dir}/lib
+		COMMAND cmd /c ${batch_config}
 		# You would expect us to use nt.mak to compile a static library here, but mk1mf.pl uses the /MT[d]
 		# CRT in that case, which is incompatible with our dynamic runtime, /MD[d]. It seems that the libs
 		# built by ntdll.mak, which are compiled with /MD[d], are full libraries and not import libs,
