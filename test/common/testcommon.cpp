@@ -239,6 +239,16 @@ bool test_invisible_temp_file_stream()
 {
 	SETUP();
 
+	std::ostringstream name;
+	name << "boxbackup.recombinetemp.1.XXXXXX";
+
+	// Open the temporary file
+	std::auto_ptr<IOStream> apfs(
+		FileStream::CreateTemporaryFile(name.str(), "", // temp_dir
+			O_BINARY, true)); // delete_asap
+	TEST_THAT(!TestFileExists(name.str().c_str()));
+	apfs.reset();
+
 	std::string tempfile("testfiles/tempfile");
 	TEST_CHECK_THROWS(InvisibleTempFileStream fs(tempfile.c_str()),
 		CommonException, OSFileOpenError);

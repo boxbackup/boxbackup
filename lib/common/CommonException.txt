@@ -62,3 +62,4 @@ SignalReceived				54	The function call returned because the process received a s
 NamedLockFailed				55	Failed to acquire a named lock
 FileLockingConflict			56	The file is already locked by another process
 TempDirNotSet				57	Your temporary directory is not set. Either the TMP or TEMP environment variable should be set to a path
+FailedToCreateTemporaryFile		58	Failed to create a temporary file

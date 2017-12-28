@@ -12,10 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
-#	include <unistd.h>
-#endif
-
 #include "autogen_BackupStoreException.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreAccountDatabase.h"
@@ -139,26 +135,12 @@ void BackupStoreCheck::Check()
 	else
 	{
 		std::string temp_file = GetTempDirPath() + "boxbackup_refcount_db_XXXXXX";
-		char temp_file_buf[PATH_MAX];
-		strncpy(temp_file_buf, temp_file.c_str(), sizeof(temp_file_buf));
-#ifdef WIN32
-		if(_mktemp_s(temp_file_buf, sizeof(temp_file_buf)) != 0)
-		{
-			THROW_EXCEPTION_MESSAGE(BackupStoreException, FailedToCreateTemporaryFile,
-				"Failed to get a temporary file name based on " << temp_file);
-		}
-#else
-		int fd = mkstemp(temp_file_buf);
-		if(fd == -1)
-		{
-			THROW_SYS_FILE_ERROR("Failed to get a temporary file name based on",
-				temp_file, BackupStoreException, FailedToCreateTemporaryFile);
-		}
-		close(fd);
-#endif
+		std::auto_ptr<FileStream> fs = FileStream::CreateTemporaryFile(
+			"boxbackup_refcount_db_XXXXXX", "", O_BINARY, false); // delete_asap
 
-		BOX_TRACE("Creating temporary refcount DB in a temporary file: " << temp_file_buf);
-		mapOwnNewRefs = BackupStoreRefCountDatabase::Create(temp_file_buf,
+		BOX_TRACE("Creating temporary refcount DB in a temporary file: " <<
+			fs->GetFileName());
+		mapOwnNewRefs = BackupStoreRefCountDatabase::Create(fs->GetFileName(),
 			mrFileSystem.GetAccountID(), true); // reuse_existing_file
 		mpNewRefs = mapOwnNewRefs.get();
 	}

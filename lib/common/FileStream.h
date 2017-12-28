@@ -48,20 +48,28 @@ public:
 		EXCLUSIVE,
 	};
 
+	static const int DEFAULT_MODE = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+
 	FileStream(const std::string& rFilename,
 		int flags = (O_RDONLY | O_BINARY),
-		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH),
-		lock_mode_t lock_mode = SHARED);
+		int mode = DEFAULT_MODE,
+		lock_mode_t lock_mode = SHARED,
+		bool delete_asap = false);
 
 	// Ensure that const char * name doesn't end up as a handle
 	// on Windows!
 
 	FileStream(const char *pFilename, 
 		int flags = (O_RDONLY | O_BINARY),
-		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH),
-		lock_mode_t lock_mode = SHARED);
+		int mode = DEFAULT_MODE,
+		lock_mode_t lock_mode = SHARED,
+		bool delete_asap = false);
 
-	FileStream(tOSFileHandle FileDescriptor);
+	FileStream(tOSFileHandle FileDescriptor, const std::string& rFilename = "",
+		bool delete_asap = false);
+
+	static std::auto_ptr<FileStream> CreateTemporaryFile(const std::string& pattern,
+		std::string temp_dir = "", int flags = O_BINARY, bool delete_asap = true);
 	
 	virtual ~FileStream();
 	
@@ -88,7 +96,8 @@ private:
 	tOSFileHandle mOSFileHandle;
 	bool mIsEOF;
 	FileStream(const FileStream &rToCopy) { /* do not call */ }
-	void OpenFile(int flags, int mode, lock_mode_t lock_mode);
+	void OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap);
+	void AfterOpen(bool delete_asap);
 
 	// for debugging..
 	std::string mFileName;

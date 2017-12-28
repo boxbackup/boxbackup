@@ -10,9 +10,18 @@
 #include "Box.h"
 
 #include <errno.h>
+#include <limits.h>
 
 #ifdef HAVE_FCNTL_G
 	#include <fcntl.h>
+#endif
+
+#ifdef WIN32
+	#include <io.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
 #endif
 
 #ifdef HAVE_SYS_FILE_H
@@ -34,12 +43,12 @@
 //
 // --------------------------------------------------------------------------
 FileStream::FileStream(const std::string& mFileName, int flags, int mode,
-	lock_mode_t lock_mode)
+	lock_mode_t lock_mode, bool delete_asap)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
   mFileName(mFileName)
 {
-	OpenFile(flags, mode, lock_mode);
+	OpenFile(flags, mode, lock_mode, delete_asap);
 }
 
 // --------------------------------------------------------------------------
@@ -52,15 +61,38 @@ FileStream::FileStream(const std::string& mFileName, int flags, int mode,
 //
 // --------------------------------------------------------------------------
 FileStream::FileStream(const char *pFilename, int flags, int mode,
-	lock_mode_t lock_mode)
+	lock_mode_t lock_mode, bool delete_asap)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
   mFileName(pFilename)
 {
-	OpenFile(flags, mode, lock_mode);
+	OpenFile(flags, mode, lock_mode, delete_asap);
 }
 
-void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode)
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    FileStream::FileStream(tOSFileHandle)
+//		Purpose: Constructor, using existing file descriptor
+//		Created: 2003/08/28
+//
+// --------------------------------------------------------------------------
+FileStream::FileStream(tOSFileHandle FileDescriptor, const std::string& rFilename,
+	bool delete_asap)
+: mOSFileHandle(FileDescriptor),
+  mIsEOF(false),
+  mFileName(rFilename)
+{
+	if(mOSFileHandle == INVALID_FILE)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, OSFileOpenError,
+			"FileStream: called with invalid file handle");
+	}
+
+	AfterOpen(delete_asap);
+}
+
+void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap)
 {
 	std::string lock_method_name, lock_message;
 
@@ -109,10 +141,14 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode)
 		lock_message = std::string("shared using ") + lock_method_name;
 	}
 
-	BOX_TRACE("Trying to " << (mode & O_CREAT ? "create" : "open") << " " << mFileName << " " <<
-		lock_message);
+	BOX_TRACE("Trying to " << (mode & O_CREAT ? "create" : "open") << " " <<
+		(delete_asap ? "temporary " : "") << mFileName << " " << lock_message);
 
 #ifdef WIN32
+	if(delete_asap)
+	{
+		flags |= O_TEMPORARY;
+	}
 	mOSFileHandle = ::openfile(mFileName.c_str(), flags, mode);
 #else
 	mOSFileHandle = ::open(mFileName.c_str(), flags, mode);
@@ -205,26 +241,62 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode)
 		THROW_EXCEPTION_MESSAGE(CommonException, FileLockingConflict,
 			BOX_FILE_MESSAGE(mFileName, "File already locked by another process"));
 	}
+
+	AfterOpen(delete_asap);
 }
 
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    FileStream::FileStream(tOSFileHandle)
-//		Purpose: Constructor, using existing file descriptor
-//		Created: 2003/08/28
-//
-// --------------------------------------------------------------------------
-FileStream::FileStream(tOSFileHandle FileDescriptor)
-	: mOSFileHandle(FileDescriptor),
-	  mIsEOF(false),
-	  mFileName("HANDLE")
+std::auto_ptr<FileStream> FileStream::CreateTemporaryFile(const std::string& pattern,
+	std::string temp_dir, int flags, bool delete_asap)
 {
-	if(mOSFileHandle == INVALID_FILE)
+	if(temp_dir == "")
 	{
-		BOX_ERROR("FileStream: called with invalid file handle");
-		THROW_EXCEPTION(CommonException, OSFileOpenError)
+		temp_dir = GetTempDirPath();
+	}
+
+	std::string temp_filename_pattern = temp_dir + DIRECTORY_SEPARATOR + pattern;
+	char temp_filename_buf[PATH_MAX];
+	strncpy(temp_filename_buf, temp_filename_pattern.c_str(), sizeof(temp_filename_buf));
+	std::auto_ptr<FileStream> fs;
+
+#ifdef WIN32
+	if(_mktemp_s(temp_filename_buf, sizeof(temp_filename_buf)) != 0)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, FailedToCreateTemporaryFile,
+			"Failed to get a temporary file name based on " << temp_filename_pattern);
+	}
+	fs.reset(new FileStream(temp_filename_buf, flags | O_RDWR | O_CREAT | O_EXCL, 0700,
+		SHARED, delete_asap));
+#else
+	int fd = mkstemp(temp_filename_buf);
+	if(fd == -1)
+	{
+		THROW_SYS_FILE_ERROR("Failed to get a temporary file name based on",
+			temp_filename_pattern, CommonException, FailedToCreateTemporaryFile);
+	}
+	fs.reset(new FileStream(fd, temp_filename_buf, delete_asap));
+#endif
+
+	return fs;
+}
+
+void FileStream::AfterOpen(bool delete_asap)
+{
+	if(delete_asap)
+	{
+		if(mFileName.size() == 0)
+		{
+			THROW_EXCEPTION_MESSAGE(CommonException, AssertFailed,
+				"FileStream: called with delete_asap but no filename");
+		}
+
+#ifndef WIN32
+		if(EMU_UNLINK(mFileName.c_str()) != 0)
+		{
+			THROW_EMU_FILE_ERROR("Failed to delete temporary file after opening",
+				mFileName, CommonException, OSFileError);
+		}
+#endif
 	}
 }
 

@@ -16,13 +16,15 @@
 class InvisibleTempFileStream : public FileStream
 {
 public:
-	InvisibleTempFileStream(const std::string& Filename, 
+	InvisibleTempFileStream(const std::string& filename,
 #ifdef WIN32
 		int flags = (O_RDONLY | O_BINARY),
 #else
 		int flags = O_RDONLY,
 #endif
-		int mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+		int mode = DEFAULT_MODE)
+	: FileStream(filename, flags, mode, FileStream::SHARED, true) // delete_asap
+	{ }
 
 private:	
 	InvisibleTempFileStream(const InvisibleTempFileStream &rToCopy) 
