@@ -132,14 +132,6 @@ std::auto_ptr<BackupProtocolCallable> connect_and_login(TLSContext& rContext,
 	return protocol;
 }
 
-bool check_num_files(int files, int old, int deleted, int dirs)
-{
-	std::auto_ptr<BackupStoreInfo> apInfo =
-		BackupStoreInfo::Load(0x1234567,
-		"backup/01234567/", 0, true);
-	return check_num_files(*apInfo, files, old, deleted, dirs);
-}
-
 bool check_num_files(BackupFileSystem& fs, int files, int old, int deleted, int dirs)
 {
 	std::auto_ptr<BackupStoreInfo> apInfo = fs.GetBackupStoreInfoUncached();
