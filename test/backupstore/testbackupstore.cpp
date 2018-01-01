@@ -2700,13 +2700,17 @@ bool test_symlinks()
 bool test_store_info()
 {
 	SETUP_TEST_BACKUPSTORE();
+	RaidBackupFileSystem fs(76, "test-info/", 0);
 
 	{
 		RaidFileWrite::CreateDirectory(0, "test-info");
-		BackupStoreInfo::CreateNew(76, "test-info/", 0, 3461231233455433LL, 2934852487LL);
-		TEST_CHECK_THROWS(BackupStoreInfo::CreateNew(76, "test-info/", 0, 0, 0), RaidFileException, CannotOverwriteExistingFile);
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
-		TEST_CHECK_THROWS(info->Save(), BackupStoreException, StoreInfoIsReadOnly);
+		BackupStoreInfo info(76, 3461231233455433LL, 2934852487LL);
+		fs.PutBackupStoreInfo(info);
+	}
+
+	{
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
+		TEST_CHECK_THROWS(fs.PutBackupStoreInfo(*info), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksUsed(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(1), BackupStoreException, StoreInfoIsReadOnly);
@@ -2714,28 +2718,33 @@ bool test_store_info()
 		TEST_CHECK_THROWS(info->AddDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->SetAccountName("hello"), BackupStoreException, StoreInfoIsReadOnly);
 	}
+
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
-		info->ChangeBlocksUsed(8);
-		info->ChangeBlocksInOldFiles(9);
-		info->ChangeBlocksInDeletedFiles(10);
-		info->ChangeBlocksUsed(-1);
-		info->ChangeBlocksInOldFiles(-4);
-		info->ChangeBlocksInDeletedFiles(-9);
-		TEST_CHECK_THROWS(info->ChangeBlocksUsed(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		info->AddDeletedDirectory(2);
-		info->AddDeletedDirectory(3);
-		info->AddDeletedDirectory(4);
-		info->RemovedDeletedDirectory(3);
-		info->SetAccountName("whee");
-		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(9), BackupStoreException, StoreInfoDirNotInList);
-		info->Save();
+		BackupStoreInfo& info(fs.GetBackupStoreInfo(false)); // !ReadOnly
+		info.ChangeBlocksUsed(8);
+		info.ChangeBlocksInOldFiles(9);
+		info.ChangeBlocksInDeletedFiles(10);
+		info.ChangeBlocksUsed(-1);
+		info.ChangeBlocksInOldFiles(-4);
+		info.ChangeBlocksInDeletedFiles(-9);
+		TEST_CHECK_THROWS(info.ChangeBlocksUsed(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		TEST_CHECK_THROWS(info.ChangeBlocksInOldFiles(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		TEST_CHECK_THROWS(info.ChangeBlocksInDeletedFiles(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		info.AddDeletedDirectory(2);
+		info.AddDeletedDirectory(3);
+		info.AddDeletedDirectory(4);
+		info.RemovedDeletedDirectory(3);
+		info.SetAccountName("whee");
+		TEST_CHECK_THROWS(info.RemovedDeletedDirectory(9),
+			BackupStoreException, StoreInfoDirNotInList);
+		fs.PutBackupStoreInfo(info);
 	}
 
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
 		TEST_THAT(info->GetBlocksUsed() == 7);
 		TEST_THAT(info->GetBlocksInOldFiles() == 5);
 		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
@@ -2790,6 +2799,33 @@ bool test_bbstoreaccounts_create()
 		" -c testfiles/bbstored.conf -Wwarning create 01234567 0 "
 		"10000B 20000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+
+	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL(0x01234567, info->GetAccountID());
+	TEST_EQUAL(1, info->GetLastObjectIDUsed());
+	TEST_EQUAL(2, info->GetBlocksUsed());
+	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
+	TEST_EQUAL(0, info->GetBlocksInOldFiles());
+	TEST_EQUAL(0, info->GetBlocksInDeletedFiles());
+	TEST_EQUAL(2, info->GetBlocksInDirectories());
+	TEST_EQUAL(0, info->GetDeletedDirectories().size());
+	TEST_EQUAL(10000, info->GetBlocksSoftLimit());
+	TEST_EQUAL(20000, info->GetBlocksHardLimit());
+	TEST_EQUAL(0, info->GetNumCurrentFiles());
+	TEST_EQUAL(0, info->GetNumOldFiles());
+	TEST_EQUAL(0, info->GetNumDeletedFiles());
+	TEST_EQUAL(1, info->GetNumDirectories());
+	TEST_EQUAL(true, info->IsAccountEnabled());
+	TEST_EQUAL(true, info->IsReadOnly());
+	TEST_EQUAL(0, info->GetClientStoreMarker());
+	TEST_EQUAL("", info->GetAccountName());
+
+	std::auto_ptr<RaidFileRead> root_stream =
+		get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	BackupStoreDirectory root_dir(*root_stream);
+	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
 	TEARDOWN_TEST_BACKUPSTORE();
 }
