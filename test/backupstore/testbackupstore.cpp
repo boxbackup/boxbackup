@@ -1401,6 +1401,7 @@ bool test_multiple_uploads()
 	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
 	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
 		"backup/01234567/", 0, true); // ReadOnly
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
 	for(int l = 0; l < 3; ++l)
@@ -1430,7 +1431,7 @@ bool test_multiple_uploads()
 
 	// TODO FIXME dedent
 	{
-		TEST_THAT(check_num_files(0, 0, 0, 1));
+		TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
@@ -1471,7 +1472,7 @@ bool test_multiple_uploads()
 			if (t >= 13) expected_num_old_files++;
 			int expected_num_current_files = t + 1 - expected_num_old_files;
 
-			TEST_THAT(check_num_files(expected_num_current_files,
+			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
 
 			apProtocol->QueryFinished();
@@ -1480,13 +1481,13 @@ bool test_multiple_uploads()
 			apProtocol = connect_and_login(context);
 			protocolReadOnly.Reopen();
 
-			TEST_THAT(check_num_files(expected_num_current_files,
+			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
 		}
 
 		// Add some attributes onto one of them
 		{
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 3, 3, 0, 1));
 			std::auto_ptr<IOStream> attrnew(
 				new MemBlockStream(attr3, sizeof(attr3)));
 			std::auto_ptr<BackupProtocolSuccess> set(apProtocol->QuerySetReplacementFileAttributes(
@@ -1495,7 +1496,7 @@ bool test_multiple_uploads()
 				uploads[UPLOAD_ATTRS_EN].name,
 				attrnew));
 			TEST_THAT(set->GetObjectID() == uploads[UPLOAD_ATTRS_EN].allocated_objid);
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 3, 3, 0, 1));
 		}
 
 		apProtocol->QueryFinished();
@@ -1510,7 +1511,7 @@ bool test_multiple_uploads()
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				uploads[UPLOAD_DELETE_EN].name));
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
-			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
 		apProtocol->QueryFinished();
@@ -1577,12 +1578,11 @@ bool test_multiple_uploads()
 			::free(buf);
 		}
 
-		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
 		// Run housekeeping (for which we need to disconnect
 		// ourselves) and check that it doesn't change the numbers
 		// of files
-
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
@@ -1602,7 +1602,7 @@ bool test_multiple_uploads()
 		apProtocol = connect_and_login(context);
 		protocolReadOnly.Reopen();
 
-		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
 		{
 			// Fetch the block index for this one
@@ -1625,6 +1625,7 @@ bool test_multiple_uploads()
 					NULL, // pointer to DiffTimer impl
 					&modtime, &isCompletelyDifferent));
 			TEST_THAT(isCompletelyDifferent == false);
+
 			// Sent this to a file, so we can check the size, rather than uploading it directly
 			{
 				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT);
@@ -1632,6 +1633,7 @@ bool test_multiple_uploads()
 			}
 			// Make sure the stream is a plausible size for a patch containing only one new block
 			TEST_THAT(TestGetFileSize(TEST_FILE_FOR_PATCHING ".patch") < (8*1024));
+
 			// Upload it
 			int64_t patchedID = 0;
 			{
@@ -1657,9 +1659,10 @@ bool test_multiple_uploads()
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream,
 				TEST_FILE_FOR_PATCHING ".downloaded", SHORT_TIMEOUT);
+
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
-			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 4, 2, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 4, 2, 1));
 		}
 	}
 
