@@ -100,6 +100,8 @@ ExternalProject_Add(boost
 	URL "http://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORES}.tar.bz2"
 	URL_HASH ${BOOST_HASH}
 	# DOWNLOAD_NO_PROGRESS 1
+	# Disable automatic updating (untarring) as it's slow and not necessary
+	UPDATE_DISCONNECTED 1
 	CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "No configure step needed"
 	BUILD_COMMAND ${CMAKE_COMMAND} -E echo "No build step needed"
 	INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "No install step needed"
