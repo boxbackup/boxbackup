@@ -450,6 +450,21 @@ int test(int argc, const char *argv[])
 				{
 					TEST_THAT(en->GetDependsNewer() == 0);
 					TEST_THAT(en->GetDependsOlder() == 0);
+					bool found = false;
+
+					for(int tfi = 0; tfi < NUMBER_FILES; tfi++)
+					{
+						if(test_files[tfi].IDOnServer == en->GetObjectID())
+						{
+							found = true;
+							test_files[tfi].CurrentSizeInBlocks =
+								en->GetSizeInBlocks();
+							break;
+						}
+					}
+
+					TEST_LINE(found, "Unexpected file found on server: " <<
+						en->GetObjectID());
 				}
 			}
 
@@ -484,15 +499,30 @@ int test(int argc, const char *argv[])
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
 				dir.Dump(0, true);
+
+				// Find the test_files entry for the file that was just deleted:
+				int just_deleted = deleteIndex == 0 ? -1 : test_file_remove_order[deleteIndex - 1];
+				file_info* p_just_deleted;
+				if(just_deleted == 0 || just_deleted == -1)
+				{
+					p_just_deleted = NULL;
+				}
+				else
+				{
+					p_just_deleted = test_files + just_deleted;
+				}
 				
 				// Check that dependency info is correct
-				for(unsigned int f = 0; f < NUMBER_FILES; ++f)
+				for(unsigned int f = 1; f < NUMBER_FILES; ++f)
 				{
 					//TRACE1("t f = %d\n", f);
 					BackupStoreDirectory::Entry *en = dir.FindEntryByID(test_files[f].IDOnServer);
 					if(en == 0)
 					{
-						TEST_THAT(test_files[f].HasBeenDeleted);
+						TEST_LINE(test_files[f].HasBeenDeleted,
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") was unexpectedly deleted by housekeeping");
 						// check that unreferenced
 						// object was removed by
 						// housekeeping
@@ -513,20 +543,73 @@ int test(int argc, const char *argv[])
 					}
 					else
 					{
-						TEST_THAT(!test_files[f].HasBeenDeleted);
+						TEST_LINE(!test_files[f].HasBeenDeleted,
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") was unexpectedly not deleted by housekeeping");
 						TEST_THAT(en->GetDependsNewer() == test_files[f].DepNewer);
-						TEST_THAT(en->GetDependsOlder() == test_files[f].DepOlder);
+						TEST_EQUAL_LINE(test_files[f].DepOlder, en->GetDependsOlder(),
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") has different dependencies than "
+							"expected after housekeeping");
 						// Test that size is plausible
 						if(en->GetDependsNewer() == 0)
 						{
 							// Should be a full file
-							TEST_THAT(en->GetSizeInBlocks() > 40);
+							TEST_LINE(en->GetSizeInBlocks() > 40,
+								"Test file " << f << " (id " <<
+								BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+								") was smaller than expected: "
+								"wanted a full file with >40 blocks, "
+								"but found " << en->GetSizeInBlocks());
 						}
 						else
 						{
 							// Should be a patch
-							TEST_THAT(en->GetSizeInBlocks() < 40);
+							TEST_LINE(en->GetSizeInBlocks() < 40,
+								"Test file " << f << " (id " <<
+								BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+								") was larger than expected: "
+								"wanted a patch file with <40 blocks, "
+								"but found " << en->GetSizeInBlocks());
 						}
+					}
+
+					// All the files that we've deleted so far should have had
+					// HasBeenDeleted set to true.
+					if(test_files[f].HasBeenDeleted)
+					{
+						TEST_LINE(en == NULL, "File " << f << " should have been "
+							"deleted by this point")
+					}
+					else if(en == 0)
+					{
+						TEST_FAIL_WITH_MESSAGE("File " << f << " has been unexpectedly "
+							"deleted, cannot check its size");
+					}
+					// If the file that was just deleted was a patch that this file depended on,
+					// then it should have been merged with this file, which should have made this
+					// file larger. But that might not translate to a larger number of blocks.
+					else if(test_files[just_deleted].DepOlder == test_files[f].IDOnServer)
+					{
+						TEST_LINE(en->GetSizeInBlocks() >= test_files[f].CurrentSizeInBlocks,
+							"File " << f << " has been merged with an older patch, "
+							"so it should be larger than its previous size of " <<
+							test_files[f].CurrentSizeInBlocks << " blocks, but it is " <<
+							en->GetSizeInBlocks() << " blocks now");
+					}
+					else
+					{
+						// This file should not have changed in size.
+						TEST_EQUAL_LINE(test_files[f].CurrentSizeInBlocks, en->GetSizeInBlocks(),
+							"File " << f << " unexpectedly changed size");
+					}
+
+					if(en != 0)
+					{
+						// Update test_files to record new size for next pass:
+						test_files[f].CurrentSizeInBlocks = en->GetSizeInBlocks();
 					}
 				}
 			}
@@ -548,7 +631,10 @@ int test(int argc, const char *argv[])
 			// that we uploaded earlier.
 			for(unsigned int f = 0; f < NUMBER_FILES; ++f)
 			{
-				::printf("r=%d, f=%d\n", deleteIndex, f);
+				::printf("r=%d, f=%d, id=%08llx, blocks=%d, deleted=%s\n", deleteIndex, f,
+					(long long)test_files[f].IDOnServer,
+					test_files[f].CurrentSizeInBlocks,
+					test_files[f].HasBeenDeleted ? "true" : "false");
 				
 				// Might have been deleted
 				if(test_files[f].HasBeenDeleted)
@@ -563,19 +649,29 @@ int test(int argc, const char *argv[])
 				EMU_UNLINK(filename_fetched);
 	
 				// Fetch the file
+				try
 				{
 					std::auto_ptr<BackupProtocolSuccess> getobj(protocol.QueryGetFile(
 						BackupProtocolListDirectory::RootDirectory,
 						test_files[f].IDOnServer));
 					TEST_THAT(getobj->GetObjectID() == test_files[f].IDOnServer);
-					// BLOCK
-					{
-						// Get stream
-						std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
-						// Get and decode
-						BackupStoreFile::DecodeFile(*filestream, filename_fetched, SHORT_TIMEOUT);
-					}
 				}
+				catch(ConnectionException &e)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to get test file " << f <<
+						" (id " << BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+						") from server: " << e.what());
+					continue;
+				}
+
+				// BLOCK
+				{
+					// Get stream
+					std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+					// Get and decode
+					BackupStoreFile::DecodeFile(*filestream, filename_fetched, SHORT_TIMEOUT);
+				}
+
 				// Test for identicalness
 				TEST_THAT(files_identical(filename_fetched, filename));
 				
@@ -601,7 +697,10 @@ int test(int argc, const char *argv[])
 			
 			// Modify the entry
 			BackupStoreDirectory::Entry *pentry = dir.FindEntryByID(test_files[todel].IDOnServer);
-			TEST_THAT(pentry != 0);
+			TEST_LINE_OR(pentry != 0, "Cannot delete test file " << todel << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[todel].IDOnServer) << "): not found on server",
+				break);
+
 			pentry->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
 			// Save it back
 			{
