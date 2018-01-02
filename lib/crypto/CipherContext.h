@@ -19,6 +19,22 @@ class CipherDescription;
 
 #define CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH		32
 
+// Macros to allow compatibility with OpenSSL 1.0 and 1.1 APIs. See
+// https://github.com/charybdis-ircd/charybdis/blob/release/3.5/libratbox/src/openssl_ratbox.h
+// for the gory details.
+#if defined(LIBRESSL_VERSION_NUMBER) || (OPENSSL_VERSION_NUMBER >= 0x10100000L) // OpenSSL >= 1.1
+#	define BOX_OPENSSL_INIT_CTX(ctx) ctx = EVP_CIPHER_CTX_new();
+#	define BOX_OPENSSL_CTX(ctx) ctx
+#	define BOX_OPENSSL_CLEANUP_CTX(ctx) EVP_CIPHER_CTX_free(ctx)
+typedef EVP_CIPHER_CTX* BOX_EVP_CIPHER_CTX;
+#else // OpenSSL < 1.1
+#	define BOX_OPENSSL_INIT_CTX(ctx) EVP_CIPHER_CTX_init(&ctx); // no error return code, even though the docs says it does
+#	define BOX_OPENSSL_CTX(ctx) &ctx
+#	define BOX_OPENSSL_CLEANUP_CTX(ctx) EVP_CIPHER_CTX_cleanup(&ctx)
+typedef EVP_CIPHER_CTX BOX_EVP_CIPHER_CTX;
+#endif
+
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -74,16 +90,14 @@ public:
 #endif
 	
 private:
-	EVP_CIPHER_CTX ctx;
+	BOX_EVP_CIPHER_CTX ctx;
 	bool mInitialised;
 	bool mWithinTransform;
 	bool mPaddingOn;
-	uint8_t mGeneratedIV[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
 	CipherFunction mFunction;
 	std::string mCipherName;
-#ifdef HAVE_OLD_SSL
-	CipherDescription *mpDescription;
-#endif
+	const CipherDescription *mpDescription;
+	std::string mIV;
 };
 
 
