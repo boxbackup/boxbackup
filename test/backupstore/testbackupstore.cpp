@@ -3528,6 +3528,38 @@ bool test_read_write_attr_streamformat()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
+bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3control)
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	// Test that S3BackupFileSystem returns a RevisionID based on the ETag (MD5
+	// checksum) of the file.
+	// rand() is platform-specific, so we can't rely on it to generate files with a
+	// particular ETag, so we write the file ourselves instead.
+	{
+		FileStream fs("testfiles/store/subdir/0.file", O_CREAT | O_WRONLY | O_BINARY);
+		for(int i = 0; i < 455; i++)
+		{
+			char c = (char)i;
+			fs.Write(&c, 1);
+		}
+	}
+
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	S3Client client(s3config);
+	HTTPResponse response = client.HeadObject("/subdir/0.file");
+	client.CheckResponse(response, "Failed to get file /subdir/0.file");
+
+	std::string etag = response.GetHeaderValue("etag");
+	TEST_EQUAL("\"447baac70b0149224b4f48daedf5266f\"", etag);
+
+	S3BackupFileSystem fs(config, "/subdir/", DEFAULT_S3_CACHE_DIR, client);
+	int64_t revision_id = 0, expected_id = 0x447baac70b014922;
+	TEST_THAT(fs.ObjectExists(0, &revision_id));
+	TEST_EQUAL(expected_id, revision_id);
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
 
 // Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
 bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
@@ -3692,6 +3724,7 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(kill_running_daemons());
 	TEST_THAT(StartSimulator());
+	TEST_THAT(test_s3backupfilesystem(*s3config, *ap_s3control));
 	TEST_THAT(test_simpledb_locking(*s3config, *ap_s3control));
 
 	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
