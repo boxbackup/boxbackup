@@ -448,6 +448,16 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 	check_root_dir_ok(after_entries, after_deps);
 }
 
+bool compare_store_contents_with_expected(int phase)
+{
+	BOX_INFO("Running testbackupstorefix.pl to check contents of store (phase " <<
+		phase << ")");
+	std::ostringstream cmd;
+	cmd << PERL_EXECUTABLE " testfiles/testbackupstorefix.pl ";
+	cmd << ((phase == 6) ? "reroot" : "check") << " " << phase;
+	return ::system(cmd.str().c_str()) == 0;
+}
+
 int test(int argc, const char *argv[])
 {
 	// Enable logging timestamps to help debug race conditions on AppVeyor
@@ -711,8 +721,8 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it was
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl check 0") == 0);
+	TEST_THAT(compare_store_contents_with_expected(0));
+
 	// Check the random file doesn't exist
 	{
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
@@ -801,9 +811,7 @@ int test(int argc, const char *argv[])
 		}
 
 		// Check
-		TEST_THAT(::system(PERL_EXECUTABLE
-			" testfiles/testbackupstorefix.pl check 1") 
-			== 0);
+		TEST_THAT(compare_store_contents_with_expected(1));
 
 		// Check the modified file doesn't exist
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
@@ -889,8 +897,8 @@ int test(int argc, const char *argv[])
 	}
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 2") == 0);
+	TEST_THAT(compare_store_contents_with_expected(2));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -949,8 +957,8 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 3") == 0);
+	TEST_THAT(compare_store_contents_with_expected(3));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -966,8 +974,7 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is where it is predicted to be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 4") == 0);
+	TEST_THAT(compare_store_contents_with_expected(4));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
@@ -996,8 +1003,7 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl check 5") == 0);
+	TEST_THAT(compare_store_contents_with_expected(5));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Overwrite root with a file");
@@ -1011,10 +1017,9 @@ int test(int argc, const char *argv[])
 
 	// Fix it
 	RUN_CHECK
-	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl reroot 6") == 0);
 
+	// Check everything is where it should be
+	TEST_THAT(compare_store_contents_with_expected(6));
 
 	// ---------------------------------------------------------
 	// Stop server
