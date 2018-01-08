@@ -14,10 +14,13 @@
 #include <signal.h>
 
 #include "autogen_BackupProtocol.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
+#include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -39,6 +42,7 @@
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
+#include "StoreTestUtils.h" // for run_housekeeping()
 #include "TLSContext.h"
 #include "Test.h"
 
@@ -76,6 +80,7 @@ int test_file_remove_order[] = {0, 2, 3, 5, 8, 1, 4, -1};
 #define FIRST_FILE_SIZE	(64*1024+3)
 #define BUFFER_SIZE		(256*1024)
 #define SHORT_TIMEOUT 5000
+#define HOUSEKEEPING_IN_PROCESS
 
 // Chunk of memory to use for copying files, etc
 static void *buffer = 0;
@@ -336,7 +341,16 @@ int test(int argc, const char *argv[])
 	}
 	RaidFileDiscSet rfd(rcontroller.GetDiscSet(discSet));
 
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify("testfiles/bbstored.conf",
+			&BackupConfigFileVerify, errs));
+	TEST_EQUAL(0, errs.size());
+
+	BackupStoreAccountControl control(*config, 0x01234567);
+	BackupFileSystem& filesystem(control.GetFileSystem());
+
+	int pid = LaunchServer(BBSTORED " -c testfiles/bbstored.conf " + bbstored_args,
 		"testfiles/bbstored.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
@@ -489,6 +503,19 @@ int test(int argc, const char *argv[])
 			test_files[f].DepOlder = older;
 		}
 
+#ifdef HOUSEKEEPING_IN_PROCESS
+		// Kill store server
+		TEST_THAT(KillServer(pid));
+		TEST_THAT(!ServerIsAlive(pid));
+
+		#ifndef WIN32
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
+#else
+		// We need to leave the bbstored process running, so that we can connect to it
+		// and retrieve directory listings from it.
+#endif // HOUSEKEEPING_IN_PROCESS
+
 		// Check the stuff on the server
 		int deleteIndex = 0;
 		while(true)
@@ -527,7 +554,6 @@ int test(int argc, const char *argv[])
 						// object was removed by
 						// housekeeping
 						std::string filenameOut;
-						int startDisc = 0;
 						StoreStructure::MakeObjectFilename(
 							test_files[f].IDOnServer,
 							storeRootDir, discSet,
@@ -614,6 +640,9 @@ int test(int argc, const char *argv[])
 				}
 			}
 			
+#ifdef HOUSEKEEPING_IN_PROCESS
+			BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/", 0, true);
+#else
 			// Open a connection to the server (need to do this each time, otherwise
 			// housekeeping won't run on Windows, and thus won't delete any files).
 			SocketStreamTLS *pConn = new SocketStreamTLS;
@@ -626,6 +655,7 @@ int test(int argc, const char *argv[])
 				TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 				protocol.QueryLogin(0x01234567, 0);
 			}
+#endif
 
 			// Pull all the files down, and check that they (still) match the files
 			// that we uploaded earlier.
@@ -714,16 +744,31 @@ int test(int argc, const char *argv[])
 			int64_t first_revision = 0;
 			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
 
-#ifdef WIN32
+#ifdef HOUSEKEEPING_IN_PROCESS
+			// Housekeeping wants to open both a temporary and a permanent refcount DB,
+			// and after committing the temporary one, it becomes the permanent one and
+			// not ReadOnly, and the BackupFileSystem does not allow opening another
+			// temporary refcount DB if the permanent one is open for writing (with good
+			// reason), so we need to close it here so that housekeeping can open it
+			// again, read-only, on the second and subsequent passes.
+			if(filesystem.GetCurrentRefCountDatabase() != NULL)
+			{
+				filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
+			}
+
+			TEST_EQUAL_LINE(0, run_housekeeping(filesystem),
+				"Housekeeping detected errors in account");
+#else
+#	ifdef WIN32
 			// Cannot signal bbstored to do housekeeping now, and we don't need to, as we will
 			// wait up to 32 seconds and detect automatically when it has finished.
-#else
+#	else
 			// Send the server a restart signal, so it does 
 			// housekeeping immediately, and wait for it to happen
 			// Wait for old connections to terminate
 			::sleep(1);	
 			::kill(pid, SIGHUP);
-#endif
+#	endif // WIN32
 
 			// Wait for changes to be written back to the root directory.
 			for(int secs_remaining = 32; secs_remaining >= 0; secs_remaining--)
@@ -734,19 +779,40 @@ int test(int argc, const char *argv[])
 				::fflush(stdout);
 				
 				// Early end?
-				if(!TestFileExists("testfiles/0_0/backup/01234567/write.lock"))
+				try
 				{
-					int64_t revid = 0;
-					RaidFileRead::FileExists(0, "backup/01234567/o01", &revid);
-					if(revid != first_revision)
+					int64_t current_revision = 0;
+					TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
+						&current_revision));
+
+					if(current_revision != first_revision)
 					{
+						// Root directory has changed, and housekeeping is
+						// not running right now (as we have a lock), so it
+						// must have run already.
 						break;
+					}
+				}
+				catch(BackupStoreException &e)
+				{
+					if(EXCEPTION_IS_TYPE(e, BackupStoreException,
+						CouldNotLockStoreAccount))
+					{
+						// Housekeeping must still be running. Do nothing,
+						// hopefully after another few seconds it will have
+						// finished.
+					}
+					else
+					{
+						// Unexpected exception
+						throw;
 					}
 				}
 
 				TEST_LINE(secs_remaining != 0, "No changes detected to root directory after 32 seconds");
 			}
 			::printf("\n");
+#endif // HOUSEKEEPING_IN_PROCESS
 			
 			// Flag for test
 			test_files[todel].HasBeenDeleted = true;
@@ -765,6 +831,9 @@ int test(int argc, const char *argv[])
 			if(z < (int)NUMBER_FILES) test_files[z].DepOlder = test_files[todel].DepOlder;
 		}
 
+#ifdef HOUSEKEEPING_IN_PROCESS
+		// We already killed the bbstored process earlier
+#else
 		// Kill store server
 		TEST_THAT(KillServer(pid));
 		TEST_THAT(!ServerIsAlive(pid));
@@ -772,6 +841,7 @@ int test(int argc, const char *argv[])
 		#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
 		#endif
+#endif // HOUSEKEEPING_IN_PROCESS
 	}
 	
 	::free(buffer);
