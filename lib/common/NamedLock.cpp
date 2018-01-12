@@ -86,6 +86,8 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 #elif defined BOX_LOCK_TYPE_WIN32
 	flags |= BOX_OPEN_LOCK;
 	method_name = "BOX_OPEN_LOCK";
+#elif defined BOX_LOCK_TYPE_F_OFD_SETLK
+	method_name = "no special flags (for F_OFD_SETLK)";
 #elif defined BOX_LOCK_TYPE_F_SETLK
 	method_name = "no special flags (for F_SETLK)";
 #elif defined BOX_LOCK_TYPE_FLOCK
@@ -119,7 +121,7 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 		if(errno == EBUSY)
 #elif defined BOX_LOCK_TYPE_DUMB
 		if(errno == EEXIST)
-#else // F_SETLK or FLOCK
+#else // F_OFD_SETLK, F_SETLK or FLOCK
 		if(false)
 #endif
 		{
@@ -158,14 +160,19 @@ bool NamedLock::TryAndGetLock(const std::string& rFilename, int mode)
 					rFilename, CommonException, OSFileError);
 			}
 		}
-#elif defined BOX_LOCK_TYPE_F_SETLK
+#elif defined BOX_LOCK_TYPE_F_SETLK || defined BOX_LOCK_TYPE_F_OFD_SETLK
 		struct flock desc;
 		desc.l_type = F_WRLCK;
 		desc.l_whence = SEEK_SET;
 		desc.l_start = 0;
 		desc.l_len = 0;
+		desc.l_pid = 0;
 		BOX_TRACE("Trying to lock lockfile " << rFilename << " using fcntl()");
+#	if defined BOX_LOCK_TYPE_F_OFD_SETLK
+		if(::fcntl(fd, F_OFD_SETLK, &desc) != 0)
+#	else // BOX_LOCK_TYPE_F_SETLK
 		if(::fcntl(fd, F_SETLK, &desc) != 0)
+#	endif
 		{
 			if(errno == EAGAIN)
 			{

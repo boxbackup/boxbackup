@@ -378,15 +378,17 @@ bool test_named_locks()
 		// And again on that name. This works on platforms that have
 		// non-reentrant file locks: Windows and O_EXLOCK.
 		NamedLock lock2;
-#if defined BOX_LOCK_TYPE_O_EXLOCK || defined BOX_LOCK_TYPE_WIN32
-		TEST_THAT(!lock2.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
-#else
-		// It appears to work (because we can't detect the conflict at this point):
+#if defined BOX_LOCK_TYPE_F_SETLK
+		// This lock type is reentrant, unfortunately. It appears that we can lock the same
+		// file again, and we only detect the problem when we unlock and then try to delete
+		// the lockfile for the first lock, when we discover that we've already deleted it,
+		// which means that we made a mistake:
 		TEST_THAT(lock2.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
-		// But when we unlock the outer lock, we discover that the lockfile has already been
-		// deleted, which means that we made a mistake:
 		lock2.ReleaseLock();
 		TEST_CHECK_THROWS(lock1.ReleaseLock(), CommonException, OSFileError);
+#else
+		// These lock types are non-reentrant, so any attempt to lock them again should fail:
+		TEST_THAT(!lock2.TryAndGetLock("testfiles" DIRECTORY_SEPARATOR "lock"));
 #endif
 	}
 

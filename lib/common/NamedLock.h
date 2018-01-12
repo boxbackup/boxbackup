@@ -51,10 +51,16 @@ private:
 #	define BOX_LOCK_TYPE_O_EXLOCK
 #elif defined BOX_OPEN_LOCK
 #	define BOX_LOCK_TYPE_WIN32
-#elif HAVE_DECL_F_SETLK
-#	define BOX_LOCK_TYPE_F_SETLK
 #elif defined HAVE_FLOCK
+// This is preferable to F_OFD_SETLK because no byte ranges are involved
 #	define BOX_LOCK_TYPE_FLOCK
+#elif HAVE_DECL_F_OFD_SETLK
+// This is preferable to F_SETLK because it's non-reentrant
+#	define BOX_LOCK_TYPE_F_OFD_SETLK
+#elif HAVE_DECL_F_SETLK
+// This is not ideal because it's reentrant, but better than a dumb lock
+// (reentrancy only matters in tests; in real use it's as good as F_OFD_SETLK).
+#	define BOX_LOCK_TYPE_F_SETLK
 #else
 // We have no other way to get a lock, so all we can do is fail if the
 // file already exists, and take the risk of stale locks.
