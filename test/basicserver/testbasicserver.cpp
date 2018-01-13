@@ -321,7 +321,7 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 		if(typeid(*conns[c]) == typeid(SocketStreamTLS))
 		{
 			SocketStreamTLS *ptls = (SocketStreamTLS *)conns[c];
-			printf("Connected to '%s'\n", ptls->GetPeerCommonName().c_str());
+			BOX_INFO("Connected to '" << ptls->GetPeerCommonName() << "'");
 		
 			// Send some data, any data, to get the first response.
 			conns[c]->Write("Hello\n", 6);
@@ -486,6 +486,10 @@ void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainst
 
 int test(int argc, const char *argv[])
 {
+	// Timing information is very useful for debugging race conditions during this test,
+	// so enable it unconditionally:
+	Console::SetShowTime(true);
+
 	// Server launching stuff
 	if(argc >= 2)
 	{
@@ -768,13 +772,13 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetValuePlusOne() == 810);
 			}
 			
-			// Streams, twice, both uncertain and certain sizes
+			BOX_INFO("Streams, twice, both uncertain and certain sizes");
 			TestStreamReceive(protocol, 374, false);
 			TestStreamReceive(protocol, 23983, true);
 			TestStreamReceive(protocol, 12098, false);
 			TestStreamReceive(protocol, 4342, true);
 			
-			// Try to send a stream
+			BOX_INFO("Try to send a stream");
 			{
 				std::auto_ptr<CollectInBufferStream>
 					s(new CollectInBufferStream());
@@ -786,13 +790,14 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetStartingValue() == sizeof(buf));
 			}
 
-			// Lots of simple queries
+			BOX_INFO("Lots of simple queries");
 			for(int q = 0; q < 514; q++)
 			{
 				std::auto_ptr<TestProtocolSimpleReply> reply(protocol.QuerySimple(q));
 				TEST_THAT(reply->GetValuePlusOne() == (q+1));
 			}
-			// Send a list of strings to it
+
+			BOX_INFO("Send a list of strings");
 			{
 				std::vector<std::string> strings;
 				strings.push_back(std::string("test1"));
@@ -802,7 +807,7 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetNumberOfStrings() == 3);
 			}
 			
-			// And another
+			BOX_INFO("Send some mixed data");
 			{
 				std::auto_ptr<TestProtocolHello> reply(protocol.QueryHello(41,87,11,std::string("pingu")));
 				TEST_THAT(reply->GetNumber32() == 12);
@@ -811,9 +816,7 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetText() == "Hello world!");
 			}
 
-			// Try to trigger a deliberate and an unexpected error (the latter
-			// by throwing an exception that isn't caught and handled by
-			// HandleException):
+			BOX_INFO("Try to trigger an expected error");
 			{
 				TEST_CHECK_THROWS(protocol.QueryDeliberateError(),
 					ConnectionException, Protocol_UnexpectedReply);
@@ -823,6 +826,9 @@ int test(int argc, const char *argv[])
 				TEST_EQUAL(TestProtocolError::Err_DeliberateError, subtype);
 			}
 
+			BOX_INFO("Try to trigger an unexpected error");
+			// ... by throwing an exception that isn't caught and handled by
+			// HandleException:
 			{
 				TEST_CHECK_THROWS(protocol.QueryUnexpectedError(),
 					ConnectionException, Protocol_UnexpectedReply);
@@ -835,7 +841,7 @@ int test(int argc, const char *argv[])
 			// The unexpected exception should kill the server child process that we
 			// connected to (except on Windows where the server does not fork a child),
 			// so we cannot communicate with it any more:
-
+			BOX_INFO("Try to end protocol (should fail as server is already dead)");
 			{
 				bool didthrow = false;
 				HideExceptionMessageGuard hide;
