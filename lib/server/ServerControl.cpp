@@ -238,6 +238,7 @@ bool KillServer(int pid, bool WaitForProcess)
 	}
 	#endif
 
+	BOX_INFO("Waiting for server to die (pid " << pid << ")");
 	printf("Waiting for server to die (pid %d): ", pid);
 
 	for (int i = 0; i < 300; i++)
