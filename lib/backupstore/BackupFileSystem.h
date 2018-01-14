@@ -309,7 +309,6 @@ private:
 	NamedLock mCacheLock;
 	S3Client& mrClient;
 	std::auto_ptr<SimpleDBClient> mapSimpleDBClient;
-	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
 	bool mHaveLock;
 	std::string mSimpleDBDomain, mLockName, mLockValue, mCurrentUserName,
 		mCurrentHostName;
@@ -359,7 +358,6 @@ public:
 	virtual void DeleteFile(int64_t ObjectID);
 	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
-	std::string GetObjectURL(const std::string& ObjectPath) const;
 
 	// These should not really be APIs, but they are public to make them testable:
 	const std::string& GetSimpleDBDomain() const { return mSimpleDBDomain; }
@@ -422,7 +420,16 @@ protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 
 private:
+	// GetObjectURL() returns the complete URL for an object at the given
+	// path, by adding the hostname, port and the object's URI (which can
+	// be retrieved from GetMetadataURI or GetObjectURI).
+	std::string GetObjectURL(const std::string& ObjectURI) const;
+
+	// GetObjectURI() is a private interface which converts an object ID
+	// and type into a URI, which starts with mBasePath:
 	std::string GetObjectURI(int64_t ObjectID, int Type) const;
+
+	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
 
 	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
 	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
