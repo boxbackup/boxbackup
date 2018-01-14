@@ -523,7 +523,7 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 			foreach(header_file ${header_files})
 				list(APPEND detect_header_files ${header_file})
 			endforeach()
-		elseif(m4_function MATCHES "^ *AC_CHECK_FUNCS\\(\\[([A-Za-z0-9./_ ]+)\\](.*)\\)$")
+		elseif(m4_function MATCHES "^ *AC_CHECK_FUNCS\\(\\[([a-z0-9./_ ]+)\\](.*)\\)$")
 			if(DEBUG)
 				message(STATUS "Processing ac_check_funcs: ${CMAKE_MATCH_1}")
 			endif()
@@ -551,7 +551,7 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 				check_symbol_exists("${decl_name}" "${header_files}" HAVE_DECL_${platform_var_name})
 				file(APPEND "${boxconfig_h_file}" "#cmakedefine01 HAVE_DECL_${platform_var_name}\n")
 			endforeach()
-		elseif(m4_function MATCHES "^ *AC_SEARCH_LIBS\\(\\[([A-Za-z._/ ]+)\\], \\[([A-Za-z0-9._]+)\\]\\)$")
+		elseif(m4_function MATCHES "^ *AC_SEARCH_LIBS\\(\\[([A-Za-z._/ ]+)\\], \\[([A-Za-z._]+)\\]\\)$")
 			if(DEBUG)
 				message(STATUS "Processing ac_search_libs: ${CMAKE_MATCH_1} in ${CMAKE_MATCH_2}")
 			endif()
@@ -688,16 +688,6 @@ if(HAVE_STRUCT_STATFS_F_MNTONNAME OR
 	set(HAVE_MOUNTS 1)
 	file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_MOUNTS\n")
 endif()
-CHECK_CXX_SOURCE_COMPILES([=[
-	#include "windows.h"
-	int main()
-	{
-		char buffer[1024];
-		GetUserNameA(buffer, sizeof(buffer));
-		return strlen(buffer) ? 0 : 1
-	}
-	]=] "HAVE_DECL_GETUSERNAMEA")
-
 
 # Emulate ax_random_device.m4
 if(EXISTS /dev/urandom)
