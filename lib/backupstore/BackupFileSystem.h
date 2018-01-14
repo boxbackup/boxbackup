@@ -206,26 +206,18 @@ public:
 		ASSERT(AccountRootDir[AccountRootDir.size() - 1] == '/' ||
 			AccountRootDir[AccountRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 	}
-	~RaidBackupFileSystem()
+	virtual ~RaidBackupFileSystem()
 	{
-		// Close any open refcount DBs before partially destroying the
-		// BackupFileSystem that they need to close down. Need to do this in the
-		// subclass to avoid calling SaveRefCountDatabase() when the subclass
-		// has already been partially destroyed.
+		// Call ReleaseLock() to close any open refcount DBs before
+		// partially destroying the BackupFileSystem that they need to
+		// close down. Need to do this in the subclass to avoid calling
+		// SaveRefCountDatabase() (from
+		// ~BackupStoreRefCountDatabaseWrapper) when the subclass has
+		// already been partially destroyed.
 		// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-		if(mapPotentialRefCountDatabase.get())
-		{
-			mapPotentialRefCountDatabase->Discard();
-			mapPotentialRefCountDatabase.reset();
-		}
-
-		mapPermanentRefCountDatabase.reset();
-
-		if(mWriteLock.GotLock())
-		{
-			ReleaseLock();
-		}
+		ReleaseLock();
 	}
+
 	virtual void ReleaseLock()
 	{
 		BackupFileSystem::ReleaseLock();
@@ -335,7 +327,8 @@ private:
 public:
 	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
 		const std::string& CacheDirectory, S3Client& rClient);
-	~S3BackupFileSystem();
+	virtual ~S3BackupFileSystem();
+
 	virtual void ReleaseLock();
 	virtual bool HaveLock()
 	{
