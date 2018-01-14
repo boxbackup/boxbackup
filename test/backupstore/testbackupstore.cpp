@@ -40,6 +40,7 @@
 #include "FileStream.h"
 #include "HousekeepStoreAccount.h"
 #include "MemBlockStream.h"
+#include "NamedLock.h" // for BOX_LOCK_TYPE_F_SETLK
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
@@ -2474,8 +2475,8 @@ bool test_cannot_open_multiple_writable_connections()
 	// Set the client store marker
 	protocolWritable.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
-	// This works on platforms that have non-reentrant file locks: Windows and O_EXLOCK
-#if HAVE_DECL_O_EXLOCK || defined BOX_OPEN_LOCK
+	// This works on platforms that have non-reentrant file locks (all but F_SETLK)
+#ifndef BOX_LOCK_TYPE_F_SETLK
 	{
 		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
 		bsContext.SetClientHasAccount("backup/01234567/", 0);

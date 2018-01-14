@@ -14,8 +14,6 @@
 
 #include "BackupStoreAccountDatabase.h"
 
-class NamedLock;
-
 // --------------------------------------------------------------------------
 //
 // Class

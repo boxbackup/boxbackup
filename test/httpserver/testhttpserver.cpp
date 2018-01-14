@@ -1126,13 +1126,6 @@ bool test_httpserver()
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
 	}
 
-	// Copy testfiles/dsfdsfs98.fd to testfiles/store/dsfdsfs98.fd
-	{
-		FileStream in("testfiles/dsfdsfs98.fd", O_RDONLY);
-		FileStream out("testfiles/store/dsfdsfs98.fd", O_CREAT | O_WRONLY);
-		in.CopyStreamTo(out);
-	}
-
 	// S3Client tests with S3Simulator in-process server for debugging
 	{
 		S3Simulator simulator;

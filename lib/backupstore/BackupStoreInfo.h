@@ -124,10 +124,6 @@ public:
 	void AdjustNumOldFiles(int64_t increase);
 	void AdjustNumDeletedFiles(int64_t increase);
 	void AdjustNumDirectories(int64_t increase);
-	void SetLastObjectIDUsed(int64_t LastObjectIDUsed)
-	{
-		mLastObjectIDUsed = LastObjectIDUsed;
-	}
 
 	// Object IDs
 	int64_t AllocateObjectID();

@@ -51,8 +51,6 @@ void memleakfinder_traceblocksinsection();
 
 void memleakfinder_notaleak(void *ptr);
 
-void memleakfinder_delete(void *ptr);
-
 void *operator new  (size_t size, const char *file, int line);
 void *operator new[](size_t size, const char *file, int line);
 // "If the object is being created as part of a new expression, and an exception is thrown, the

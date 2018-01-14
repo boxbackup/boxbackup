@@ -22,8 +22,6 @@
 #	include <process.h> // for getpid() on Windows
 #endif
 
-#include <signal.h>
-#include <stdlib.h>
 #include <sys/types.h>
 
 #include <sstream>

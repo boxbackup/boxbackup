@@ -15,13 +15,11 @@
 #include <vector>
 #include <set>
 
-#include "BackupFileSystem.h"
 #include "BackupStoreDirectory.h"
-#include "NamedLock.h"
 #include "Utils.h" // for object_exists_t
 
 class IOStream;
-class BackupStoreFilename;
+class BackupFileSystem;
 class BackupStoreRefCountDatabase;
 
 /*
@@ -179,9 +177,6 @@ private:
 	bool mQuiet;
 
 	int64_t mNumberErrorsFound;
-
-	// Lock for the store account
-	NamedLock mAccountLock;
 
 	// Storage for ID data
 	typedef std::map<BackupStoreCheck_ID_t, IDBlock*> Info_t;

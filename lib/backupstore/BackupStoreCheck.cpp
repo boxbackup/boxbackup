@@ -16,11 +16,8 @@
 #	include <unistd.h>
 #endif
 
-#ifdef WIN32
-#	include <io.h> // for _mktemp_s
-#endif
-
 #include "autogen_BackupStoreException.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"

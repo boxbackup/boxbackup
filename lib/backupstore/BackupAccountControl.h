@@ -55,12 +55,6 @@ public:
 	virtual BackupFileSystem* GetCurrentFileSystem() { return mapFileSystem.get(); }
 	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
 		const std::string& AccountName);
-	// Close any open BackupFileSystem. Invalidates any references to it. Careless use of this
-	// interface might introduce subtle bugs.
-	void CloseFileSystem()
-	{
-		mapFileSystem.reset();
-	}
 };
 
 
@@ -87,8 +81,7 @@ public:
 	int DeleteAccount(bool AskForConfirmation);
 	int CheckAccount(bool FixErrors, bool Quiet,
 		bool ReturnNumErrorsFound = false);
-	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit,
-		int32_t HardLimit);
+	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit, int32_t HardLimit);
 	int HousekeepAccountNow();
 	virtual BackupFileSystem& GetFileSystem()
 	{

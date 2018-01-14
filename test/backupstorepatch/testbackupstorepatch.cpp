@@ -41,7 +41,7 @@
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
-#include "StoreTestUtils.h"
+#include "StoreTestUtils.h" // for run_housekeeping()
 #include "TLSContext.h"
 #include "Test.h"
 

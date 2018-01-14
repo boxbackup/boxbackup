@@ -15,7 +15,6 @@
 #include <cstring>
 #include <iostream>
 
-#include "BackupFileSystem.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreConstants.h"
