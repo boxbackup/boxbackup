@@ -31,6 +31,7 @@ BOX_CHECK_CXX_FLAG(-Wall)
 BOX_CHECK_CXX_FLAG(-Werror=return-type)
 BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
 BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 BOX_CHECK_CXX_FLAG(-Werror=parentheses)
 BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
 BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
@@ -49,7 +50,6 @@ BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations, -Wdeprecated-declarations)
 # We also get copious warnings from the 'register' storage class specifier in the system
 # headers (ntohl and friends) which we can't do much about, so disable it:
 BOX_CHECK_CXX_FLAG(-Wno-deprecated-register, -Wdeprecated-register)
-BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
