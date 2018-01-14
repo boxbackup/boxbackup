@@ -2597,7 +2597,9 @@ bool test_delete_update_and_symlink_files()
 // Check that store errors are reported neatly.
 bool test_store_error_reporting()
 {
-	// Add times with milliseconds to test log messages, to help debug random test failures
+	// Temporarily enable timestamp logging, to help debug race conditions causing
+	// test failures:
+	Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::TRACE);
 	Console::SettingsGuard save_old_settings;
 	Console::SetShowTime(true);
 	Console::SetShowTimeMicros(true);
