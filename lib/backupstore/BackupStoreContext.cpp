@@ -21,11 +21,6 @@
 #include "BufferedStream.h"
 #include "BufferedWriteStream.h"
 #include "FileStream.h"
-#include "InvisibleTempFileStream.h"
-#include "RaidFileController.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
-#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
