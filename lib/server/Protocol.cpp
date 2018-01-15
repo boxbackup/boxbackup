@@ -118,7 +118,8 @@ void Protocol::Handshake()
 		int bytesRead = mapConn->Read(readInto, bytesToRead, GetTimeout());
 		if(bytesRead == 0)
 		{
-			THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+			THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+				"Timed out waiting " << GetTimeout() << " ms to read handshake");
 		}
 		readInto += bytesRead;
 		bytesToRead -= bytesRead;
@@ -162,7 +163,8 @@ void Protocol::CheckAndReadHdr(void *hdr)
 	if(!mapConn->ReadFullBuffer(hdr, sizeof(PW_ObjectHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+		THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+			"Timed out waiting " << mTimeout << " ms to read message header");
 	}
 }
 
@@ -205,7 +207,8 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	if(!mapConn->ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+		THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+			"Timed out waiting " << mTimeout << " ms to read message contents");
 	}
 
 	// Setup ready to read out data from the buffer
