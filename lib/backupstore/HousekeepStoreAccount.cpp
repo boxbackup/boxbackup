@@ -907,6 +907,7 @@ void HousekeepStoreAccount::UpdateDirectorySize(
 
 	if(new_size_in_blocks == old_size_in_blocks)
 	{
+		// No need to update the entry for this directory in its parent directory.
 		return;
 	}
 
