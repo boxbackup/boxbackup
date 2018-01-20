@@ -57,7 +57,8 @@ RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename)
 	: mSetNumber(SetNumber),
 	  mFilename(Filename),
 	  mOSFileHandle(-1), // not valid file handle
-	  mRefCount(-1) // unknown refcount
+	  mRefCount(-1), // unknown refcount
+	  mAllowOverwrite(false) // safe default
 {
 }
 
@@ -76,7 +77,8 @@ RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename,
 	: mSetNumber(SetNumber),
 	  mFilename(Filename),
 	  mOSFileHandle(-1),		// not valid file handle
-	  mRefCount(refcount)
+	  mRefCount(refcount),
+	  mAllowOverwrite(false) // safe default
 {
 	// Can't check for zero refcount here, because it's legal
 	// to create a RaidFileWrite to delete an object with zero refcount.
@@ -142,7 +144,9 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	{
 		THROW_EXCEPTION(RaidFileException, AlreadyOpen)
 	}
-	
+
+	mAllowOverwrite = AllowOverwrite;
+
 	// Get disc set
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
@@ -329,7 +333,10 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
 
-	if (mRefCount == 0)
+	// It's allowed to create a file with no references, but you must pass
+	// AllowOverwrite = false when opening it to assert that it doesn't already
+	// exist. You cannot modify an existing file with no references.
+	if(mRefCount == 0 && mAllowOverwrite)
 	{
 		THROW_FILE_ERROR("Attempted to modify object file with "
 			"no references", mTempFilename, RaidFileException,

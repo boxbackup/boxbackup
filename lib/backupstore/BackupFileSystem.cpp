@@ -587,11 +587,8 @@ RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	// We can only do this when the file (ObjectID) doesn't already exist.
 	ASSERT(refcount == 0);
 
-	// But RaidFileWrite won't allow us to write to a file that doesn't have exactly one
-	// reference, so we pretend for now that there is one. If the file already exists,
-	// then Open(false) below will raise an exception for us.
 	RaidPutFileCompleteTransaction* pTrans = new RaidPutFileCompleteTransaction(
-		mStoreDiscSet, filename, 1);
+		mStoreDiscSet, filename, refcount);
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());

@@ -75,6 +75,7 @@ private:
 	std::string mFilename, mTempFilename;
 	int mOSFileHandle;
 	int mRefCount;
+	bool mAllowOverwrite;
 };
 
 #endif // RAIDFILEWRITE__H
