@@ -10,17 +10,6 @@
 
 #include "Box.h"
 
-#include <fcntl.h>
-#include <errno.h>
-
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
-#ifdef HAVE_FLOCK
-	#include <sys/file.h>
-#endif
-
 #include "CommonException.h"
 #include "NamedLock.h"
 #include "Utils.h"

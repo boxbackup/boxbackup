@@ -60,5 +60,4 @@ InvalidConfiguration			52	Some required values are missing or incorrect in the c
 IOStreamTimedOut			53	A network operation timed out
 SignalReceived				54	The function call returned because the process received a signal
 NamedLockFailed				55	Failed to acquire a named lock
-FileLockFailed				56	Failed to acquire a lock on a file for an unexpected reason
-FileLockingConflict			57	The file is already locked by another process
+FileLockingConflict			56	The file is already locked by another process
