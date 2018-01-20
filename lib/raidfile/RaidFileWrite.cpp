@@ -527,19 +527,12 @@ void RaidFileWrite::TransformToRaidStorage()
 	// Then open them all for writing (in strict order)
 	try
 	{
-#if HAVE_DECL_O_EXLOCK
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> parity(parityFilenameW.c_str());
-#elif defined BOX_OPEN_LOCK
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_BINARY | BOX_OPEN_LOCK)> parity(parityFilenameW.c_str());
-#else
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> parity(parityFilenameW.c_str());
-#endif
+		FileStream stripe1(stripe1FilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
+		FileStream stripe2(stripe2FilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
+		FileStream parity(parityFilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
 
 		// Then... read in data...
 		int bytesRead = -1;
@@ -619,10 +612,7 @@ void RaidFileWrite::TransformToRaidStorage()
 				}
 
 				// Write block
-				if(::write(parity, parityBuffer, parityWriteSize) != parityWriteSize)
-				{
-					THROW_EXCEPTION(RaidFileException, OSError)
-				}
+				parity.Write(parityBuffer, parityWriteSize);
 			}
 
 			// Write stripes
@@ -633,11 +623,14 @@ void RaidFileWrite::TransformToRaidStorage()
 				int toWrite = (l == (blocksToDo - 1))
 								?(bytesRead - ((blocksToDo-1)*blockSize))
 								:blockSize;
-				if(::write(((l&1)==0)?stripe1:stripe2, writeFrom, toWrite) != toWrite)
+				if((l & 1) == 0)
 				{
-					THROW_SYS_FILE_ERROR("Failed to write to permanent RAID file",
-						writeFilename, RaidFileException, OSError);
-				}			
+					stripe1.Write(writeFrom, toWrite);
+				}
+				else
+				{
+					stripe2.Write(writeFrom, toWrite);
+				}
 
 				// Next block
 				writeFrom += blockSize;
@@ -646,6 +639,7 @@ void RaidFileWrite::TransformToRaidStorage()
 			// Count of blocks done
 			blocksDone += blocksToDo;
 		}
+
 		// Error on read?
 		if(bytesRead == -1)
 		{
@@ -665,12 +659,8 @@ void RaidFileWrite::TransformToRaidStorage()
 		{
 			ASSERT(sizeof(writeFileStat.st_size) <= sizeof(RaidFileRead::FileSizeType));
 			RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
-			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
-			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))
-			{
-				THROW_SYS_FILE_ERROR("Failed to write to file", writeFilename,
-					RaidFileException, OSError);
-			}
+			ASSERT((parity.GetPosition() % blockSize) == 0);
+			parity.Write(&sw, sizeof(sw));
 		}
 
 		// Then close the written files (note in reverse order of opening)
@@ -679,7 +669,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		stripe1.Close();
 
 #ifdef WIN32
-		// Must delete before renaming
+		// Must delete any existing file before renaming over it
 		#define CHECK_UNLINK(file) \
 		{ \
 			if (EMU_UNLINK(file) != 0 && errno != ENOENT) \

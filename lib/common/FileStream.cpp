@@ -8,11 +8,20 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
+
+#include <errno.h>
+
+#ifdef HAVE_FCNTL_G
+	#include <fcntl.h>
+#endif
+
+#ifdef HAVE_SYS_FILE_H
+	#include <sys/file.h>
+#endif
+
 #include "FileStream.h"
 #include "CommonException.h"
 #include "Logging.h"
-
-#include <errno.h>
 
 #include "MemLeakFindOn.h"
 
@@ -24,11 +33,11 @@
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-FileStream::FileStream(const std::string& rFilename, int flags, int mode,
+FileStream::FileStream(const std::string& mFileName, int flags, int mode,
 	lock_mode_t lock_mode)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
-  mFileName(rFilename)
+  mFileName(mFileName)
 {
 	OpenFile(flags, mode, lock_mode);
 }
@@ -144,63 +153,59 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode)
 		}
 	}
 
-	try
-	{
-		bool lock_failed = false;
+	bool lock_failed = false;
 
 #ifdef BOX_LOCK_TYPE_FLOCK
-		BOX_TRACE("Trying to lock " << rFilename << " " << lock_message);
-		if(::flock(fd, (lock_mode == SHARED ? LOCK_SH : LOCK_EX) | LOCK_NB) != 0)
-		{
-			if(errno == EWOULDBLOCK)
-			{
-				lock_failed = true;
-			}
-			else
-			{
-				THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
-					mFileName, CommonException, OSFileError);
-			}
-		}
-#elif defined BOX_LOCK_TYPE_F_SETLK || defined BOX_LOCK_TYPE_F_OFD_SETLK
-		struct flock desc;
-		desc.l_type = (lock_mode == SHARED ? F_RDLCK : F_WRLCK);
-		desc.l_whence = SEEK_SET;
-		desc.l_start = 0;
-		desc.l_len = 0;
-		desc.l_pid = 0;
-		BOX_TRACE("Trying to lock " << mFileName << " " << lock_message);
-#	if defined BOX_LOCK_TYPE_F_OFD_SETLK
-		if(::fcntl(fd, F_OFD_SETLK, &desc) != 0)
-#	else // BOX_LOCK_TYPE_F_SETLK
-		if(::fcntl(fd, F_SETLK, &desc) != 0)
-#	endif
-		{
-			if(errno == EAGAIN)
-			{
-				lock_failed = true;
-			}
-			else
-			{
-				THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
-					mFileName, CommonException, OSFileError);
-			}
-		}
-#endif
+	BOX_TRACE("Trying to lock " << mFileName << " " << lock_message);
+	if(::flock(mOSFileHandle, (lock_mode == SHARED ? LOCK_SH : LOCK_EX) | LOCK_NB) != 0)
+	{
+		Close();
 
-		if(lock_failed)
+		if(errno == EWOULDBLOCK)
 		{
-			// We failed to lock the file, which means that it's locked by someone else.
-			// Need to throw a specific exception that's expected by NamedLock, which
-			// should just return false in this case (and only this case).
-			THROW_EXCEPTION_MESSAGE(CommonException, FileLockingConflict,
-				BOX_FILE_MESSAGE(mFileName, "File already locked by another process"));
+			lock_failed = true;
+		}
+		else
+		{
+			THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
+				mFileName, CommonException, OSFileError);
 		}
 	}
-	catch(BoxException &e)
+#elif defined BOX_LOCK_TYPE_F_SETLK || defined BOX_LOCK_TYPE_F_OFD_SETLK
+	struct flock desc;
+	desc.l_type = (lock_mode == SHARED ? F_RDLCK : F_WRLCK);
+	desc.l_whence = SEEK_SET;
+	desc.l_start = 0;
+	desc.l_len = 0;
+	desc.l_pid = 0;
+	BOX_TRACE("Trying to lock " << mFileName << " " << lock_message);
+#	if defined BOX_LOCK_TYPE_F_OFD_SETLK
+	if(::fcntl(mOSFileHandle, F_OFD_SETLK, &desc) != 0)
+#	else // BOX_LOCK_TYPE_F_SETLK
+	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+#	endif
 	{
-		THROW_FILE_ERROR("Failed to lock file: " << e.what(), mFileName,
-			CommonException, FileLockFailed);
+		Close();
+
+		if(errno == EAGAIN)
+		{
+			lock_failed = true;
+		}
+		else
+		{
+			THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
+				mFileName, CommonException, OSFileError);
+		}
+	}
+#endif
+
+	if(lock_failed)
+	{
+		// We failed to lock the file, which means that it's locked by someone else.
+		// Need to throw a specific exception that's expected by NamedLock, which
+		// should just return false in this case (and only this case).
+		THROW_EXCEPTION_MESSAGE(CommonException, FileLockingConflict,
+			BOX_FILE_MESSAGE(mFileName, "File already locked by another process"));
 	}
 }
 
