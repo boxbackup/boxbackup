@@ -301,7 +301,7 @@ bool test_named_locks()
 				"testfiles"
 				DIRECTORY_SEPARATOR "non-exist"
 				DIRECTORY_SEPARATOR "lock"),
-			CommonException, OSFileError);
+			CommonException, OSFileOpenError);
 
 		// And a more reasonable request
 		TEST_THAT(lock1.TryAndGetLock(
