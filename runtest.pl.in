@@ -266,7 +266,7 @@ sub runtest
 		open LOG, ">$logfile" or die "$logfile: $!";
 		chdir("$base_dir/$test_mode/test/$t");
 
-		open TEE, "$test_dst_exe |"
+		open TEE, "$test_dst_exe $test_options |"
 			or die "$test_dst_dir/$test_dst_exe: $!";
 
 		while (my $line = <TEE>)
@@ -281,7 +281,7 @@ sub runtest
 	else
 	{
 		chdir($base_dir);
-		$test_res = system("cd $test_mode/test/$t ; sh t 2>&1 " .
+		$test_res = system("cd $test_mode/test/$t; sh t $test_options 2>&1 " .
 			"| tee ../../../$logfile");
 	}
 
