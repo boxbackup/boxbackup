@@ -489,6 +489,10 @@ int test(int argc, const char *argv[])
 	// Timing information is very useful for debugging race conditions during this test,
 	// so enable it unconditionally:
 	Console::SetShowTime(true);
+	if(Logging::GetConsole().GetLevel() < Log::INFO)
+	{
+		Logging::FilterConsole(Log::INFO);
+	}
 
 	// Enable stack trace logging for ServerException(SocketOpenError) to help debug random
 	// test failures:
@@ -864,6 +868,8 @@ int test(int argc, const char *argv[])
 					}
 					else
 					{
+						TEST_FAIL_WITH_MESSAGE("Caught unexpected exception: " <<
+							e.what());
 						throw;
 					}
 				}
