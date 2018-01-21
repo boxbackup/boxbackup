@@ -258,6 +258,7 @@ AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
 AC_CHECK_DECLS([IPPROTO_TCP],,, [[#include <netinet/in.h>]])
 AC_CHECK_DECLS([SOL_TCP,TCP_INFO,TCP_CONNECTION_INFO],,, [[#include <netinet/tcp.h>]])
+AC_CHECK_DECLS([SYS_open, SYS_openat],,, [[#include <sys/syscall.h>]])
 
 if test -n "$have_sys_socket_h"; then
   AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <sys/socket.h>]])

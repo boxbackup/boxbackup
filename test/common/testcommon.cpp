@@ -445,16 +445,18 @@ bool test_timers()
 	// throws an assertion failure. Can only do this in debug mode
 	#ifndef BOX_RELEASE_BUILD
 	{
+		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+			AssertFailed);
+
 		Timer tim(0, "tim");
 		TEST_CHECK_THROWS(Timers::Add(tim), CommonException, AssertFailed);
 		Timers::Remove(tim);
-	}
-	#endif
 
-	// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
-	#ifndef BOX_RELEASE_BUILD
-		TEST_CHECK_THROWS(Timers::Cleanup(), CommonException,
+		TEST_CHECK_THROWS(Timer t1(900, "t1"), CommonException,
 			AssertFailed);
+	
+		// TEST_CHECK_THROWS(Timers::Signal(), CommonException, AssertFailed);
+	}
 	#endif
 
 	// Check that we can initialise the timers

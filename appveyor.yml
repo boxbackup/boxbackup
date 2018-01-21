@@ -108,5 +108,4 @@ deploy:
     on:
       branch:
         - master
-        - s3_support_merge
 

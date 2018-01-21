@@ -44,7 +44,6 @@ class Timers
 	public:
 	static void Init();
 	static void Cleanup(bool throw_exception_if_not_initialised = true);
-	static void AssertInitialised();
 	static void Add   (Timer& rTimer);
 	static void Remove(Timer& rTimer);
 	static void RequestReschedule();

@@ -922,8 +922,6 @@ std::auto_ptr<BackupClientContext> BackupDaemon::GetNewContext
 // it, let it be destroyed and close the connection.
 std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 {
-	Timers::AssertInitialised();
-
 	// Delete the serialised store object file,
 	// so that we don't try to reload it after a
 	// partially completed backup
