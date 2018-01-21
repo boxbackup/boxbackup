@@ -395,6 +395,7 @@ bool test_named_locks()
 	TEARDOWN();
 }
 
+#ifdef BOX_MEMORY_LEAK_TESTING
 // Test that memory leak detection doesn't crash
 bool test_memory_leak_detection()
 {
@@ -407,7 +408,6 @@ bool test_memory_leak_detection()
 		delete s;
 	}
 
-#ifdef BOX_MEMORY_LEAK_TESTING
 	{
 		Timers::Cleanup();
 
@@ -429,10 +429,10 @@ bool test_memory_leak_detection()
 
 		Timers::Init();
 	}
-#endif // BOX_MEMORY_LEAK_TESTING
 
 	TEARDOWN();
 }
+#endif // BOX_MEMORY_LEAK_TESTING
 
 bool test_timers()
 {
@@ -1114,7 +1114,9 @@ int test(int argc, const char *argv[])
 	test_stream_large_files();
 	test_invisible_temp_file_stream();
 	test_named_locks();
+#ifdef BOX_MEMORY_LEAK_TESTING
 	test_memory_leak_detection();
+#endif
 	test_timers();
 	test_getline();
 	test_configuration();
