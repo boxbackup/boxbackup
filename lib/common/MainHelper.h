@@ -30,9 +30,6 @@ void mainhelper_init_win32();
 	try {
 
 #define MAINHELPER_END \
-	} catch(BoxException &e) { \
-		BOX_FATAL(e.what() << ": " << e.GetMessage()); \
-		return 1; \
 	} catch(std::exception &e) { \
 		BOX_FATAL(e.what()); \
 		return 1; \
