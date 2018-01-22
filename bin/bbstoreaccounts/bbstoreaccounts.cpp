@@ -22,6 +22,7 @@
 
 #include "box_getopt.h"
 #include "BackupAccountControl.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreCheck.h"
@@ -103,6 +104,7 @@ int main(int argc, const char *argv[])
 	std::string configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
 	Logging::OptionParser log_level;
 	bool machineReadableOutput = false;
+	bool amazon_S3_mode = false;
 
 	// See if there's another entry on the command line
 	int c;
@@ -111,6 +113,10 @@ int main(int argc, const char *argv[])
 	{
 		switch(c)
 		{
+		case '3':
+			amazon_S3_mode = true;
+			break;
+
 		case 'c':
 			// store argument
 			configFilename = optarg;
@@ -151,9 +157,26 @@ int main(int argc, const char *argv[])
 
 	// Read in the configuration file
 	std::string errs;
-	std::auto_ptr<Configuration> config(
-		Configuration::LoadAndVerify
-			(configFilename, &BackupConfigFileVerify, errs));
+	std::auto_ptr<Configuration> config;
+	if(amazon_S3_mode)
+	{
+		// Read a bbackupd configuration file, instead of a bbstored one.
+		if(configFilename.empty())
+		{
+			configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
+		}
+		config = Configuration::LoadAndVerify
+			(configFilename, &BackupDaemonConfigVerify, errs);
+	}
+	else
+	{
+		if(configFilename.empty())
+		{
+			configFilename = BOX_GET_DEFAULT_BBSTORED_CONFIG_FILE;
+		}
+		config = Configuration::LoadAndVerify
+			(configFilename, &BackupConfigFileVerify, errs);
+	}
 
 	if(config.get() == 0 || !errs.empty())
 	{
@@ -161,11 +184,27 @@ int main(int argc, const char *argv[])
 			":" << errs);
 	}
 
+	std::auto_ptr<S3BackupAccountControl> apS3Control;
 	std::auto_ptr<BackupStoreAccountControl> apStoreControl;
 	BackupAccountControl* pControl;
 
+#define STORE_ONLY \
+	if(amazon_S3_mode) \
+	{ \
+		BOX_ERROR("The '" << command << "' command only applies to bbstored " \
+			"backends"); \
+		return 2; \
+	}
+
+	if(amazon_S3_mode)
 	{
-		// Initialise the raid file controller
+		apS3Control.reset(new S3BackupAccountControl(*config,
+			machineReadableOutput));
+		pControl = apS3Control.get();
+	}
+	else
+	{
+		// Initialise the raid file controller. Not needed in Amazon S3 mode.
 		RaidFileController &rcontroller(RaidFileController::GetController());
 		rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
 
@@ -191,9 +230,39 @@ int main(int argc, const char *argv[])
 	{
 		if(command == "create")
 		{
-			// Create the account...
+			// which disc?
+			int32_t discnum;
+
+			if(amazon_S3_mode)
 			{
-				int32_t discnum = 0;
+				if(argc != 3)
+				{
+					BOX_ERROR("create requires an account name/label, "
+						"soft and hard limits.");
+					return 2;
+				}
+			}
+			else
+			{
+				if(argc != 3 || ::sscanf(argv[0], "%d", &discnum) != 1)
+				{
+					BOX_ERROR("create requires raid file disc number, "
+						"soft and hard limits.");
+					return 2;
+				}
+			}
+
+			// Create the account...
+			if(amazon_S3_mode)
+			{
+				int blocksize = apS3Control->GetBlockSize();
+				// Decode limits
+				int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
+				int32_t hardlimit = pControl->SizeStringToBlocks(argv[2], blocksize);
+				return apS3Control->CreateAccount(argv[0], softlimit, hardlimit);
+			}
+			else
+			{
 				int blocksize = apStoreControl->BlockSizeOfDiscSet(discnum);
 				// Decode limits
 				int32_t softlimit = pControl->SizeStringToBlocks(argv[1], blocksize);
@@ -250,11 +319,14 @@ int main(int argc, const char *argv[])
 				BOX_ERROR("name command requires a new name.");
 				return 1;
 			}
+
 			return control.SetAccountName(argv[0]);
 		}
 		else if(command == "delete")
 		{
 			// Delete an account
+			STORE_ONLY;
+
 			bool askForConfirmation = true;
 			if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
 			{
@@ -264,6 +336,8 @@ int main(int argc, const char *argv[])
 		}
 		else if(command == "check")
 		{
+			STORE_ONLY;
+
 			bool fixErrors = false;
 			bool quiet = false;
 
@@ -290,6 +364,7 @@ int main(int argc, const char *argv[])
 		}
 		else if(command == "housekeep")
 		{
+			STORE_ONLY;
 			return apStoreControl->HousekeepAccountNow();
 		}
 		else

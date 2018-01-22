@@ -524,7 +524,7 @@ int test(int argc, const char *argv[])
 			{
 				// Take a lock before actually reading files from disk,
 				// to avoid them changing under our feet.
-				filesystem.TryGetLock();
+				filesystem.GetLock();
 
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
@@ -787,7 +787,7 @@ int test(int argc, const char *argv[])
 				// Early end?
 				try
 				{
-					filesystem.TryGetLock();
+					filesystem.GetLock();
 					int64_t current_revision = 0;
 					TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
 						&current_revision));

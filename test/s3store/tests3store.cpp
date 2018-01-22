@@ -125,6 +125,32 @@ bool check_new_account_info()
 	return (old_failure_count_local == num_failures);
 }
 
+#define BBSTOREACCOUNTS_COMMAND BBSTOREACCOUNTS " -3 -c " \
+	DEFAULT_BBACKUPD_CONFIG_FILE "  "
+
+bool test_bbstoreaccounts_commands()
+{
+	SETUP_TEST_S3SIMULATOR();
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "create test 1000B 2000B"), 0);
+	TEST_THAT(check_new_account_info());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "name foo"), 0);
+	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
+	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(),
+		true); // ReadOnly
+	TEST_EQUAL("foo", apInfo->GetAccountName());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "enabled no"), 0);
+	fs.Seek(0, IOStream::SeekType_Absolute);
+	apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(), true); // ReadOnly
+	TEST_EQUAL(false, apInfo->IsAccountEnabled());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "info"), 0);
+
+	TEARDOWN_TEST_S3SIMULATOR();
+}
+
 int test(int argc, const char *argv[])
 {
 	// SSL library
@@ -139,6 +165,7 @@ int test(int argc, const char *argv[])
 #endif
 
 	TEST_THAT(test_create_account_with_account_control());
+	TEST_THAT(test_bbstoreaccounts_commands());
 
 	return finish_test_suite();
 }
