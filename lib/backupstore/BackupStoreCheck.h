@@ -16,6 +16,7 @@
 #include <set>
 
 #include "BackupStoreDirectory.h"
+#include "Utils.h" // for object_exists_t
 
 class IOStream;
 class BackupFileSystem;
