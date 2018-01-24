@@ -420,9 +420,6 @@ protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 
 private:
-	// S3BackupAccountControl wants to call some of these private APIs, but nobody else should:
-	friend class S3BackupAccountControl;
-
 	// GetObjectURL() returns the complete URL for an object at the given
 	// path, by adding the hostname, port and the object's URI (which can
 	// be retrieved from GetMetadataURI or GetObjectURI).
