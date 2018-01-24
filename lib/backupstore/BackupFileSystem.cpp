@@ -168,7 +168,7 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
 {
 	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
-	// This is the temporary database, so it is about to be committed and become the permanent
+	// This is the potential database, so it is about to be committed and become the permanent
 	// database, so we need to close the current permanent database (if any) first.
 	mapPermanentRefCountDatabase.reset();
 }
@@ -1502,7 +1502,7 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 	// Creating the "official" temporary refcount DB is actually a change
 	// to the cache, even if you don't commit it, because it's in the same
 	// directory and would conflict with another process trying to do the
-	// same thing, so it requires that you hold the write lock.
+	// same thing, so it requires that you hold the write and cache locks.
 	ASSERT(mHaveLock);
 
 	if(mapPotentialRefCountDatabase.get())
