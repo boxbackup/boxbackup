@@ -27,6 +27,7 @@
 #include <sstream>
 
 #include "autogen_BackupStoreException.h"
+#include "autogen_RaidFileException.h"
 #include "BackupConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupFileSystem.h"
@@ -49,6 +50,7 @@
 #include "RaidFileWrite.h"
 #include "S3Client.h"
 #include "StoreStructure.h"
+#include "Utils.h" // for FileExists, StartsWith, EndsWith
 
 #include "MemLeakFindOn.h"
 
