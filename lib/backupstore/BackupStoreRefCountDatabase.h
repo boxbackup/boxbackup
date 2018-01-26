@@ -45,7 +45,8 @@ END_STRUCTURE_PACKING_FOR_WIRE
 //
 // Class
 //		Name:    BackupStoreRefCountDatabase
-//		Purpose: Backup store reference count database storage
+//		Purpose: Abstract interface for an object reference count
+//			 database.
 //		Created: 2009/06/01
 //
 // --------------------------------------------------------------------------
@@ -55,72 +56,60 @@ class BackupStoreRefCountDatabase
 	friend class BackupStoreContext;
 	friend class HousekeepStoreAccount;
 
-public:
-	~BackupStoreRefCountDatabase();
 private:
-	// Creation through static functions only
-	BackupStoreRefCountDatabase(const BackupStoreAccountDatabase::Entry&
-		rAccount, bool ReadOnly, bool Temporary,
-		std::auto_ptr<FileStream> apDatabaseFile);
 	// No copying allowed
 	BackupStoreRefCountDatabase(const BackupStoreRefCountDatabase &);
-	
+
+protected:
+	// Protected constructor which does nothing, to allow concrete implementations
+	// to initialise themselves.
+	BackupStoreRefCountDatabase() { }
+
 public:
+	virtual ~BackupStoreRefCountDatabase() { }
+
 	// Create a blank database, using a temporary file that you must
 	// Discard() or Commit() to make permanent.
+	virtual void Commit() = 0;
+	virtual void Discard() = 0;
+	virtual void Close() = 0;
+
+	// I'm not sure that Reopen() is a good idea, but it's part of BackupFileSystem's
+	// API that it manages the lifetime of two BackupStoreRefCountDatabases, and
+	// Commit() changes the temporary DB to permanent, and it should not be
+	// invalidated by this, so we need a way to reopen it to make the existing object
+	// usable again.
+	virtual void Reopen() = 0;
+	virtual bool IsReadOnly() = 0;
+
+	// These static methods actually create instances of
+	// BackupStoreRefCountDatabaseImpl.
+
+	// Create a new empty database:
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const BackupStoreAccountDatabase::Entry& rAccount);
-	void Commit();
-	void Discard();
-
+	static std::auto_ptr<BackupStoreRefCountDatabase> Create
+		(const std::string& Filename, int64_t AccountID, bool reuse_existing_file = false);
 	// Load it from the store
-	static std::auto_ptr<BackupStoreRefCountDatabase> Load(const
-		BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
+	// Load it from a stream (file or RaidFile)
+	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
+		const std::string& FileName, int64_t AccountID, bool ReadOnly);
+	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
+		rAccount);
 
 	typedef uint32_t refcount_t;
 
 	// Data access functions
-	refcount_t GetRefCount(int64_t ObjectID) const;
-	int64_t GetLastObjectIDUsed() const;
+	virtual refcount_t GetRefCount(int64_t ObjectID) const = 0;
+	virtual int64_t GetLastObjectIDUsed() const = 0;
 
 	// Data modification functions
-	void AddReference(int64_t ObjectID);
+	virtual void AddReference(int64_t ObjectID) = 0;
 	// RemoveReference returns false if refcount drops to zero
-	bool RemoveReference(int64_t ObjectID);
-	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs);
-
-private:
-	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&
-		rAccount, bool Temporary);
-
-	IOStream::pos_type GetSize() const
-	{
-		return mapDatabaseFile->GetPosition() +
-			mapDatabaseFile->BytesLeftToRead();
-	}
-	IOStream::pos_type GetEntrySize() const
-	{
-		return sizeof(refcount_t);
-	}
-	IOStream::pos_type GetOffset(int64_t ObjectID) const
-	{
-		return ((ObjectID - 1) * GetEntrySize()) +
-			sizeof(refcount_StreamFormat);
-	}
-	void SetRefCount(int64_t ObjectID, refcount_t NewRefCount);
-	
-	// Location information
-	BackupStoreAccountDatabase::Entry mAccount;
-	std::string mFilename;
-	bool mReadOnly;
-	bool mIsModified;
-	bool mIsTemporaryFile;
-	std::auto_ptr<FileStream> mapDatabaseFile;
-
-	bool NeedsCommitOrDiscard()
-	{
-		return mapDatabaseFile.get() && mIsModified && mIsTemporaryFile;
-	}
+	virtual bool RemoveReference(int64_t ObjectID) = 0;
+	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs) = 0;
 };
 
 #endif // BACKUPSTOREREFCOUNTDATABASE__H

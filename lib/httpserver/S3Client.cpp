@@ -14,6 +14,9 @@
 // #include <cstdio>
 // #include <ctime>
 
+#include <boost/foreach.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 #include <openssl/hmac.h>
 
 #include "HTTPRequest.h"
@@ -28,19 +31,146 @@
 
 #include "MemLeakFindOn.h"
 
+using boost::property_tree::ptree;
+
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    S3Client::GetObject(const std::string& rObjectURI)
+//		Name:    S3Client::ListBucket(const std::string& prefix,
+//			 const std::string& delimiter,
+//			 std::vector<S3Client::BucketEntry>* p_contents_out,
+//			 std::vector<std::string>* p_common_prefixes_out,
+//			 bool* p_truncated_out, int max_keys,
+//			 const std::string& marker)
+//		Purpose: Retrieve a list of objects in a bucket, with a
+//			 common prefix, optionally starting from a specified
+//			 marker, up to some limit. The entries, and common
+//			 prefixes of entries containing the specified
+//			 delimiter, will be appended to p_contents_out and
+//			 p_common_prefixes_out. Returns the number of items
+//			 appended (p_contents_out + p_common_prefixes_out),
+//			 which may be 0 if there is nothing left to iterate
+//			 over, or no matching files in the bucket.
+//		Created: 18/03/2016
+//
+// --------------------------------------------------------------------------
+
+int S3Client::ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
+	std::vector<std::string>* p_common_prefixes_out,
+	const std::string& prefix, const std::string& delimiter,
+	bool* p_truncated_out, int max_keys, const std::string& marker)
+{
+	HTTPRequest request(HTTPRequest::Method_GET, "/");
+	request.SetParameter("delimiter", delimiter);
+	request.SetParameter("prefix", prefix);
+	request.SetParameter("marker", marker);
+	if(max_keys != -1)
+	{
+		std::ostringstream max_keys_stream;
+		max_keys_stream << max_keys;
+		request.SetParameter("max-keys", max_keys_stream.str());
+	}
+
+	HTTPResponse response = FinishAndSendRequest(request);
+	CheckResponse(response, "Failed to list files in bucket");
+	ASSERT(response.GetResponseCode() == HTTPResponse::Code_OK);
+
+	std::string response_data((const char *)response.GetBuffer(),
+		response.GetSize());
+	std::auto_ptr<std::istringstream> ap_response_stream(
+		new std::istringstream(response_data));
+
+	ptree response_tree;
+	read_xml(*ap_response_stream, response_tree,
+		boost::property_tree::xml_parser::trim_whitespace);
+
+	if(response_tree.begin()->first != "ListBucketResult")
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"Failed to list files in bucket: unexpected root element in "
+			"response: " << response_tree.begin()->first);
+	}
+
+	if(++(response_tree.begin()) != response_tree.end())
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+			"Failed to list files in bucket: multiple root elements in "
+			"response: " << (++(response_tree.begin()))->first);
+	}
+
+	ptree result = response_tree.get_child("ListBucketResult");
+	ASSERT(result.get<std::string>("Delimiter") == delimiter);
+	ASSERT(result.get<std::string>("Prefix") == prefix);
+	ASSERT(result.get<std::string>("Marker") == marker);
+
+	std::string truncated = result.get<std::string>("IsTruncated");
+	ASSERT(truncated == "true" || truncated == "false");
+	if(p_truncated_out)
+	{
+		*p_truncated_out = (truncated == "true");
+	}
+
+	int num_results = 0;
+
+	// Iterate over all the children of the ListBucketResult, looking for
+	// nodes called "Contents", and examine them.
+	BOOST_FOREACH(ptree::value_type &v, result)
+	{
+		if(v.first == "Contents")
+		{
+			std::string name = v.second.get<std::string>("Key");
+			std::string etag = v.second.get<std::string>("ETag");
+			std::string size = v.second.get<std::string>("Size");
+			const char * size_end_ptr;
+			int64_t size_int = box_strtoui64(size.c_str(), &size_end_ptr, 10);
+			if(*size_end_ptr != 0)
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, BadResponse,
+					"Failed to list files in bucket: bad size in "
+					"contents: " << size);
+			}
+
+			p_contents_out->push_back(BucketEntry(name, etag, size_int));
+			num_results++;
+		}
+	}
+
+	ptree common_prefixes = result.get_child("CommonPrefixes");
+	BOOST_FOREACH(ptree::value_type &v, common_prefixes)
+	{
+		if(v.first == "Prefix")
+		{
+			p_common_prefixes_out->push_back(v.second.data());
+			num_results++;
+		}
+	}
+
+	return num_results;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Client::GetObject(const std::string& rObjectURI,
+//			 const std::string& MD5Checksum)
 //		Purpose: Retrieve the object with the specified URI (key)
-//			 from your S3 bucket.
+//			 from your S3 bucket. If you supply an MD5 checksum,
+//			 then it is assumed that you already have the file
+//			 data with that checksum, and if the file version on
+//			 the server is the same, then you will get a 304
+//			 Not Modified response instead of a 200 OK, and no
+//			 file data.
 //		Created: 09/01/2009
 //
 // --------------------------------------------------------------------------
 
-HTTPResponse S3Client::GetObject(const std::string& rObjectURI)
+HTTPResponse S3Client::GetObject(const std::string& rObjectURI,
+	const std::string& MD5Checksum)
 {
-	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI);
+	return FinishAndSendRequest(HTTPRequest::Method_GET, rObjectURI,
+		NULL, // pStreamToSend
+		NULL, // pStreamContentType
+		MD5Checksum);
 }
 
 // --------------------------------------------------------------------------
@@ -59,7 +189,22 @@ HTTPResponse S3Client::HeadObject(const std::string& rObjectURI)
 }
 
 
-HTTPResponse HeadObject(const std::string& rObjectURI);
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Client::DeleteObject(const std::string& rObjectURI)
+//		Purpose: Delete the object with the specified URI (key) from
+//			 your S3 bucket.
+//		Created: 27/01/2016
+//
+// --------------------------------------------------------------------------
+
+HTTPResponse S3Client::DeleteObject(const std::string& rObjectURI)
+{
+	return FinishAndSendRequest(HTTPRequest::Method_DELETE, rObjectURI);
+}
+
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -100,11 +245,35 @@ HTTPResponse S3Client::PutObject(const std::string& rObjectURI,
 
 HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	const std::string& rRequestURI, IOStream* pStreamToSend,
-	const char* pStreamContentType)
+	const char* pStreamContentType, const std::string& MD5Checksum)
 {
+	// It's very unlikely that you want to request a URI from Amazon S3 servers
+	// that doesn't start with a /. Very very unlikely.
+	ASSERT(rRequestURI[0] == '/');
 	HTTPRequest request(Method, rRequestURI);
-	request.SetHostName(mHostName);
-	
+	return FinishAndSendRequest(request, pStreamToSend, pStreamContentType, MD5Checksum);
+}
+
+HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStreamToSend,
+	const char* pStreamContentType, const std::string& MD5Checksum)
+{
+	std::string virtual_host_name;
+
+	if(!mVirtualHostName.empty())
+	{
+		virtual_host_name = mVirtualHostName;
+	}
+	else
+	{
+		virtual_host_name = mHostName;
+	}
+
+	bool with_parameters_for_get_request = (
+		request.GetMethod() == HTTPRequest::Method_GET ||
+		request.GetMethod() == HTTPRequest::Method_HEAD);
+	BOX_TRACE("S3Client: " << mHostName << " > " << request.GetMethodName() <<
+		" " << request.GetRequestURI(with_parameters_for_get_request));
+
 	std::ostringstream date;
 	time_t tt = time(NULL);
 	struct tm *tp = gmtime(&tt);
@@ -131,21 +300,28 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 		request.AddHeader("Content-Type", pStreamContentType);
 	}
 
+	if (!MD5Checksum.empty())
+	{
+		request.AddHeader("If-None-Match",
+			std::string("\"") + MD5Checksum + "\"");
+	}
+
+	request.SetHostName(virtual_host_name);
 	std::string s3suffix = ".s3.amazonaws.com";
 	std::string bucket;
-	if (mHostName.size() > s3suffix.size())
+	if (virtual_host_name.size() > s3suffix.size())
 	{
-		std::string suffix = mHostName.substr(mHostName.size() -
+		std::string suffix = virtual_host_name.substr(virtual_host_name.size() -
 			s3suffix.size(), s3suffix.size());
 		if (suffix == s3suffix)
 		{
-			bucket = mHostName.substr(0, mHostName.size() -
+			bucket = virtual_host_name.substr(0, virtual_host_name.size() -
 				s3suffix.size());
 		}
 	}
 
 	std::ostringstream data;
-	data << request.GetVerb() << "\n";
+	data << request.GetMethodName() << "\n";
 	data << "\n"; /* Content-MD5 */
 	data << request.GetContentType() << "\n";
 	data << date.str() << "\n";
@@ -176,20 +352,27 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 	}
 
 	request.AddHeader("Authorization", auth_code);
-	
+	HTTPResponse response;
+
 	if (mpSimulator)
 	{
 		if (pStreamToSend)
 		{
-			pStreamToSend->CopyStreamTo(request);
+			request.SetDataStream(pStreamToSend);
 		}
 
 		request.SetForReading();
-		CollectInBufferStream response_buffer;
-		HTTPResponse response(&response_buffer);
-	
 		mpSimulator->Handle(request, response);
-		return response;
+
+		// TODO FIXME: HTTPServer::Connection does some post-processing on every
+		// response to determine whether Connection: keep-alive is possible.
+		// We should do that here too, but currently our HTTP implementation
+		// doesn't support chunked encoding, so it's disabled there, so we don't
+		// do it here either.
+
+		// We are definitely finished writing to the HTTPResponse, so leave it
+		// ready for reading back.
+		response.SetForReading();
 	}
 	else
 	{
@@ -201,7 +384,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				mapClientSocket->Open(Socket::TypeINET,
 					mHostName, mPort);
 			}
-			return SendRequest(request, pStreamToSend,
+			response = SendRequest(request, pStreamToSend,
 				pStreamContentType);
 		}
 		catch (ConnectionException &ce)
@@ -212,7 +395,7 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				// try to reconnect, just once
 				mapClientSocket->Open(Socket::TypeINET,
 					mHostName, mPort);
-				return SendRequest(request, pStreamToSend,
+				response = SendRequest(request, pStreamToSend,
 					pStreamContentType);
 			}
 			else
@@ -221,7 +404,20 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest::Method Method,
 				throw;
 			}
 		}
+
+		// No need to call response.SetForReading() because HTTPResponse::Receive()
+		// already did that.
 	}
+
+	// It's not valid to have a keep-alive response if the length isn't known.
+	// S3Simulator should really check this, but depending on how it's called above,
+	// it might be possible to bypass that check, so this is a double-check.
+	ASSERT(response.GetContentLength() >= 0 || !response.IsKeepAlive());
+
+	BOX_TRACE("S3Client: " << mHostName << " < " << response.GetResponseCode() <<
+		": " << response.GetContentLength() << " bytes")
+
+	return response;
 }
 
 // --------------------------------------------------------------------------
@@ -247,11 +443,24 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 
 	if (pStreamToSend)
 	{
-		rRequest.SendWithStream(*mapClientSocket, mNetworkTimeout,
-			pStreamToSend, response);
+		try
+		{
+			rRequest.SendWithStream(*mapClientSocket, mNetworkTimeout,
+				pStreamToSend, response);
+		}
+		catch(BoxException &e)
+		{
+			// If we encounter a read error from the stream while sending, then
+			// the client socket is unsafe (because we have sent a request, and
+			// possibly some data) so we need to close it.
+			mapClientSocket.reset();
+			throw;
+		}
 	}
 	else
 	{
+		// No stream, so it's always safe to enable keep-alive
+		rRequest.SetClientKeepAliveRequested(true);
 		rRequest.Send(*mapClientSocket, mNetworkTimeout);
 		response.Receive(*mapClientSocket, mNetworkTimeout);
 	}
@@ -273,20 +482,33 @@ HTTPResponse S3Client::SendRequest(HTTPRequest& rRequest,
 //
 // Function
 //		Name:    S3Client::CheckResponse(HTTPResponse&,
-//			 std::string& message)
+//		         std::string& message)
 //		Purpose: Check the status code of an Amazon S3 response, and
-//			 throw an exception with a useful message (including
-//			 the supplied message) if it's not a 200 OK response.
+//		         throw an exception with a useful message (including
+//		         the supplied message) if it's not a 200 OK response
+//		         (or 204 if ExpectNoContent is true).
 //		Created: 26/07/2015
 //
 // --------------------------------------------------------------------------
 
-void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message) const
+void S3Client::CheckResponse(const HTTPResponse& response, const std::string& message,
+	bool ExpectNoContent) const
 {
-	if(response.GetResponseCode() != HTTPResponse::Code_OK)
+	// Throw a different exception type (FileNotFound) for 404 responses, since this makes
+	// debugging easier (makes the actual cause more obvious).
+	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
 	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, FileNotFound,
+			message << ": " << response.ResponseCodeString());
+	}
+	else if(response.GetResponseCode() !=
+		(ExpectNoContent ? HTTPResponse::Code_NoContent : HTTPResponse::Code_OK))
+	{
+		std::string response_data((const char *)response.GetBuffer(),
+			response.GetSize());
 		THROW_EXCEPTION_MESSAGE(HTTPException, RequestFailedUnexpectedly,
-			message);
+			message << ": " << response.ResponseCodeString() << ":\n" <<
+			response_data);
 	}
 }
 

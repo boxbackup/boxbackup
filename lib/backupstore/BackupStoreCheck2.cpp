@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "autogen_BackupStoreException.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreCheck.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
@@ -22,9 +23,6 @@
 #include "BackupStoreObjectMagic.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "MemBlockStream.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
-#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
@@ -49,8 +47,7 @@ void BackupStoreCheck::CheckRoot()
 	}
 	else
 	{
-		BOX_WARNING("Root directory doesn't exist");
-
+		BOX_ERROR("Root directory doesn't exist");
 		++mNumberErrorsFound;
 
 		if(mFixErrors)
@@ -79,37 +76,25 @@ void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t Contain
 	}
 
 	BackupStoreDirectory dir(DirectoryID, ContainingDirID);
-
-	// Serialise to disc
-	std::string filename;
-	StoreStructure::MakeObjectFilename(DirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
-	RaidFileWrite obj(mDiscSetNumber, filename);
-	obj.Open(false /* don't allow overwriting */);
-	dir.WriteToStream(obj);
-	int64_t size = obj.GetDiscUsageInBlocks();
-	obj.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Record the fact we've done this
 	mDirsAdded.insert(DirectoryID);
 
 	// Add to sizes
-	mBlocksUsed += size;
-	mBlocksInDirectories += size;
+	mBlocksUsed += dir.GetUserInfo1_SizeInBlocks();
+	mBlocksInDirectories += dir.GetUserInfo1_SizeInBlocks();
 }
 
 class BackupStoreDirectoryFixer
 {
 	private:
 	BackupStoreDirectory mDirectory;
-	std::string mFilename;
-	std::string mStoreRoot;
-	int mDiscSetNumber;
+	BackupFileSystem& mrFileSystem;
 
 	public:
-	BackupStoreDirectoryFixer(std::string storeRoot, int discSetNumber,
-		int64_t ID);
-	void InsertObject(int64_t ObjectID, bool IsDirectory,
-		int32_t lostDirNameSerial);
+	BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem, int64_t ID);
+	void InsertObject(int64_t ObjectID, bool IsDirectory, int32_t lostDirNameSerial);
 	~BackupStoreDirectoryFixer();
 };
 
@@ -160,15 +145,11 @@ void BackupStoreCheck::CheckUnattachedObjects()
 					// File. Only attempt to attach it somewhere if it isn't a patch
 					{
 						int64_t diffFromObjectID = 0;
-						std::string filename;
-						StoreStructure::MakeObjectFilename(ObjectID,
-							mStoreRoot, mDiscSetNumber, filename,
-							false /* don't attempt to make sure the dir exists */);
 
 						// The easiest way to do this is to verify it again. Not such a bad penalty, because
 						// this really shouldn't be done very often.
 						{
-							std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
+							std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
 							BackupStoreFile::VerifyEncodedFileFormat(*file, &diffFromObjectID);
 						}
 
@@ -181,8 +162,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 							// Delete this object instead
 							if(mFixErrors)
 							{
-								RaidFileWrite del(mDiscSetNumber, filename);
-								del.Delete();
+								mrFileSystem.DeleteFile(ObjectID);
 							}
 
 							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
@@ -239,8 +219,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				{
 					// no match, create a new one
 					pFixer = new BackupStoreDirectoryFixer(
-						mStoreRoot, mDiscSetNumber,
-						putIntoDirectoryID);
+						mrFileSystem, putIntoDirectoryID);
 					fixers.insert(fixer_pair_t(
 						putIntoDirectoryID, pFixer));
 				}
@@ -260,7 +239,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 				pFixer->InsertObject(ObjectID,
 					((flags & Flags_IsDir) == Flags_IsDir),
 					lostDirNameSerial);
-				mapNewRefs->AddReference(ObjectID);
+				mpNewRefs->AddReference(ObjectID);
 			}
 		}
 	}
@@ -309,16 +288,10 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 
 	// Create a blank directory
 	BackupStoreDirectory dir(MissingDirectoryID, missing->second /* containing dir ID */);
+
 	// Note that this directory already contains a directory entry pointing to
 	// this dir, so it doesn't have to be added.
-
-	// Serialise to disc
-	std::string filename;
-	StoreStructure::MakeObjectFilename(MissingDirectoryID, mStoreRoot, mDiscSetNumber, filename, true /* make sure the dir exists */);
-	RaidFileWrite root(mDiscSetNumber, filename);
-	root.Open(false /* don't allow overwriting */);
-	dir.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Record the fact we've done this
 	mDirsAdded.insert(MissingDirectoryID);
@@ -329,19 +302,11 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	return true;
 }
 
-BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(std::string storeRoot,
-	int discSetNumber, int64_t ID)
-: mStoreRoot(storeRoot),
-  mDiscSetNumber(discSetNumber)
+BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem,
+	int64_t ID)
+: mrFileSystem(rFileSystem)
 {
-	// Generate filename
-	StoreStructure::MakeObjectFilename(ID, mStoreRoot, mDiscSetNumber,
-		mFilename, false /* don't make sure the dir exists */);
-
-	// Read it in
-	std::auto_ptr<RaidFileRead> file(
-		RaidFileRead::Open(mDiscSetNumber, mFilename));
-	mDirectory.ReadFromStream(*file, IOStream::TimeOutInfinite);
+	mrFileSystem.GetDirectory(ID, mDirectory);
 }
 
 void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
@@ -361,19 +326,11 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	}
 	else
 	{
-		// Files require a little more work...
-		// Open file
-		std::string fileFilename;
-		StoreStructure::MakeObjectFilename(ObjectID, mStoreRoot,
-			mDiscSetNumber, fileFilename,
-			false /* don't make sure the dir exists */);
-		std::auto_ptr<RaidFileRead> file(
-			RaidFileRead::Open(mDiscSetNumber, fileFilename));
-
-		// Fill in size information
-		sizeInBlocks = file->GetDiscUsageInBlocks();
+		// Files require a little more work... Fill in size information.
+		sizeInBlocks = mrFileSystem.GetFileSizeInBlocks(ObjectID);
 
 		// Read in header
+		std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
 		file_StreamFormat hdr;
 		if(file->Read(&hdr, sizeof(hdr)) != sizeof(hdr) ||
 			(ntohl(hdr.mMagicValue) != OBJECTMAGIC_FILE_MAGIC_VALUE_V1
@@ -404,10 +361,7 @@ BackupStoreDirectoryFixer::~BackupStoreDirectoryFixer()
 	mDirectory.CheckAndFix();
 
 	// Write it out
-	RaidFileWrite root(mDiscSetNumber, mFilename);
-	root.Open(true /* allow overwriting */);
-	mDirectory.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(mDirectory);
 }
 
 // --------------------------------------------------------------------------
@@ -434,12 +388,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 
 	// Load up the root directory
 	BackupStoreDirectory dir;
-	std::string filename;
-	StoreStructure::MakeObjectFilename(BACKUPSTORE_ROOT_DIRECTORY_ID, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-	{
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-	}
+	mrFileSystem.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, dir);
 
 	// Find a suitable name
 	BackupStoreFilename lostAndFound;
@@ -467,10 +416,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	dir.AddEntry(lostAndFound, 0, id, 0, BackupStoreDirectory::Entry::Flags_Dir, 0);
 
 	// Write out root dir
-	RaidFileWrite root(mDiscSetNumber, filename);
-	root.Open(true /* allow overwriting */);
-	dir.WriteToStream(root);
-	root.Commit(true /* convert to raid now */);
+	mrFileSystem.PutDirectory(dir);
 
 	// Store
 	mLostAndFoundDirectoryID = id;
@@ -506,21 +452,13 @@ void BackupStoreCheck::FixDirsWithWrongContainerID()
 
 		// Load in
 		BackupStoreDirectory dir;
-		std::string filename;
-		StoreStructure::MakeObjectFilename(*i, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-		{
-			std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-			dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-		}
+		mrFileSystem.GetDirectory(*i, dir);
 
 		// Adjust container ID
 		dir.SetContainerID(pblock->mContainer[index]);
 
 		// Write it out
-		RaidFileWrite root(mDiscSetNumber, filename);
-		root.Open(true /* allow overwriting */);
-		dir.WriteToStream(root);
-		root.Commit(true /* convert to raid now */);
+		mrFileSystem.PutDirectory(dir);
 	}
 }
 
@@ -551,12 +489,7 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 
 		// Load in
 		BackupStoreDirectory dir;
-		std::string filename;
-		StoreStructure::MakeObjectFilename(i->second, mStoreRoot, mDiscSetNumber, filename, false /* don't make sure the dir exists */);
-		{
-			std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(mDiscSetNumber, filename));
-			dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-		}
+		mrFileSystem.GetDirectory(i->second, dir);
 
 		// Delete the dodgy entry
 		dir.DeleteEntry(i->first);
@@ -565,10 +498,7 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 		dir.CheckAndFix();
 
 		// Write it out
-		RaidFileWrite root(mDiscSetNumber, filename);
-		root.Open(true /* allow overwriting */);
-		dir.WriteToStream(root);
-		root.Commit(true /* convert to raid now */);
+		mrFileSystem.PutDirectory(dir);
 	}
 }
 
@@ -584,11 +514,11 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 void BackupStoreCheck::WriteNewStoreInfo()
 {
 	// Attempt to load the existing store info file
-	std::auto_ptr<BackupStoreInfo> pOldInfo;
+	std::auto_ptr<BackupStoreInfo> apOldInfo;
 	try
 	{
-		pOldInfo.reset(BackupStoreInfo::Load(mAccountID, mStoreRoot, mDiscSetNumber, true /* read only */).release());
-		mAccountName = pOldInfo->GetAccountName();
+		apOldInfo = mrFileSystem.GetBackupStoreInfoUncached();
+		mAccountName = apOldInfo->GetAccountName();
 	}
 	catch(...)
 	{
@@ -606,14 +536,14 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	int64_t minSoft = ((mBlocksUsed * 11) / 10) + 1024;
 	int64_t minHard = ((minSoft * 11) / 10) + 1024;
 
-	int64_t softLimit = pOldInfo.get() ? pOldInfo->GetBlocksSoftLimit() : minSoft;
-	int64_t hardLimit = pOldInfo.get() ? pOldInfo->GetBlocksHardLimit() : minHard;
+	int64_t softLimit = apOldInfo.get() ? apOldInfo->GetBlocksSoftLimit() : minSoft;
+	int64_t hardLimit = apOldInfo.get() ? apOldInfo->GetBlocksHardLimit() : minHard;
 
-	if(mNumberErrorsFound && pOldInfo.get())
+	if(mNumberErrorsFound && apOldInfo.get())
 	{
-		if(pOldInfo->GetBlocksSoftLimit() > minSoft)
+		if(apOldInfo->GetBlocksSoftLimit() > minSoft)
 		{
-			softLimit = pOldInfo->GetBlocksSoftLimit();
+			softLimit = apOldInfo->GetBlocksSoftLimit();
 		}
 		else
 		{
@@ -621,9 +551,9 @@ void BackupStoreCheck::WriteNewStoreInfo()
 				"housekeeping doesn't delete files on next run.");
 		}
 
-		if(pOldInfo->GetBlocksHardLimit() > minHard)
+		if(apOldInfo->GetBlocksHardLimit() > minHard)
 		{
-			hardLimit = pOldInfo->GetBlocksHardLimit();
+			hardLimit = apOldInfo->GetBlocksHardLimit();
 		}
 		else
 		{
@@ -641,19 +571,17 @@ void BackupStoreCheck::WriteNewStoreInfo()
 
 	// Build a new store info
 	std::auto_ptr<MemBlockStream> extra_data;
-	if(pOldInfo.get())
+	if(apOldInfo.get())
 	{
-		extra_data.reset(new MemBlockStream(pOldInfo->GetExtraData()));
+		extra_data.reset(new MemBlockStream(apOldInfo->GetExtraData()));
 	}
 	else
 	{
 		extra_data.reset(new MemBlockStream(/* empty */));
 	}
-	std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::CreateForRegeneration(
+	std::auto_ptr<BackupStoreInfo> apNewInfo(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
 		mAccountName,
-		mStoreRoot,
-		mDiscSetNumber,
 		lastObjID,
 		mBlocksUsed,
 		mBlocksInCurrentFiles,
@@ -662,35 +590,35 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		mBlocksInDirectories,
 		softLimit,
 		hardLimit,
-		(pOldInfo.get() ? pOldInfo->IsAccountEnabled() : true),
+		(apOldInfo.get() ? apOldInfo->IsAccountEnabled() : true),
 		*extra_data));
-	info->AdjustNumCurrentFiles(mNumCurrentFiles);
-	info->AdjustNumOldFiles(mNumOldFiles);
-	info->AdjustNumDeletedFiles(mNumDeletedFiles);
-	info->AdjustNumDirectories(mNumDirectories);
+	apNewInfo->AdjustNumCurrentFiles(mNumCurrentFiles);
+	apNewInfo->AdjustNumOldFiles(mNumOldFiles);
+	apNewInfo->AdjustNumDeletedFiles(mNumDeletedFiles);
+	apNewInfo->AdjustNumDirectories(mNumDirectories);
 
 	// If there are any errors (apart from wrong block counts), then we
 	// should reset the ClientStoreMarker to zero, which
 	// CreateForRegeneration does. But if there are no major errors, then
 	// we should maintain the old ClientStoreMarker, to avoid invalidating
 	// the client's directory cache.
-	if (pOldInfo.get() && !mNumberErrorsFound)
+	if(apOldInfo.get() && !mNumberErrorsFound)
 	{
 		BOX_INFO("No major errors found, preserving old "
 			"ClientStoreMarker: " <<
-			pOldInfo->GetClientStoreMarker());
-		info->SetClientStoreMarker(pOldInfo->GetClientStoreMarker());
+			apOldInfo->GetClientStoreMarker());
+		apNewInfo->SetClientStoreMarker(apOldInfo->GetClientStoreMarker());
 	}
 
-	if(pOldInfo.get())
+	if(apOldInfo.get())
 	{
-		mNumberErrorsFound += info->ReportChangesTo(*pOldInfo);
+		mNumberErrorsFound += apNewInfo->ReportChangesTo(*apOldInfo);
 	}
 
 	// Save to disc?
 	if(mFixErrors)
 	{
-		info->Save();
+		mrFileSystem.PutBackupStoreInfo(*apNewInfo);
 		BOX_INFO("New store info file written successfully.");
 	}
 }

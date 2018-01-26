@@ -20,9 +20,9 @@ set(OPENSSL_VERSION 1.1.0g)
 set(OPENSSL_HASH SHA256=de4d501267da39310905cb6dc8c6121f7a2cad45a7707f76df828fe1b85073af)
 
 # Version of PCRE to download, build, and compile Box Backup against:
-set(PCRE_VERSION    8.39)
-# Hash of pcre-${PCRE_VERSION}.tar.gz, to be verified after download:
-set(PCRE_HASH SHA256=ccdf7e788769838f8285b3ee672ed573358202305ee361cfec7a4a4fb005bbc7)
+set(PCRE_VERSION    8.41)
+# Hash of pcre-${PCRE_VERSION}.tar.bz2, to be verified after download:
+set(PCRE_HASH SHA256=e62c7eac5ae7c0e7286db61ff82912e1c0b7a0c13706616e94a7dd729321b530)
 
 # Version of Boost to download, unpack, and compile Box Backup against:
 set(BOOST_VERSION    1.62.0)
@@ -44,26 +44,30 @@ ExternalProject_Add(zlib
 )
 
 if(WIN32)
+	if(PLATFORM STREQUAL "x64")
+		set(openssl_config debug-VC-WIN64A)
+		set(batch_config ms\\do_win64a.bat)
+	else()
+		set(openssl_config debug-VC-WIN32)
+		set(batch_config ms\\do_ms.bat)
+	endif()
 	ExternalProject_Add(openssl
 		DEPENDS zlib
 		URL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 		URL_HASH ${OPENSSL_HASH}
 		DOWNLOAD_NO_PROGRESS 1
-		CONFIGURE_COMMAND perl Configure debug-VC-WIN32 no-asm no-shared
+		CONFIGURE_COMMAND perl Configure ${openssl_config} no-asm no-shared
 			--prefix=${install_dir}
 			--openssldir=etc
 		# Run tests before install, but don't make the main target depend on them, so that
 		# we don't have to run them whenever we build manually on Windows.
 		TEST_BEFORE_INSTALL 1
 		TEST_EXCLUDE_FROM_MAIN 1
-		# You would expect us to use nt.mak to compile a static library here, but mk1mf.pl uses the /MT[d]
-		# CRT in that case, which is incompatible with our dynamic runtime, /MD[d]. It seems that the libs
-		# built by ntdll.mak, which are compiled with /MD[d], are full libraries and not import libs,
-		# so we can link statically against them and still get a dynamic runtime.
 		BUILD_IN_SOURCE 1
 		BUILD_COMMAND   nmake /s
 		TEST_COMMAND    nmake /s test
 		INSTALL_COMMAND nmake /s install
+		STEP_TARGETS test
 	)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	ExternalProject_Add(openssl
@@ -87,10 +91,8 @@ else()
 endif()
 
 ExternalProject_Add(pcre
-	# Temporarily use SVN repo until the PCRE_STATIC issue in 8.40 is fixed:
-	# https://vcs.pcre.org/pcre?view=revision&revision=1677
-	SVN_REPOSITORY svn://vcs.exim.org/pcre/code/trunk
-	SVN_REVISION -r 1677
+	URL "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-${PCRE_VERSION}.tar.bz2"
+	URL_HASH ${PCRE_HASH}
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	-DPCRE_SUPPORT_LIBREADLINE=OFF

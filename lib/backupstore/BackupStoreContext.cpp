@@ -21,24 +21,13 @@
 #include "BufferedStream.h"
 #include "BufferedWriteStream.h"
 #include "FileStream.h"
-#include "InvisibleTempFileStream.h"
-#include "RaidFileController.h"
-#include "RaidFileRead.h"
-#include "RaidFileWrite.h"
-#include "StoreStructure.h"
 
 #include "MemLeakFindOn.h"
 
 
 // Maximum number of directories to keep in the cache When the cache is bigger
-// than this, everything gets deleted. In tests, we set the cache size to zero
-// to ensure that it's always flushed, which is very inefficient but helps to
-// catch programming errors (use of freed data).
-#ifdef BOX_RELEASE_BUILD
-	#define	MAX_CACHE_SIZE	32
-#else
-	#define	MAX_CACHE_SIZE	0
-#endif
+// than this, everything gets deleted.
+#define	MAX_CACHE_SIZE	32
 
 // Allow the housekeeping process 4 seconds to release an account
 #define MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT	4
@@ -46,11 +35,17 @@
 // Maximum amount of store info updates before it's actually saved to disc.
 #define STORE_INFO_SAVE_DELAY	96
 
+#define CHECK_FILESYSTEM_INITIALISED() \
+	if(!mpFileSystem) \
+	{ \
+		THROW_EXCEPTION(BackupStoreException, FileSystemNotInitialised); \
+	}
+
 // --------------------------------------------------------------------------
 //
 // Function
 //		Name:    BackupStoreContext::BackupStoreContext()
-//		Purpose: Constructor
+//		Purpose: Traditional constructor (for RAID filesystems only)
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------
@@ -61,9 +56,34 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mpHousekeeping(pHousekeeping),
   mProtocolPhase(Phase_START),
   mClientHasAccount(false),
-  mStoreDiscSet(-1),
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpFileSystem(NULL),
+  mpTestHook(NULL)
+// If you change the initialisers, be sure to update
+// BackupStoreContext::ReceivedFinishCommand as well!
+{
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::BackupStoreContext()
+//		Purpose: New constructor (for any type of BackupFileSystem)
+//		Created: 2015/11/02
+//
+// --------------------------------------------------------------------------
+BackupStoreContext::BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
+	HousekeepingInterface* pHousekeeping, const std::string& rConnectionDetails)
+: mConnectionDetails(rConnectionDetails),
+  mClientID(ClientID),
+  mpHousekeeping(pHousekeeping),
+  mProtocolPhase(Phase_START),
+  mClientHasAccount(false),
+  mReadOnly(true),
+  mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
+  mpFileSystem(&rFileSystem),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
@@ -81,17 +101,24 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
 // --------------------------------------------------------------------------
 BackupStoreContext::~BackupStoreContext()
 {
-	ClearDirectoryCache();
+	try
+	{
+		ClearDirectoryCache();
+		ReleaseWriteLock();
+	}
+	catch(BoxException &e)
+	{
+		BOX_ERROR("Failed to clean up BackupStoreContext: " << e.what());
+	}
 }
 
 
 void BackupStoreContext::ClearDirectoryCache()
 {
 	// Delete the objects in the cache
-	for(std::map<int64_t, BackupStoreDirectory*>::iterator i(mDirectoryCache.begin());
-		i != mDirectoryCache.end(); ++i)
+	for(auto i(mDirectoryCache.begin()); i != mDirectoryCache.end(); ++i)
 	{
-		delete (i->second);
+		delete i->second;
 	}
 	mDirectoryCache.clear();
 }
@@ -107,43 +134,46 @@ void BackupStoreContext::ClearDirectoryCache()
 // --------------------------------------------------------------------------
 void BackupStoreContext::CleanUp()
 {
-	// Make sure the store info is saved, if it has been loaded, isn't read only and has been modified
-	if(mapStoreInfo.get() && !(mapStoreInfo->IsReadOnly()) &&
-		mapStoreInfo->IsModified())
+	if(!mpFileSystem)
 	{
-		mapStoreInfo->Save();
+		return;
 	}
-}
 
+	CHECK_FILESYSTEM_INITIALISED();
 
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::ReceivedFinishCommand()
-//		Purpose: Called when the finish command is received by the protocol
-//		Created: 16/12/03
-//
-// --------------------------------------------------------------------------
-void BackupStoreContext::ReceivedFinishCommand()
-{
-	if(!mReadOnly && mapStoreInfo.get())
+	if(!mReadOnly)
 	{
-		// Save the store info, not delayed
-		SaveStoreInfo(false);
+		// Make sure the store info is saved, if it has been loaded, isn't
+		// read only and has been modified.
+		BackupStoreInfo& info(GetBackupStoreInfoInternal());
+		if(!info.IsReadOnly() && info.IsModified())
+		{
+			// Save the store info, not delayed
+			SaveStoreInfo(false);
+		}
+		// Ask the BackupFileSystem to clear its BackupStoreInfo, so that we don't use
+		// a stale one if the Context is later reused.
+		mpFileSystem->DiscardBackupStoreInfo(info);
+
+		// Make sure the refcount database is saved too, and removed from the
+		// BackupFileSystem (in case it's modified before reopening).
+		if(mpRefCount)
+		{
+			mpFileSystem->CloseRefCountDatabase(mpRefCount);
+			mpRefCount = NULL;
+		}
 	}
+
+	ReleaseWriteLock();
 
 	// Just in case someone wants to reuse a local protocol object,
 	// put the context back to its initial state.
 	mProtocolPhase = BackupStoreContext::Phase_Version;
 
-	// Avoid the need to check version again, by not resetting
-	// mClientHasAccount, mAccountRootDir or mStoreDiscSet
-
+	// Avoid the need to check version again, by not resetting mClientHasAccount.
 	mReadOnly = true;
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
 	mpTestHook = NULL;
-	mapStoreInfo.reset();
-	mapRefCount.reset();
 	ClearDirectoryCache();
 }
 
@@ -158,41 +188,72 @@ void BackupStoreContext::ReceivedFinishCommand()
 // --------------------------------------------------------------------------
 bool BackupStoreContext::AttemptToGetWriteLock()
 {
-	// Make the filename of the write lock file
-	std::string writeLockFile;
-	StoreStructure::MakeWriteLockFilename(mAccountRootDir, mStoreDiscSet, writeLockFile);
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Request the lock
-	bool gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
+	bool gotLock = false;
 
-	if(!gotLock && mpHousekeeping)
+	for(int i = 0; i < (mpHousekeeping ? 2 : 1); i++)
 	{
-		// The housekeeping process might have the thing open -- ask it to stop
-		char msg[256];
-		int msgLen = snprintf(msg, sizeof(msg), "r%x\n", mClientID);
-		// Send message
-		mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
-
-		// Then try again a few times
-		int tries = MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT;
-		do
+		try
 		{
-			::sleep(1 /* second */);
-			--tries;
-			gotLock = mWriteLock.TryAndGetLock(writeLockFile.c_str(), 0600 /* restrictive file permissions */);
+			// On the first pass, only try once. If it fails, and we have a
+			// housekeeping process, then we'll notify it and try again,
+			// with more retries.
+			mpFileSystem->GetLock((i == 0) ? 1 :
+				MAX_WAIT_FOR_HOUSEKEEPING_TO_RELEASE_ACCOUNT);
 
-		} while(!gotLock && tries > 0);
+			// If we got to here, then it worked!
+			gotLock = true;
+		}
+		catch(BackupStoreException &e)
+		{
+			if(!EXCEPTION_IS_TYPE(e, BackupStoreException, CouldNotLockStoreAccount))
+			{
+				// We don't know what this error is.
+				throw;
+			}
+
+			if(mpHousekeeping)
+			{
+				// The housekeeping process might have the account locked. Ask it to stop.
+				char msg[256];
+				int msgLen = snprintf(msg, sizeof(msg), "r%x\n", mClientID);
+
+				// Send message
+				mpHousekeeping->SendMessageToHousekeepingProcess(msg, msgLen);
+
+				// Then loop again, with more retries this time
+			}
+		}
 	}
 
 	if(gotLock)
 	{
 		// Got the lock, mark as not read only
 		mReadOnly = false;
+
+		// GetDirectoryInternal assumes that if we have the write lock, everything in the
+		// cache was loaded with that lock, and cannot be stale. That would be violated if
+		// we had anything in the cache already when the lock was obtained, so clear it now.
+		ClearDirectoryCache();
 	}
 
 	return gotLock;
 }
 
+
+void BackupStoreContext::SetClientHasAccount(const std::string &rStoreRoot,
+	int StoreDiscSet)
+{
+	// Check that the BackupStoreContext hasn't already been initialised, or already
+	// created its own BackupFileSystem.
+	ASSERT(!mpFileSystem);
+	mClientHasAccount = true;
+	mapOwnFileSystem.reset(
+		new RaidBackupFileSystem(mClientID, rStoreRoot, StoreDiscSet));
+	mpFileSystem = mapOwnFileSystem.get();
+}
 
 // --------------------------------------------------------------------------
 //
@@ -204,37 +265,27 @@ bool BackupStoreContext::AttemptToGetWriteLock()
 // --------------------------------------------------------------------------
 void BackupStoreContext::LoadStoreInfo()
 {
-	if(mapStoreInfo.get() != 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoAlreadyLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
-	// Load it up!
-	std::auto_ptr<BackupStoreInfo> i(BackupStoreInfo::Load(mClientID, mAccountRootDir, mStoreDiscSet, mReadOnly));
+	// Load it up! This checks the account ID on RaidBackupFileSystem backends,
+	// but not on S3BackupFileSystem which don't use account IDs.
+	GetBackupStoreInfo();
 
-	// Check it
-	if(i->GetAccountID() != mClientID)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoForWrongAccount)
-	}
-
-	// Keep the pointer to it
-	mapStoreInfo = i;
-
-	BackupStoreAccountDatabase::Entry account(mClientID, mStoreDiscSet);
-
-	// try to load the reference count database
+	// Try to load the reference count database
 	try
 	{
-		mapRefCount = BackupStoreRefCountDatabase::Load(account, false);
+		mpRefCount = &(mpFileSystem->GetPermanentRefCountDatabase(mReadOnly));
 	}
 	catch(BoxException &e)
 	{
+		// Do not create a new refcount DB here, it is not safe! Users may wonder
+		// why they have lost all their files, and/or unwittingly overwrite their
+		// backup data.
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CorruptReferenceCountDatabase, "Reference count "
-			"database is missing or corrupted, cannot safely open "
-			"account. Housekeeping will fix this automatically "
-			"when it next runs.");
+			CorruptReferenceCountDatabase, "Account " <<
+			BOX_FORMAT_ACCOUNT(mClientID) << " reference count database is "
+			"missing or corrupted, cannot safely open account. Housekeeping "
+			"will fix this automatically when it next runs.");
 	}
 }
 
@@ -249,7 +300,7 @@ void BackupStoreContext::LoadStoreInfo()
 // --------------------------------------------------------------------------
 void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 {
-	if(mapStoreInfo.get() == 0)
+	if(!mpFileSystem)
 	{
 		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
 	}
@@ -270,27 +321,11 @@ void BackupStoreContext::SaveStoreInfo(bool AllowDelay)
 	}
 
 	// Want to save now
-	mapStoreInfo->Save();
+	CHECK_FILESYSTEM_INITIALISED();
+	mpFileSystem->PutBackupStoreInfo(GetBackupStoreInfoInternal());
 
-	// Set count for next delay
+	// Reset counter for next delayed save.
 	mSaveStoreInfoDelay = STORE_INFO_SAVE_DELAY;
-}
-
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::MakeObjectFilename(int64_t, std::string &, bool)
-//		Purpose: Create the filename of an object in the store, optionally creating the 
-//				 containing directory if it doesn't already exist.
-//		Created: 2003/09/02
-//
-// --------------------------------------------------------------------------
-void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists)
-{
-	// Delegate to utility function
-	StoreStructure::MakeObjectFilename(ObjectID, mAccountRootDir, mStoreDiscSet, rOutput, EnsureDirectoryExists);
 }
 
 
@@ -299,54 +334,80 @@ void BackupStoreContext::MakeObjectFilename(int64_t ObjectID, std::string &rOutp
 // Function
 //		Name:    BackupStoreContext::GetDirectoryInternal(int64_t,
 //			 bool)
-//		Purpose: Return a reference to a directory. Valid only until
-//			 the next time a function which affects directories
-//			 is called. Mainly this function, and creation of
-//			 files. Private version of this, which returns
-//			 non-const directories. Unless called with
-//			 AllowFlushCache == false, the cache may be flushed,
-//			 invalidating all directory references that you may
-//			 be holding, so beware.
+//		Purpose: Return a reference to a directory, valid only until
+//			 the next time a function which may flush the
+//			 directory cache is called: mainly this function
+//			 (with AllowFlushCache == true) or creation of files.
+//			 This is a private function which returns non-const
+//			 references to directories in the cache. It will
+//			 invalidate all directory references that you may be
+//			 holding, except for the one that it returns.
 //		Created: 2003/09/02
 //
 // --------------------------------------------------------------------------
 BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	bool AllowFlushCache)
 {
+	CHECK_FILESYSTEM_INITIALISED();
+
+#ifndef BOX_RELEASE_BUILD
+	// In debug builds, if AllowFlushCache is true, we invalidate the entire cache. That's
+	// because it could be flushed at any time, invalidating any pointers held to any entry
+	// except the one returned by this function. Invalidating makes all attempted accesses
+	// throw exceptions, so it should catch any such programming error. We will need to
+	// uninvalidate whatever entry we return, before returning it, otherwise it cannot be used.
+	if(AllowFlushCache)
+	{
+		for(auto i = mDirectoryCache.begin(); i != mDirectoryCache.end(); i++)
+		{
+			i->second->Invalidate(true);
+		}
+	}
+#endif
+
 	// Get the filename
-	std::string filename;
-	MakeObjectFilename(ObjectID, filename);
 	int64_t oldRevID = 0, newRevID = 0;
+	bool gotRevID = false;
 
 	// Already in cache?
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
-	if(item != mDirectoryCache.end()) {
-#ifndef BOX_RELEASE_BUILD // it might be in the cache, but invalidated
-		// in which case, delete it instead of returning it.
-		if(!item->second->IsInvalidated())
-#else
-		if(true)
+	auto item = mDirectoryCache.find(ObjectID);
+	if(item != mDirectoryCache.end())
+	{
+#ifndef BOX_RELEASE_BUILD
+		// Uninvalidate this one entry (we invalidated them all above):
+		item->second->Invalidate(false);
 #endif
+		oldRevID = item->second->GetRevisionID();
+
+		// Check the revision ID of the file -- does it need refreshing?
+		// We assume that if we have the write lock, everything in the cache was loaded
+		// with that lock held, and therefore cannot be stale.
+		if(!mReadOnly)
 		{
-			oldRevID = item->second->GetRevisionID();
-
-			// Check the revision ID of the file -- does it need refreshing?
-			if(!RaidFileRead::FileExists(mStoreDiscSet, filename, &newRevID))
-			{
-				THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
-			}
-
-			if(newRevID == oldRevID)
-			{
-				// Looks good... return the cached object
-				BOX_TRACE("Returning object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" from cache, modtime = " << newRevID)
-				return *(item->second);
-			}
+			// Looks good... return the cached object
+			BOX_TRACE("Returning directory " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" from cache (locked), modtime = " << oldRevID)
+			return *(item->second);
 		}
 
-		// Delete this cached object
+		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
+		{
+			THROW_EXCEPTION(BackupStoreException, DirectoryHasBeenDeleted)
+		}
+
+		gotRevID = true;
+
+		if(newRevID == oldRevID)
+		{
+			// Looks good... return the cached object
+			BOX_TRACE("Returning directory " <<
+				BOX_FORMAT_OBJECTID(ObjectID) <<
+				" from cache (validated), modtime = " << newRevID)
+			return *(item->second);
+		}
+
+		// The cached object is stale, so remove it from the cache.
 		delete item->second;
 		mDirectoryCache.erase(item);
 	}
@@ -356,64 +417,44 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 	// First check to see if the cache is too big
 	if(mDirectoryCache.size() > MAX_CACHE_SIZE && AllowFlushCache)
 	{
-		// Very simple. Just delete everything! But in debug builds,
-		// leave the entries in the cache and invalidate them instead,
-		// so that any attempt to access them will cause an assertion
-		// failure that helps to track down the error.
-#ifdef BOX_RELEASE_BUILD
+		// Trivial policy: just delete everything!
 		ClearDirectoryCache();
-#else
-		for(std::map<int64_t, BackupStoreDirectory*>::iterator
-			i = mDirectoryCache.begin();
-			i != mDirectoryCache.end(); i++)
-		{
-			i->second->Invalidate();
-		}
-#endif
 	}
 
-	// Get a RaidFileRead to read it
-	std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet,
-		filename, &newRevID));
+	if(!gotRevID)
+	{
+		// We failed to find it in the cache, so it might not exist at all (if it was in
+		// the cache then it definitely does). Check for it now:
+		if(!mpFileSystem->ObjectExists(ObjectID, &newRevID))
+		{
+			THROW_EXCEPTION(BackupStoreException, ObjectDoesNotExist);
+		}
+	}
 
+	// Get an IOStream to read it in
 	ASSERT(newRevID != 0);
 
 	if (oldRevID == 0)
 	{
-		BOX_TRACE("Loading object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+		BOX_TRACE("Loading directory " << BOX_FORMAT_OBJECTID(ObjectID) <<
 			" with modtime " << newRevID);
 	}
 	else
 	{
-		BOX_TRACE("Refreshing object " << BOX_FORMAT_OBJECTID(ObjectID) <<
-			" in cache, modtime changed from " << oldRevID <<
-			" to " << newRevID);
+		BOX_TRACE("Refreshing directory " << BOX_FORMAT_OBJECTID(ObjectID) <<
+			" in cache (modtime changed from " << oldRevID <<
+			" to " << newRevID << ")");
 	}
 
 	// Read it from the stream, then set it's revision ID
-	BufferedStream buf(*objectFile);
-	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory(buf));
-	dir->SetRevisionID(newRevID);
-
-	// Make sure the size of the directory is available for writing the dir back
-	int64_t dirSize = objectFile->GetDiscUsageInBlocks();
-	ASSERT(dirSize > 0);
-	dir->SetUserInfo1_SizeInBlocks(dirSize);
+	std::auto_ptr<BackupStoreDirectory> dir(new BackupStoreDirectory);
+	mpFileSystem->GetDirectory(ObjectID, *dir);
 
 	// Store in cache
-	BackupStoreDirectory *pdir = dir.release();
-	try
-	{
-		mDirectoryCache[ObjectID] = pdir;
-	}
-	catch(...)
-	{
-		delete pdir;
-		throw;
-	}
+	mDirectoryCache[ObjectID] = dir.get();
 
-	// Return it
-	return *pdir;
+	// Since it's freshly loaded, it won't be invalidated, and we can just return it:
+	return *(dir.release());
 }
 
 
@@ -427,10 +468,7 @@ BackupStoreDirectory &BackupStoreContext::GetDirectoryInternal(int64_t ObjectID,
 // --------------------------------------------------------------------------
 int64_t BackupStoreContext::AllocateObjectID()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Given that the store info may not be saved for STORE_INFO_SAVE_DELAY
 	// times after it has been updated, this is a reasonable number of times
@@ -441,13 +479,11 @@ int64_t BackupStoreContext::AllocateObjectID()
 	while(retryLimit > 0)
 	{
 		// Attempt to allocate an ID from the store
-		int64_t id = mapStoreInfo->AllocateObjectID();
+		BackupStoreInfo& info(GetBackupStoreInfoInternal());
+		int64_t id = info.AllocateObjectID();
 
-		// Generate filename
-		std::string filename;
-		MakeObjectFilename(id, filename);
 		// Check it doesn't exist
-		if(!RaidFileRead::FileExists(mStoreDiscSet, filename))
+		if(!mpFileSystem->ObjectExists(id))
 		{
 			// Success!
 			return id;
@@ -483,10 +519,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	int64_t DiffFromFileID, const BackupStoreFilename &rFilename,
 	bool MarkFileWithSameNameAsOldVersions)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	if(mReadOnly)
 	{
@@ -509,170 +542,51 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 	int64_t id = AllocateObjectID();
 
 	// Stream the file to disc
-	std::string fn;
-	MakeObjectFilename(id, fn, true /* make sure the directory it's in exists */);
-	int64_t newObjectBlocksUsed = 0;
-	RaidFileWrite *ppreviousVerStoreFile = 0;
-	bool reversedDiffIsCompletelyDifferent = false;
-	int64_t oldVersionNewBlocksUsed = 0;
 	BackupStoreInfo::Adjustment adjustment = {};
+	std::auto_ptr<BackupFileSystem::Transaction> apTransaction;
 
-	try
-	{
-		RaidFileWrite storeFile(mStoreDiscSet, fn);
-		storeFile.Open(false /* no overwriting */);
-
-		int64_t spaceSavedByConversionToPatch = 0;
-
-		// Diff or full file?
-		if(DiffFromFileID == 0)
-		{
-			// A full file, just store to disc
-			if(!rFile.CopyStreamTo(storeFile, BACKUP_STORE_TIMEOUT))
-			{
-				THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut)
-			}
-		}
-		else
-		{
-			// Check that the diffed from ID actually exists in the directory
-			if(dir.FindEntryByID(DiffFromFileID) == 0)
-			{
-				THROW_EXCEPTION(BackupStoreException, DiffFromIDNotFoundInDirectory)
-			}
-
-			// Diff file, needs to be recreated.
-			// Choose a temporary filename.
-			std::string tempFn(RaidFileController::DiscSetPathToFileSystemPath(mStoreDiscSet, fn + ".difftemp",
-				1 /* NOT the same disc as the write file, to avoid using lots of space on the same disc unnecessarily */));
-
-			try
-			{
-				// Open it twice
-#ifdef WIN32
-				InvisibleTempFileStream diff(tempFn.c_str(), 
-					O_RDWR | O_CREAT | O_BINARY);
-				InvisibleTempFileStream diff2(tempFn.c_str(), 
-					O_RDWR | O_BINARY);
-#else
-				FileStream diff(tempFn.c_str(), O_RDWR | O_CREAT | O_EXCL);
-				FileStream diff2(tempFn.c_str(), O_RDONLY);
-
-				// Unlink it immediately, so it definitely goes away
-				if(::unlink(tempFn.c_str()) != 0)
-				{
-					THROW_EXCEPTION(CommonException, OSFileError);
-				}
-#endif
-
-				// Stream the incoming diff to this temporary file
-				if(!rFile.CopyStreamTo(diff, BACKUP_STORE_TIMEOUT))
-				{
-					THROW_EXCEPTION(BackupStoreException, ReadFileFromStreamTimedOut)
-				}
-
-				// Verify the diff
-				diff.Seek(0, IOStream::SeekType_Absolute);
-				if(!BackupStoreFile::VerifyEncodedFileFormat(diff))
-				{
-					THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify)
-				}
-
-				// Seek to beginning of diff file
-				diff.Seek(0, IOStream::SeekType_Absolute);
-
-				// Filename of the old version
-				std::string oldVersionFilename;
-				MakeObjectFilename(DiffFromFileID, oldVersionFilename, false /* no need to make sure the directory it's in exists */);
-
-				// Reassemble that diff -- open previous file, and combine the patch and file
-				std::auto_ptr<RaidFileRead> from(RaidFileRead::Open(mStoreDiscSet, oldVersionFilename));
-				BackupStoreFile::CombineFile(diff, diff2, *from, storeFile);
-
-				// Then... reverse the patch back (open the from file again, and create a write file to overwrite it)
-				std::auto_ptr<RaidFileRead> from2(RaidFileRead::Open(mStoreDiscSet, oldVersionFilename));
-				ppreviousVerStoreFile = new RaidFileWrite(mStoreDiscSet, oldVersionFilename);
-				ppreviousVerStoreFile->Open(true /* allow overwriting */);
-				from->Seek(0, IOStream::SeekType_Absolute);
-				diff.Seek(0, IOStream::SeekType_Absolute);
-				BackupStoreFile::ReverseDiffFile(diff, *from, *from2, *ppreviousVerStoreFile,
-						DiffFromFileID, &reversedDiffIsCompletelyDifferent);
-
-				// Store disc space used
-				oldVersionNewBlocksUsed = ppreviousVerStoreFile->GetDiscUsageInBlocks();
-
-				// And make a space adjustment for the size calculation
-				spaceSavedByConversionToPatch =
-					from->GetDiscUsageInBlocks() - 
-					oldVersionNewBlocksUsed;
-
-				adjustment.mBlocksUsed -= spaceSavedByConversionToPatch;
-				// The code below will change the patch from a
-				// Current file to an Old file, so we need to
-				// account for it as a Current file here.
-				adjustment.mBlocksInCurrentFiles -=
-					spaceSavedByConversionToPatch;
-
-				// Don't adjust anything else here. We'll do it
-				// when we update the directory just below,
-				// which also accounts for non-diff replacements.
-
-				// Everything cleans up here...
-			}
-			catch(...)
-			{
-				// Be very paranoid about deleting this temp file -- we could only leave a zero byte file anyway
-				::unlink(tempFn.c_str());
-				throw;
-			}
-		}
-
-		// Get the blocks used
-		newObjectBlocksUsed = storeFile.GetDiscUsageInBlocks();
-		adjustment.mBlocksUsed += newObjectBlocksUsed;
-		adjustment.mBlocksInCurrentFiles += newObjectBlocksUsed;
-		adjustment.mNumCurrentFiles++;
-
-		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
-			adjustment.mBlocksUsed;
-		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
-		{
-			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
-			// The store file will be deleted automatically by the RaidFile object
-		}
-
-		// Commit the file
-		storeFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-	}
-	catch(...)
-	{
-		// Delete any previous version store file
-		if(ppreviousVerStoreFile != 0)
-		{
-			delete ppreviousVerStoreFile;
-			ppreviousVerStoreFile = 0;
-		}
-
-		throw;
-	}
-
-	// Verify the file -- only necessary for non-diffed versions
-	// NOTE: No need to catch exceptions and delete ppreviousVerStoreFile, because
-	// in the non-diffed code path it's never allocated.
+	// Diff or full file?
 	if(DiffFromFileID == 0)
 	{
-		std::auto_ptr<RaidFileRead> checkFile(RaidFileRead::Open(mStoreDiscSet, fn));
-		if(!BackupStoreFile::VerifyEncodedFileFormat(*checkFile))
-		{
-			// Error! Delete the file
-			RaidFileWrite del(mStoreDiscSet, fn);
-			del.Delete();
-
-			// Exception
-			THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify)
-		}
+		apTransaction = mpFileSystem->PutFileComplete(id, rFile,
+			0); // refcount: BackupStoreFile requires us to pass 0 to assert that
+			// the file doesn't already exist, because it will refuse to overwrite an
+			// existing file. The refcount will increase to 1 when we commit the change
+			// to the directory, dir.
 	}
+	else
+	{
+		// Check that the diffed from ID actually exists in the directory
+		if(dir.FindEntryByID(DiffFromFileID) == 0)
+		{
+			THROW_EXCEPTION(BackupStoreException,
+				DiffFromIDNotFoundInDirectory)
+		}
+
+		apTransaction = mpFileSystem->PutFilePatch(id, DiffFromFileID,
+			rFile, mpRefCount->GetRefCount(DiffFromFileID));
+	}
+
+	// Get the blocks used
+	int64_t changeInBlocksUsed = apTransaction->GetNumBlocks() +
+		apTransaction->GetChangeInBlocksUsedByOldFile();
+	adjustment.mBlocksUsed += changeInBlocksUsed;
+	adjustment.mBlocksInCurrentFiles += changeInBlocksUsed;
+	adjustment.mNumCurrentFiles++;
+
+	// Exceeds the hard limit?
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+	int64_t newTotalBlocksUsed = info.GetBlocksUsed() + changeInBlocksUsed;
+	if(newTotalBlocksUsed > info.GetBlocksHardLimit())
+	{
+		// This will cancel the Transaction and delete the RaidFile(s).
+		THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
+	}
+
+	// Can only get this before we commit the RaidFiles.
+	int64_t numBlocksInNewFile = apTransaction->GetNumBlocks();
+	int64_t changeInBlocksUsedByOldFile =
+		apTransaction->GetChangeInBlocksUsedByOldFile();
 
 	// Modify the directory -- first make all files with the same name
 	// marked as an old version
@@ -690,7 +604,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 
 			// Adjust size of old entry
 			int64_t oldSize = poldEntry->GetSizeInBlocks();
-			poldEntry->SetSizeInBlocks(oldVersionNewBlocksUsed);
+			poldEntry->SetSizeInBlocks(oldSize + changeInBlocksUsedByOldFile);
 		}
 
 		if(MarkFileWithSameNameAsOldVersions)
@@ -722,67 +636,52 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 
 		// Then the new entry
 		BackupStoreDirectory::Entry *pnewEntry = dir.AddEntry(rFilename,
-			ModificationTime, id, newObjectBlocksUsed,
-			BackupStoreDirectory::Entry::Flags_File,
-			AttributesHash);
+			ModificationTime, id, numBlocksInNewFile,
+			BackupStoreDirectory::Entry::Flags_File, AttributesHash);
 
 		// Adjust dependency info of file?
-		if(DiffFromFileID && poldEntry && !reversedDiffIsCompletelyDifferent)
+		if(DiffFromFileID && poldEntry && !apTransaction->IsNewFileIndependent())
 		{
 			poldEntry->SetDependsNewer(id);
 			pnewEntry->SetDependsOlder(DiffFromFileID);
 		}
 
-		// Write the directory back to disc
+		// Save the directory back
 		SaveDirectory(dir);
 
-		// Commit the old version's new patched version, now that the directory safely reflects
-		// the state of the files on disc.
-		if(ppreviousVerStoreFile != 0)
-		{
-			ppreviousVerStoreFile->Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-			delete ppreviousVerStoreFile;
-			ppreviousVerStoreFile = 0;
-		}
+		// It is now safe to commit the old version's new patched version, now
+		// that the directory safely reflects the state of the files on disc.
 	}
 	catch(...)
 	{
-		// Back out on adding that file
-		RaidFileWrite del(mStoreDiscSet, fn);
-		del.Delete();
-
 		// Remove this entry from the cache
 		RemoveDirectoryFromCache(InDirectory);
 
-		// Delete any previous version store file
-		if(ppreviousVerStoreFile != 0)
-		{
-			delete ppreviousVerStoreFile;
-			ppreviousVerStoreFile = 0;
-		}
-
-		// Don't worry about the incremented number in the store info
+		// Leaving this function without committing the Transaction will cancel
+		// it, deleting the new file and not modifying the old one. Don't worry
+		// about the incremented numbers in the store info, they won't cause
+		// any real problem and bbstoreaccounts check can fix them.
 		throw;
 	}
 
-	// Check logic
-	ASSERT(ppreviousVerStoreFile == 0);
+	// Commit the new file, and replace the old file (if any) with a patch.
+	apTransaction->Commit();
 
 	// Modify the store info
-	mapStoreInfo->AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
-	mapStoreInfo->AdjustNumOldFiles(adjustment.mNumOldFiles);
-	mapStoreInfo->AdjustNumDeletedFiles(adjustment.mNumDeletedFiles);
-	mapStoreInfo->AdjustNumDirectories(adjustment.mNumDirectories);
-	mapStoreInfo->ChangeBlocksUsed(adjustment.mBlocksUsed);
-	mapStoreInfo->ChangeBlocksInCurrentFiles(adjustment.mBlocksInCurrentFiles);
-	mapStoreInfo->ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
-	mapStoreInfo->ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
-	mapStoreInfo->ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
+	info.AdjustNumCurrentFiles(adjustment.mNumCurrentFiles);
+	info.AdjustNumOldFiles(adjustment.mNumOldFiles);
+	info.AdjustNumDeletedFiles(adjustment.mNumDeletedFiles);
+	info.AdjustNumDirectories(adjustment.mNumDirectories);
+	info.ChangeBlocksUsed(adjustment.mBlocksUsed);
+	info.ChangeBlocksInCurrentFiles(adjustment.mBlocksInCurrentFiles);
+	info.ChangeBlocksInOldFiles(adjustment.mBlocksInOldFiles);
+	info.ChangeBlocksInDeletedFiles(adjustment.mBlocksInDeletedFiles);
+	info.ChangeBlocksInDirectories(adjustment.mBlocksInDirectories);
 
 	// Increment reference count on the new directory to one
-	mapRefCount->AddReference(id);
+	mpRefCount->AddReference(id);
 
-	// Save the store info -- can cope if this exceptions because infomation
+	// Save the store info -- can cope if this exceptions because information
 	// will be rebuilt by housekeeping, and ID allocation can recover.
 	SaveStoreInfo(false);
 
@@ -805,12 +704,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 // --------------------------------------------------------------------------
 bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -843,8 +739,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				madeChanges = true;
 
 				int64_t blocks = e->GetSizeInBlocks();
-				mapStoreInfo->AdjustNumDeletedFiles(1);
-				mapStoreInfo->ChangeBlocksInDeletedFiles(blocks);
+				BackupStoreInfo& info(GetBackupStoreInfoInternal());
+				info.AdjustNumDeletedFiles(1);
+				info.ChangeBlocksInDeletedFiles(blocks);
 
 				// We're marking all old versions as deleted.
 				// This is how a file can be old and deleted
@@ -854,8 +751,8 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				// we do need to adjust the current counts.
 				if(!e->IsOld())
 				{
-					mapStoreInfo->AdjustNumCurrentFiles(-1);
-					mapStoreInfo->ChangeBlocksInCurrentFiles(-blocks);
+					info.AdjustNumCurrentFiles(-1);
+					info.ChangeBlocksInCurrentFiles(-blocks);
 				}
 
 				// Is this the last version?
@@ -873,6 +770,8 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 		{
 			// Save the directory back
 			SaveDirectory(dir);
+
+			// Maybe postponed save of store info
 			SaveStoreInfo(false);
 		}
 	}
@@ -897,12 +796,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 // --------------------------------------------------------------------------
 bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -953,7 +849,8 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 			SaveDirectory(dir);
 
 			// Modify the store info, and write
-			mapStoreInfo->ChangeBlocksInDeletedFiles(blocksDel);
+			BackupStoreInfo& info(GetBackupStoreInfoInternal());
+			info.ChangeBlocksInDeletedFiles(blocksDel);
 
 			// Maybe postponed save of store info
 			SaveStoreInfo();
@@ -979,12 +876,12 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 // --------------------------------------------------------------------------
 void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 {
-	std::map<int64_t, BackupStoreDirectory*>::iterator item(mDirectoryCache.find(ObjectID));
+	auto item = mDirectoryCache.find(ObjectID);
 	if(item != mDirectoryCache.end())
 	{
 		// Delete this cached object
 		delete item->second;
-		// Erase the entry form the map
+		// Erase the entry from the map
 		mDirectoryCache.erase(item);
 	}
 }
@@ -994,79 +891,56 @@ void BackupStoreContext::RemoveDirectoryFromCache(int64_t ObjectID)
 //
 // Function
 //		Name:    BackupStoreContext::SaveDirectory(BackupStoreDirectory &)
-//		Purpose: Save directory back to disc, update time in cache
+//		Purpose: Save directory back to disc, update time in cache.
+//		         Since this updates the parent directory, it needs to
+//		         fetch it, which invalidates rDir along with the rest
+//		         of the cache. But since it's usually the last thing
+//		         we do to rDir, that should be fine.
 //		Created: 2003/09/04
 //
 // --------------------------------------------------------------------------
 void BackupStoreContext::SaveDirectory(BackupStoreDirectory &rDir)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	int64_t ObjectID = rDir.GetObjectID();
+	auto i = mDirectoryCache.find(ObjectID);
+	ASSERT(i != mDirectoryCache.end());
+
+	int64_t new_dir_size;
 
 	try
 	{
 		// Write to disc, adjust size in store info
-		std::string dirfn;
-		MakeObjectFilename(ObjectID, dirfn);
 		int64_t old_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 
+		mpFileSystem->PutDirectory(rDir);
+		new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
+
 		{
-			RaidFileWrite writeDir(mStoreDiscSet, dirfn);
-			writeDir.Open(true /* allow overwriting */);
-
-			BufferedWriteStream buffer(writeDir);
-			rDir.WriteToStream(buffer);
-			buffer.Flush();
-
-			// get the disc usage (must do this before commiting it)
-			int64_t dirSize = writeDir.GetDiscUsageInBlocks();
-
-			// Commit directory
-			writeDir.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
-
-			// Make sure the size of the directory is available for writing the dir back
-			ASSERT(dirSize > 0);
-			int64_t sizeAdjustment = dirSize - rDir.GetUserInfo1_SizeInBlocks();
-			mapStoreInfo->ChangeBlocksUsed(sizeAdjustment);
-			mapStoreInfo->ChangeBlocksInDirectories(sizeAdjustment);
-			// Update size stored in directory
-			rDir.SetUserInfo1_SizeInBlocks(dirSize);
+			int64_t sizeAdjustment = new_dir_size - old_dir_size;
+			BackupStoreInfo& info(GetBackupStoreInfoInternal());
+			info.ChangeBlocksUsed(sizeAdjustment);
+			info.ChangeBlocksInDirectories(sizeAdjustment);
 		}
 
-		// Refresh revision ID in cache
-		{
-			int64_t revid = 0;
-			if(!RaidFileRead::FileExists(mStoreDiscSet, dirfn, &revid))
-			{
-				THROW_EXCEPTION(BackupStoreException, Internal)
-			}
-
-			BOX_TRACE("Saved directory " <<
-				BOX_FORMAT_OBJECTID(ObjectID) <<
-				", modtime = " << revid);
-
-			rDir.SetRevisionID(revid);
-		}
 
 		// Update the directory entry in the grandparent, to ensure
 		// that it reflects the current size of the parent directory.
-		int64_t new_dir_size = rDir.GetUserInfo1_SizeInBlocks();
 		if(new_dir_size != old_dir_size &&
 			ObjectID != BACKUPSTORE_ROOT_DIRECTORY_ID)
 		{
 			int64_t ContainerID = rDir.GetContainerID();
 			BackupStoreDirectory& parent(
 				GetDirectoryInternal(ContainerID));
-			// rDir is now invalid
+			// i and rDir are now invalid
 			BackupStoreDirectory::Entry* en =
 				parent.FindEntryByID(ObjectID);
 			if(!en)
 			{
-				BOX_ERROR("Missing entry for directory " <<
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					CouldNotFindEntryInDirectory,
+					"Missing entry for directory " <<
 					BOX_FORMAT_OBJECTID(ObjectID) <<
 					" in directory " <<
 					BOX_FORMAT_OBJECTID(ContainerID) <<
@@ -1106,10 +980,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 	int64_t ModificationTime,
 	bool &rAlreadyExists)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	if(mReadOnly)
 	{
@@ -1138,43 +1009,38 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 		}
 	}
 
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+
 	// Allocate the next ID
 	int64_t id = AllocateObjectID();
 
 	// Create an empty directory with the given attributes on disc
-	std::string fn;
-	MakeObjectFilename(id, fn, true /* make sure the directory it's in exists */);
 	int64_t dirSize;
 
 	{
 		BackupStoreDirectory emptyDir(id, InDirectory);
-		// add the atttribues
+		// Add the attributes:
 		emptyDir.SetAttributes(Attributes, AttributesModTime);
 
-		// Write...
-		RaidFileWrite dirFile(mStoreDiscSet, fn);
-		dirFile.Open(false /* no overwriting */);
-		emptyDir.WriteToStream(dirFile);
-		// Get disc usage, before it's commited
-		dirSize = dirFile.GetDiscUsageInBlocks();
+		// Write, but not using SaveDirectory() because that tries to update the entry
+		// in the parent directory with the new size, and that entry hasn't been added yet!
+		mpFileSystem->PutDirectory(emptyDir);
+		dirSize = emptyDir.GetUserInfo1_SizeInBlocks();
+	}
 
+	{
 		// Exceeds the hard limit?
-		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
-			dirSize;
-		if(newTotalBlocksUsed > mapStoreInfo->GetBlocksHardLimit())
+		int64_t newTotalBlocksUsed = info.GetBlocksUsed() + dirSize;
+		if(newTotalBlocksUsed > info.GetBlocksHardLimit())
 		{
+			mpFileSystem->DeleteDirectory(id);
 			THROW_EXCEPTION(BackupStoreException, AddedFileExceedsStorageLimit)
-			// The file will be deleted automatically by the RaidFile object
 		}
-
-		// Commit the file
-		dirFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 
 		// Make sure the size of the directory is added to the usage counts in the info
 		ASSERT(dirSize > 0);
-		mapStoreInfo->ChangeBlocksUsed(dirSize);
-		mapStoreInfo->ChangeBlocksInDirectories(dirSize);
-		// Not added to cache, so don't set the size in the directory
+		info.ChangeBlocksUsed(dirSize);
+		info.ChangeBlocksInDirectories(dirSize);
 	}
 
 	// Then add it into the parent directory
@@ -1185,25 +1051,36 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 			0 /* attributes hash */);
 		SaveDirectory(dir);
 
-		// Increment reference count on the new directory to one
-		mapRefCount->AddReference(id);
+		// Increment reference count on the new directory to one:
+		mpRefCount->AddReference(id);
 	}
 	catch(...)
 	{
-		// Back out on adding that directory
-		RaidFileWrite del(mStoreDiscSet, fn);
-		del.Delete();
+		// Back out on adding that directory:
+		mpFileSystem->DeleteDirectory(id);
 
-		// Remove this entry from the cache
-		RemoveDirectoryFromCache(InDirectory);
+		info.ChangeBlocksUsed(-dirSize);
+		info.ChangeBlocksInDirectories(-dirSize);
 
-		// Don't worry about the incremented number in the store info
+		// Remove the newly created directory from the cache:
+		RemoveDirectoryFromCache(id);
+
+		// Try to remove the new entry from this directory. If
+		// SaveDirectory() above failed because there was something
+		// wrong with this directory, then it's likely to fail again,
+		// so we do this last. Also, SaveDirectory() above invalidated
+		// dir, so we need to fetch it again.
+		BackupStoreDirectory &dir(GetDirectoryInternal(InDirectory));
+		dir.DeleteEntry(id);
+		SaveDirectory(dir);
+
+		// Don't worry about the incremented number in the store info.
 		throw;
 	}
 
-	// Save the store info (may not be postponed)
-	mapStoreInfo->AdjustNumDirectories(1);
-	SaveStoreInfo(false);
+	// Update and save the store info
+	info.AdjustNumDirectories(1);
+	SaveStoreInfo(true); // Allow defer: it's just an empty directory.
 
 	// tell caller what the ID was
 	return id;
@@ -1220,12 +1097,9 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 // --------------------------------------------------------------------------
 void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 {
-	// Essential checks!
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
+	// Essential checks!
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1298,6 +1172,8 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 // --------------------------------------------------------------------------
 void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 {
+	CHECK_FILESYSTEM_INITIALISED();
+
 	try
 	{
 		// Does things carefully to avoid using a directory in the cache after recursive call
@@ -1361,13 +1237,14 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 					ASSERT(en->IsDeleted() == Undelete); 
 					// Don't adjust counters for old files,
 					// because it can be both old and deleted.
+					BackupStoreInfo& info(GetBackupStoreInfoInternal());
 					if(!en->IsOld())
 					{
-						mapStoreInfo->ChangeBlocksInCurrentFiles(Undelete ? size : -size);
-						mapStoreInfo->AdjustNumCurrentFiles(Undelete ? 1 : -1);
+						info.ChangeBlocksInCurrentFiles(Undelete ? size : -size);
+						info.AdjustNumCurrentFiles(Undelete ? 1 : -1);
 					}
-					mapStoreInfo->ChangeBlocksInDeletedFiles(Undelete ? -size : size);
-					mapStoreInfo->AdjustNumDeletedFiles(Undelete ? -1 : 1);
+					info.ChangeBlocksInDeletedFiles(Undelete ? -size : size);
+					info.AdjustNumDeletedFiles(Undelete ? -1 : 1);
 				}
 
 				// Add/remove the deleted flags
@@ -1384,7 +1261,6 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 				changesMade = true;
 			}
 
-			// Save the directory
 			if(changesMade)
 			{
 				SaveDirectory(dir);
@@ -1409,10 +1285,8 @@ void BackupStoreContext::DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete)
 // --------------------------------------------------------------------------
 void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1447,10 +1321,8 @@ void BackupStoreContext::ChangeDirAttributes(int64_t Directory, const Streamable
 // --------------------------------------------------------------------------
 bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
+
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
@@ -1512,34 +1384,28 @@ bool BackupStoreContext::ChangeFileAttributes(const BackupStoreFilename &rFilena
 // --------------------------------------------------------------------------
 bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
+	CHECK_FILESYSTEM_INITIALISED();
 
 	// Note that we need to allow object IDs a little bit greater than the last one in the store info,
 	// because the store info may not have got saved in an error condition. Max greater ID is
 	// STORE_INFO_SAVE_DELAY in this case, *2 to be safe.
-	if(ObjectID <= 0 || ObjectID > (mapStoreInfo->GetLastObjectIDUsed() + (STORE_INFO_SAVE_DELAY * 2)))
+	if(ObjectID <= 0 || ObjectID > (GetBackupStoreInfo().GetLastObjectIDUsed() + (STORE_INFO_SAVE_DELAY * 2)))
 	{
 		// Obviously bad object ID
 		return false;
 	}
 
-	// Test to see if it exists on the disc
-	std::string filename;
-	MakeObjectFilename(ObjectID, filename);
-	if(!RaidFileRead::FileExists(mStoreDiscSet, filename))
+	if (!mpFileSystem->ObjectExists(ObjectID))
 	{
-		// RaidFile reports no file there
 		return false;
 	}
 
 	// Do we need to be more specific?
 	if(MustBe != ObjectExists_Anything)
 	{
-		// Open the file
-		std::auto_ptr<RaidFileRead> objectFile(RaidFileRead::Open(mStoreDiscSet, filename));
+		// Open the file. TODO FIXME: don't download the entire file from S3
+		// to read the first four bytes.
+		std::auto_ptr<IOStream> objectFile = mpFileSystem->GetObject(ObjectID);
 
 		// Read the first integer
 		uint32_t magic;
@@ -1583,15 +1449,100 @@ bool BackupStoreContext::ObjectExists(int64_t ObjectID, int MustBe)
 // --------------------------------------------------------------------------
 std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 {
-	if(mapStoreInfo.get() == 0)
+	CHECK_FILESYSTEM_INITIALISED();
+
+	return mpFileSystem->GetObject(ObjectID);
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::GetFile()
+//		Purpose: Retrieve a file from the store
+//		Created: 2015/08/10
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t InDirectory)
+{
+	CHECK_FILESYSTEM_INITIALISED();
+
+	// Get the directory it's in
+	const BackupStoreDirectory &rdir(GetDirectoryInternal(InDirectory,
+		true)); // AllowFlushCache
+
+	// Find the object within the directory
+	BackupStoreDirectory::Entry *pfileEntry = rdir.FindEntryByID(ObjectID);
+	if(pfileEntry == 0)
 	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
+		THROW_EXCEPTION(BackupStoreException, CouldNotFindEntryInDirectory);
 	}
 
-	// Attempt to open the file
-	std::string fn;
-	MakeObjectFilename(ObjectID, fn);
-	return std::auto_ptr<IOStream>(RaidFileRead::Open(mStoreDiscSet, fn).release());
+	// The result
+	std::auto_ptr<IOStream> stream;
+
+	// Does this depend on anything?
+	if(pfileEntry->GetDependsNewer() != 0)
+	{
+		// File exists, but is a patch from a new version. Generate the older version.
+		std::vector<int64_t> patchChain;
+		int64_t id = ObjectID;
+		BackupStoreDirectory::Entry *en = 0;
+		do
+		{
+			patchChain.push_back(id);
+			en = rdir.FindEntryByID(id);
+			if(en == 0)
+			{
+				THROW_EXCEPTION_MESSAGE(BackupStoreException,
+					PatchChainInfoBadInDirectory,
+					"Object " <<
+					BOX_FORMAT_OBJECTID(ObjectID) <<
+					" in dir " <<
+					BOX_FORMAT_OBJECTID(InDirectory) <<
+					" for account " <<
+					BOX_FORMAT_ACCOUNT(mClientID) <<
+					" references object " <<
+					BOX_FORMAT_OBJECTID(id) <<
+					" which does not exist in dir");
+			}
+			id = en->GetDependsNewer();
+		}
+		while(en != 0 && id != 0);
+
+		stream = mpFileSystem->GetFilePatch(ObjectID, patchChain);
+	}
+	else
+	{
+		// Simple case: file already exists on disc ready to go
+
+		// Open the object
+		std::auto_ptr<IOStream> object(OpenObject(ObjectID));
+		BufferedStream buf(*object);
+
+		// Verify it
+		if(!BackupStoreFile::VerifyEncodedFileFormat(buf))
+		{
+			THROW_EXCEPTION(BackupStoreException, AddedFileDoesNotVerify);
+		}
+
+		// Reset stream -- seek to beginning
+		object->Seek(0, IOStream::SeekType_Absolute);
+
+		// Reorder the stream/file into stream order
+		{
+			// Write nastily to allow this to work with gcc 2.x
+			std::auto_ptr<IOStream> t(BackupStoreFile::ReorderFileToStreamOrder(object.get(), true /* take ownership */));
+			stream = t;
+		}
+
+		// Object will be deleted when the stream is deleted,
+		// so can release the object auto_ptr here to avoid
+		// premature deletion
+		object.release();
+	}
+
+	return stream;
 }
 
 
@@ -1605,12 +1556,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 // --------------------------------------------------------------------------
 int64_t BackupStoreContext::GetClientStoreMarker()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return mapStoreInfo->GetClientStoreMarker();
+	return GetBackupStoreInfo().GetClientStoreMarker();
 }
 
 
@@ -1624,14 +1570,10 @@ int64_t BackupStoreContext::GetClientStoreMarker()
 // --------------------------------------------------------------------------
 void BackupStoreContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rBlocksSoftLimit, int64_t &rBlocksHardLimit)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	rBlocksUsed = mapStoreInfo->GetBlocksUsed();
-	rBlocksSoftLimit = mapStoreInfo->GetBlocksSoftLimit();
-	rBlocksHardLimit = mapStoreInfo->GetBlocksHardLimit();
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+	rBlocksUsed = info.GetBlocksUsed();
+	rBlocksSoftLimit = info.GetBlocksSoftLimit();
+	rBlocksHardLimit = info.GetBlocksHardLimit();
 }
 
 
@@ -1645,12 +1587,8 @@ void BackupStoreContext::GetStoreDiscUsageInfo(int64_t &rBlocksUsed, int64_t &rB
 // --------------------------------------------------------------------------
 bool BackupStoreContext::HardLimitExceeded()
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return mapStoreInfo->GetBlocksUsed() > mapStoreInfo->GetBlocksHardLimit();
+	BackupStoreInfo& info(GetBackupStoreInfoInternal());
+	return info.GetBlocksUsed() > info.GetBlocksHardLimit();
 }
 
 
@@ -1664,16 +1602,12 @@ bool BackupStoreContext::HardLimitExceeded()
 // --------------------------------------------------------------------------
 void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 {
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
 	if(mReadOnly)
 	{
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
-	mapStoreInfo->SetClientStoreMarker(ClientStoreMarker);
+	GetBackupStoreInfoInternal().SetClientStoreMarker(ClientStoreMarker);
 	SaveStoreInfo(false /* don't delay saving this */);
 }
 
@@ -1922,24 +1856,5 @@ void BackupStoreContext::MoveObject(int64_t ObjectID, int64_t MoveFromDirectory,
 		delete moving.back();
 		moving.pop_back();
 	}
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::GetBackupStoreInfo()
-//		Purpose: Return the backup store info object, exception if it isn't loaded
-//		Created: 19/4/04
-//
-// --------------------------------------------------------------------------
-const BackupStoreInfo &BackupStoreContext::GetBackupStoreInfo() const
-{
-	if(mapStoreInfo.get() == 0)
-	{
-		THROW_EXCEPTION(BackupStoreException, StoreInfoNotLoaded)
-	}
-
-	return *(mapStoreInfo.get());
 }
 

@@ -2,20 +2,31 @@
 
 #include "emu_winver.h"
 
+#include <stdint.h> // for uint64_t
+#include <stdlib.h> // for strtoull()
+
+#if ! defined EMU_INCLUDE
+#define EMU_INCLUDE
+
 #ifdef WIN32
 	#define EMU_STRUCT_STAT struct emu_stat
-	#define EMU_STAT  emu_stat
-	#define EMU_FSTAT emu_fstat
-	#define EMU_LSTAT emu_stat
+	#define EMU_STRUCT_POLLFD struct emu_pollfd
+	#define EMU_STAT   emu_stat
+	#define EMU_FSTAT  emu_fstat
+	#define EMU_LSTAT  emu_stat
+	#define EMU_LINK   emu_link
+	#define EMU_UNLINK emu_unlink
 #else
 	#define EMU_STRUCT_STAT struct stat
-	#define EMU_STAT  ::stat
-	#define EMU_FSTAT ::fstat
-	#define EMU_LSTAT ::lstat
+	#define EMU_STRUCT_POLLFD struct pollfd
+	#define EMU_STAT   ::stat
+	#define EMU_FSTAT  ::fstat
+	#define EMU_LSTAT  ::lstat
+	#define EMU_LINK   ::link
+	#define EMU_UNLINK ::unlink
 #endif
 
-#if ! defined EMU_INCLUDE && defined WIN32
-#define EMU_INCLUDE
+#ifdef WIN32
 
 // Need feature detection macros below
 #if defined BOX_CMAKE
@@ -213,11 +224,25 @@ inline int strncasecmp(const char *s1, const char *s2, size_t count)
 #error You must not include the MinGW dirent.h!
 #endif
 
+// File types for struct dirent.d_type. Not all are supported by our emulated readdir():
+#define DT_UNKNOWN       0
+#define DT_FIFO          1
+#define DT_CHR           2
+#define DT_DIR           4
+#define DT_BLK           6
+#define DT_REG           8
+#define DT_LNK          10
+#define DT_SOCK         12
+#define DT_WHT          14
+
 struct dirent
 {
 	char *d_name;
-	DWORD d_type; // file attributes
+	int d_type; // emulated UNIX file attributes
+	DWORD win_attrs; // WIN32_FIND_DATA.dwFileAttributes
 };
+
+#define HAVE_VALID_DIRENT_D_TYPE 1
 
 struct DIR
 {
@@ -297,7 +322,7 @@ extern "C" inline unsigned int sleep(unsigned int secs)
 #define SHUT_RD SD_RECEIVE
 #define SHUT_WR SD_SEND
 
-struct pollfd
+EMU_STRUCT_POLLFD
 {
 	SOCKET fd;
 	short int events;
@@ -352,12 +377,14 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 #define chdir(directory)         emu_chdir  (directory)
 #define mkdir(path,     mode)    emu_mkdir  (path)
-#define link(oldpath,   newpath) emu_link   (oldpath, newpath)
-#define unlink(file)             emu_unlink (file)
 #define utimes(buffer,  times)   emu_utimes (buffer,   times)
 #define chmod(file,     mode)    emu_chmod  (file,     mode)
 #define getcwd(buffer,  size)    emu_getcwd (buffer,   size)
 #define rename(oldname, newname) emu_rename (oldname, newname)
+
+// link() and unlink() conflict with Boost if implemented using macros like
+// the others above, so I've removed the macros and you need to use EMU_LINK
+// and EMU_UNLINK everywhere.
 
 // Not safe to replace stat/fstat/lstat on mingw at least, as struct stat
 // has a 16-bit st_ino and we need a 64-bit one.
@@ -372,7 +399,7 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 int statfs(const char * name, struct statfs * s);
 
-int poll(struct pollfd *ufds, unsigned long nfds, int timeout);
+int poll(EMU_STRUCT_POLLFD *ufds, unsigned long nfds, int timeout);
 
 struct iovec {
 	void *iov_base;   /* Starting address */
@@ -438,4 +465,11 @@ int console_read(char* pBuffer, size_t BufferSize);
 	#pragma warning(disable:4996)		// POSIX name for this item is deprecated
 #endif // _MSC_VER
 
-#endif // !EMU_INCLUDE && WIN32
+#endif // WIN32
+
+// MSVC < 12 (2013) does not have strtoull(), and _strtoi64 is signed only (truncates all values
+// greater than 1<<63 to _I64_MAX, so we roll our own using std::istringstream
+// <http://stackoverflow.com/questions/1070497/c-convert-hex-string-to-signed-integer>
+uint64_t box_strtoui64(const char *nptr, const char **endptr, int base);
+
+#endif // !EMU_INCLUDE

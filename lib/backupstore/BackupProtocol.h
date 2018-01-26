@@ -25,40 +25,54 @@
 class BackupProtocolLocal2 : public BackupProtocolLocal
 {
 private:
-	BackupStoreContext mContext;
+	std::auto_ptr<BackupStoreContext> mapLocalContext;
 	int32_t mAccountNumber;
 	bool mReadOnly;
-
-protected:
-	BackupStoreContext& GetContext() { return mContext; }
 
 public:
 	BackupProtocolLocal2(int32_t AccountNumber,
 		const std::string& ConnectionDetails,
 		const std::string& AccountRootDir, int DiscSetNumber,
 		bool ReadOnly)
-	// This is rather ugly: the BackupProtocolLocal constructor must not
-	// touch the Context, because it's not initialised yet!
-	: BackupProtocolLocal(mContext),
-	  mContext(AccountNumber, (HousekeepingInterface *)NULL,
-		ConnectionDetails),
+	// This is rather ugly: we need to pass a reference to a context to
+	// BackupProtocolLocal(), and we want it to be one that we've created ourselves,
+	// so we create one with new(), dereference it to pass the reference to the
+	// superclass, and then get the reference out again, take its address and stick
+	// that into the auto_ptr, which will delete it when we are destroyed.
+	: BackupProtocolLocal(
+		*(new BackupStoreContext(AccountNumber, (HousekeepingInterface *)NULL,
+			ConnectionDetails))
+		),
+	  mapLocalContext(&GetContext()),
 	  mAccountNumber(AccountNumber),
 	  mReadOnly(ReadOnly)
 	{
-		mContext.SetClientHasAccount(AccountRootDir, DiscSetNumber);
+		GetContext().SetClientHasAccount(AccountRootDir, DiscSetNumber);
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
 		QueryLogin(AccountNumber,
 			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
 	}
-	virtual ~BackupProtocolLocal2() { }
+
+	BackupProtocolLocal2(BackupStoreContext& rContext, int32_t AccountNumber,
+		bool ReadOnly)
+	: BackupProtocolLocal(rContext),
+	  mAccountNumber(AccountNumber),
+	  mReadOnly(ReadOnly)
+	{
+		GetContext().SetClientHasAccount();
+		QueryVersion(BACKUP_STORE_SERVER_VERSION);
+		QueryLogin(AccountNumber,
+			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
+	}
 
 	std::auto_ptr<BackupProtocolFinished> Query(const BackupProtocolFinished &rQuery)
 	{
 		std::auto_ptr<BackupProtocolFinished> finished =
 			BackupProtocolLocal::Query(rQuery);
-		mContext.ReleaseWriteLock();
+		GetContext().CleanUp();
 		return finished;
 	}
+	using BackupProtocolLocal::Query;
 
 	void Reopen()
 	{

@@ -47,6 +47,7 @@
 #include "box_getopt.h"
 #include "depot.h"
 #include "Logging.h"
+#include "MainHelper.h"
 #include "Test.h"
 #include "Timer.h"
 
@@ -70,6 +71,7 @@ std::string bbackupd_args = QUIET_PROCESS,
 	bbstored_args = QUIET_PROCESS,
 	bbackupquery_args,
 	test_args;
+bool bbackupd_args_overridden = false, bbstored_args_overridden = false;
 
 bool filedes_initialised = false;
 
@@ -252,9 +254,10 @@ int Usage(const std::string& ProgramName)
 
 int main(int argc, char * const * argv)
 {
-	// Start memory leak testing
-	MEMLEAKFINDER_START
+	// Initialise sockets, start memory leak monitoring, catch exceptions:
+	MAINHELPER_START
 
+	Logging::ToSyslog(false);
 	Logging::SetProgramName(BOX_MODULE);
 
 	struct option longopts[] = 
@@ -284,6 +287,7 @@ int main(int argc, char * const * argv)
 					bbackupd_args += " ";
 				}
 				bbackupd_args += optarg;
+				bbackupd_args_overridden = true;
 			}
 			break;
 
@@ -313,6 +317,7 @@ int main(int argc, char * const * argv)
 			{
 				bbstored_args += " ";
 				bbstored_args += optarg;
+				bbstored_args_overridden = true;
 			}
 			break;
 
@@ -329,7 +334,6 @@ int main(int argc, char * const * argv)
 		}
 	}
 
-	Logging::FilterSyslog(Log::NOTHING);
 	Logging::FilterConsole(LogLevel.GetCurrentLevel());
 
 	argc -= optind - 1;
@@ -341,7 +345,9 @@ int main(int argc, char * const * argv)
 	if(fulltestmode)
 	{
 		// banner
-		BOX_NOTICE("Running test TEST_NAME in " MODE_TEXT " mode...");
+		std::string box_module = BOX_MODULE;
+		std::string test_name = box_module.substr(5);
+		BOX_NOTICE("Running test " << test_name << " in " MODE_TEXT " mode...");
 
 		// Count open file descriptors for a very crude "files left open" test
 		Logging::GetSyslog().Shutdown();
@@ -353,21 +359,40 @@ int main(int argc, char * const * argv)
 		::gethostbyname("nonexistent");
 
 		check_filedes(false);
-
-		#ifdef WIN32
-			// Under win32 we must initialise the Winsock library
-			// before using sockets
-
-			WSADATA info;
-			TEST_THAT(WSAStartup(0x0101, &info) != SOCKET_ERROR)
-		#endif
 	}
 
 	try
 	{
-		#ifdef BOX_MEMORY_LEAK_TESTING
-		memleakfinder_init();
-		#endif
+#ifdef WIN32
+		// Create a Windows "Job Object" for Test.cpp to use as a
+		// container for all our child processes (daemons). We will
+		// close the handle (killing any running daemons) when we exit.
+		// This is the best way to avoid daemons hanging around and
+		// causing subsequent tests to fail, and/or the test runner to
+		// hang waiting for a daemon that will never terminate.
+
+		sTestChildDaemonJobObject = CreateJobObject(NULL, NULL);
+		if(sTestChildDaemonJobObject == INVALID_HANDLE_VALUE)
+		{
+			BOX_LOG_WIN_WARNING("Failed to create job object "
+				"to contain child daemons");
+		}
+		else
+		{
+			JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+			limits.BasicLimitInformation.LimitFlags =
+				JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+			if(!SetInformationJobObject(
+				sTestChildDaemonJobObject,
+				JobObjectExtendedLimitInformation,
+				&limits,
+				sizeof(limits)))
+			{
+				BOX_LOG_WIN_WARNING("Failed to set limits on "
+					"job object for child daemons");
+			}
+		}
+#endif // WIN32
 
 		Timers::Init();
 		int returncode = test(argc, (const char **)argv);
@@ -414,7 +439,14 @@ int main(int argc, char * const * argv)
 				printf("PASSED\n");
 			}
 		}
-		
+
+		// If test() returns 0 but there have been some failures, we still want
+		// to return nonzero to the OS.
+		if(returncode == 0 && num_failures)
+		{
+			returncode = 1;
+		}
+
 		return returncode;
 	}
 	catch(std::exception &e)
@@ -434,5 +466,11 @@ int main(int argc, char * const * argv)
 			printf("WARNING: Files were left open\n");
 		}
 	}
+
+#ifdef WIN32
+	CloseHandle(sTestChildDaemonJobObject);
+#endif
+
+	MAINHELPER_END
 }
 

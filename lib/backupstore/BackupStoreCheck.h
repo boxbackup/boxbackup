@@ -15,11 +15,11 @@
 #include <vector>
 #include <set>
 
-#include "NamedLock.h"
 #include "BackupStoreDirectory.h"
+#include "Utils.h" // for object_exists_t
 
 class IOStream;
-class BackupStoreFilename;
+class BackupFileSystem;
 class BackupStoreRefCountDatabase;
 
 /*
@@ -74,17 +74,18 @@ typedef int64_t BackupStoreCheck_Size_t;
 class BackupStoreCheck
 {
 public:
-	BackupStoreCheck(const std::string &rStoreRoot, int DiscSetNumber, int32_t AccountID, bool FixErrors, bool Quiet);
+	BackupStoreCheck(BackupFileSystem& rFileSystem, bool FixErrors, bool Quiet);
 	~BackupStoreCheck();
+
 private:
 	// no copying
 	BackupStoreCheck(const BackupStoreCheck &);
 	BackupStoreCheck &operator=(const BackupStoreCheck &);
-public:
 
+public:
 	// Do the exciting things
 	void Check();
-	
+
 	bool ErrorsFound() {return mNumberErrorsFound > 0;}
 	inline int64_t GetNumErrorsFound()
 	{
@@ -114,7 +115,7 @@ private:
 		BackupStoreCheck_ID_t mContainer[BACKUPSTORECHECK_BLOCK_SIZE];
 		BackupStoreCheck_Size_t mObjectSizeInBlocks[BACKUPSTORECHECK_BLOCK_SIZE];
 	} IDBlock;
-	
+
 	// Phases of the check
 	void CheckObjects();
 	void CheckDirectories();
@@ -127,7 +128,7 @@ private:
 	// Checking functions
 	int64_t CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName);
 	void CheckObjectsDir(int64_t StartID);
-	bool CheckAndAddObject(int64_t ObjectID, const std::string &rFilename);
+	object_exists_t CheckAndAddObject(int64_t ObjectID);
 	bool CheckDirectory(BackupStoreDirectory& dir);
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
@@ -150,7 +151,7 @@ private:
 		ASSERT(pBlock != 0);
 		ASSERT(Index < BACKUPSTORECHECK_BLOCK_SIZE);
 		ASSERT(Flags < (1 << Flags__NumFlags));
-		
+
 		pBlock->mFlags[Index / Flags__NumItemsPerEntry]
 			|= (Flags << ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags));
 	}
@@ -161,7 +162,7 @@ private:
 
 		return (pBlock->mFlags[Index / Flags__NumItemsPerEntry] >> ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags)) & Flags__MASK;
 	}
-	
+
 #ifndef BOX_RELEASE_BUILD
 	void DumpObjectInfo();
 	#define DUMP_OBJECT_INFO DumpObjectInfo();
@@ -170,41 +171,42 @@ private:
 #endif
 
 private:
-	std::string mStoreRoot;
-	int mDiscSetNumber;
 	int32_t mAccountID;
 	std::string mAccountName;
 	bool mFixErrors;
 	bool mQuiet;
-	
+
 	int64_t mNumberErrorsFound;
-	
-	// Lock for the store account
-	NamedLock mAccountLock;
-	
+
 	// Storage for ID data
 	typedef std::map<BackupStoreCheck_ID_t, IDBlock*> Info_t;
 	Info_t mInfo;
 	BackupStoreCheck_ID_t mLastIDInInfo;
 	IDBlock *mpInfoLastBlock;
 	int32_t mInfoLastBlockEntries;
-	
+
 	// List of stuff to fix
 	std::vector<BackupStoreCheck_ID_t> mDirsWithWrongContainerID;
 	// This is a map of lost dir ID -> existing dir ID
 	std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t>
 		mDirsWhichContainLostDirs;
-	
+
 	// Set of extra directories added
 	std::set<BackupStoreCheck_ID_t> mDirsAdded;
 
 	// The refcount database, being reconstructed as the check/fix progresses
-	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
-	
+	BackupStoreRefCountDatabase* mpNewRefs;
+	// And a holder for the auto_ptr to a new refcount DB in the temporary directory
+	// (not the one created by BackupFileSystem::GetPotentialRefCountDatabase()):
+	std::auto_ptr<BackupStoreRefCountDatabase> mapOwnNewRefs;
+
+	// Abstracted interface to software-RAID filesystem
+	BackupFileSystem& mrFileSystem;
+
 	// Misc stuff
 	int32_t mLostDirNameSerial;
 	int64_t mLostAndFoundDirectoryID;
-	
+
 	// Usage
 	int64_t mBlocksUsed;
 	int64_t mBlocksInCurrentFiles;
@@ -215,6 +217,7 @@ private:
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;
+	int mTimeout;
 };
 
 #endif // BACKUPSTORECHECK__H

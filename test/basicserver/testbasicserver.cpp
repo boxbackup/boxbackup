@@ -10,6 +10,10 @@
 
 #include "Box.h"
 
+#ifdef HAVE_SIGNAL_H
+#	include <signal.h>
+#endif
+
 #include <stdio.h>
 #include <time.h>
 
@@ -33,8 +37,8 @@
 #define SERVER_LISTEN_PORT	2003
 
 // in ms
-#define COMMS_READ_TIMEOUT					4
-#define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
+#define COMMS_READ_TIMEOUT	4
+#define COMMS_SERVER_WAIT_BEFORE_REPLYING	1000
 // Use a longer timeout to give Srv2TestConversations time to write 20 MB to each of
 // three child processes before starting to read it back again, without the children
 // timing out and aborting.
@@ -67,9 +71,10 @@ void testservers_pause_before_reply()
 #ifdef WIN32
 	Sleep(COMMS_SERVER_WAIT_BEFORE_REPLYING);
 #else
+	int64_t nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000LL * 1000;	// convert to ns
 	struct timespec t;
-	t.tv_sec = 0;
-	t.tv_nsec = COMMS_SERVER_WAIT_BEFORE_REPLYING * 1000 * 1000;	// convert to ns
+	t.tv_sec = nsec / NANO_SEC_IN_SEC;
+	t.tv_nsec = nsec % NANO_SEC_IN_SEC;
 	::nanosleep(&t, NULL);
 #endif
 }
@@ -84,22 +89,22 @@ void testservers_connection(SocketStream &rStream)
 	if(typeid(rStream) == typeid(SocketStreamTLS))
 	{
 		// need to wait for some data before sending stuff, otherwise timeout test doesn't work
-		std::string line;
-		while(!getline.GetLine(line))
-			;
+		std::string line = getline.GetLine(false); // !preprocess
 		SocketStreamTLS &rtls = (SocketStreamTLS&)rStream;
 		std::string line1("CONNECTED:");
 		line1 += rtls.GetPeerCommonName();
 		line1 += '\n';
+
+		// Reply after a short delay, to allow the client to test timing out
+		// in GetLine():
 		testservers_pause_before_reply();
+
 		rStream.Write(line1.c_str(), line1.size());
 	}
 
 	while(!getline.IsEOF())
 	{
-		std::string line;
-		while(!getline.GetLine(line))
-			;
+		std::string line = getline.GetLine(false); // !preprocess
 		if(line == "QUIT")
 		{
 			break;
@@ -313,20 +318,25 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	{
 		getline[c] = new IOStreamGetLine(*conns[c]);
 		
-		bool hadTimeout = false;
 		if(typeid(*conns[c]) == typeid(SocketStreamTLS))
 		{
 			SocketStreamTLS *ptls = (SocketStreamTLS *)conns[c];
-			printf("Connected to '%s'\n", ptls->GetPeerCommonName().c_str());
+			BOX_INFO("Connected to '" << ptls->GetPeerCommonName() << "'");
 		
 			// Send some data, any data, to get the first response.
 			conns[c]->Write("Hello\n", 6);
 		
-			std::string line1;
-			while(!getline[c]->GetLine(line1, false, COMMS_READ_TIMEOUT))
-				hadTimeout = true;
-			TEST_THAT(line1 == "CONNECTED:CLIENT");
-			TEST_THAT(hadTimeout)
+			// First read should timeout, while server sleeps in
+			// testservers_pause_before_reply():
+			TEST_CHECK_THROWS(getline[c]->GetLine(false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING * 0.5),
+				CommonException, IOStreamTimedOut);
+
+			// Second read should not timeout, because we should have waited
+			// COMMS_SERVER_WAIT_BEFORE_REPLYING * 1.5
+			std::string line1 = getline[c]->GetLine(false,
+				COMMS_SERVER_WAIT_BEFORE_REPLYING);
+			TEST_EQUAL(line1, "CONNECTED:CLIENT");
 		}
 	}
 	
@@ -338,8 +348,32 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			conns[c]->Write(tosend[q], strlen(tosend[q]));
 			std::string rep;
 			bool hadTimeout = false;
-			while(!getline[c]->GetLine(rep, false, COMMS_READ_TIMEOUT))
-				hadTimeout = true;
+			while(true)
+			{
+				try
+				{
+					// COMMS_READ_TIMEOUT is very short, so we will get a lot of these:
+					HideSpecificExceptionGuard guard(CommonException::ExceptionType,
+						CommonException::IOStreamTimedOut);
+					rep = getline[c]->GetLine(false, COMMS_READ_TIMEOUT);
+					break;
+				}
+				catch(BoxException &e)
+				{
+					if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+					{
+						hadTimeout = true;
+					}
+					else if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived))
+					{
+						// just try again
+					}
+					else
+					{
+						throw;
+					}
+				}
+			}
 			TEST_EQUAL_LINE(rep, recieve[q], "Line " << q);
 			TEST_LINE(hadTimeout, "Line " << q)
 		}
@@ -452,6 +486,14 @@ void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainst
 
 int test(int argc, const char *argv[])
 {
+	// Timing information is very useful for debugging race conditions during this test,
+	// so enable it unconditionally:
+	Console::SetShowTime(true);
+	if(Logging::GetConsole().GetLevel() < Log::INFO)
+	{
+		Logging::FilterConsole(Log::INFO);
+	}
+
 	// Server launching stuff
 	if(argc >= 2)
 	{
@@ -494,6 +536,11 @@ int test(int argc, const char *argv[])
 		}
 	}
 
+#ifndef WIN32
+	// Don't die quietly if the server dies while we're communicating with it
+	signal(SIGPIPE, SIG_IGN);
+#endif
+
 	//printf("SKIPPING TESTS------------------------\n");
 	//goto protocolserver;
 
@@ -514,7 +561,7 @@ int test(int argc, const char *argv[])
 
 			// Move the config file over
 			#ifdef WIN32
-				TEST_THAT(::unlink("testfiles"
+				TEST_THAT(EMU_UNLINK("testfiles"
 					DIRECTORY_SEPARATOR "srv1.conf") != -1);
 			#endif
 
@@ -729,13 +776,13 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetValuePlusOne() == 810);
 			}
 			
-			// Streams, twice, both uncertain and certain sizes
+			BOX_INFO("Streams, twice, both uncertain and certain sizes");
 			TestStreamReceive(protocol, 374, false);
 			TestStreamReceive(protocol, 23983, true);
 			TestStreamReceive(protocol, 12098, false);
 			TestStreamReceive(protocol, 4342, true);
 			
-			// Try to send a stream
+			BOX_INFO("Try to send a stream");
 			{
 				std::auto_ptr<CollectInBufferStream>
 					s(new CollectInBufferStream());
@@ -747,13 +794,14 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetStartingValue() == sizeof(buf));
 			}
 
-			// Lots of simple queries
+			BOX_INFO("Lots of simple queries");
 			for(int q = 0; q < 514; q++)
 			{
 				std::auto_ptr<TestProtocolSimpleReply> reply(protocol.QuerySimple(q));
 				TEST_THAT(reply->GetValuePlusOne() == (q+1));
 			}
-			// Send a list of strings to it
+
+			BOX_INFO("Send a list of strings");
 			{
 				std::vector<std::string> strings;
 				strings.push_back(std::string("test1"));
@@ -763,7 +811,7 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetNumberOfStrings() == 3);
 			}
 			
-			// And another
+			BOX_INFO("Send some mixed data");
 			{
 				std::auto_ptr<TestProtocolHello> reply(protocol.QueryHello(41,87,11,std::string("pingu")));
 				TEST_THAT(reply->GetNumber32() == 12);
@@ -771,11 +819,61 @@ int test(int argc, const char *argv[])
 				TEST_THAT(reply->GetNumber8() == 22);
 				TEST_THAT(reply->GetText() == "Hello world!");
 			}
-		
-			// Quit query to finish
-			protocol.QueryQuit();
-		
-			// Kill it
+
+			BOX_INFO("Try to trigger an expected error");
+			{
+				TEST_CHECK_THROWS(protocol.QueryDeliberateError(),
+					ConnectionException, Protocol_UnexpectedReply);
+				int type, subtype;
+				protocol.GetLastError(type, subtype);
+				TEST_EQUAL(TestProtocolError::ErrorType, type);
+				TEST_EQUAL(TestProtocolError::Err_DeliberateError, subtype);
+			}
+
+			BOX_INFO("Try to trigger an unexpected error");
+			// ... by throwing an exception that isn't caught and handled by
+			// HandleException:
+			{
+				TEST_CHECK_THROWS(protocol.QueryUnexpectedError(),
+					ConnectionException, Protocol_UnexpectedReply);
+				int type, subtype;
+				protocol.GetLastError(type, subtype);
+				TEST_EQUAL(TestProtocolError::ErrorType, type);
+				TEST_EQUAL(-1, subtype);
+			}
+
+			// The unexpected exception should kill the server child process that we
+			// connected to (except on Windows where the server does not fork a child),
+			// so we cannot communicate with it any more:
+			BOX_INFO("Try to end protocol (should fail as server is already dead)");
+			{
+				bool didthrow = false;
+				HideExceptionMessageGuard hide;
+				try
+				{
+					protocol.QueryQuit();
+				}
+				catch(ConnectionException &e)
+				{
+					if(e.GetSubType() == ConnectionException::SocketReadError ||
+						e.GetSubType() == ConnectionException::SocketWriteError)
+					{
+						didthrow = true;
+					}
+					else
+					{
+						TEST_FAIL_WITH_MESSAGE("Caught unexpected exception: " <<
+							e.what());
+						throw;
+					}
+				}
+				if(!didthrow)
+				{
+					TEST_FAIL_WITH_MESSAGE("Didn't throw expected exception");
+				}
+			}
+
+			// Kill the main server process:
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
 			TEST_THAT(!ServerIsAlive(pid));

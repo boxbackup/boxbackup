@@ -112,12 +112,16 @@
 	#define THROW_WIN_ERROR_NUMBER(message, error_number, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
 			BOX_WIN_ERRNO_MESSAGE(error_number, message))
+	#define THROW_WIN_ERROR(message, exception, subtype) \
+		THROW_WIN_ERROR_NUMBER(message, GetLastError(), exception, subtype)
 	#define THROW_WIN_FILE_ERRNO(message, filename, error_number, exception, subtype) \
 		THROW_WIN_ERROR_NUMBER(BOX_FILE_MESSAGE(filename, message), \
 			error_number, exception, subtype)
 	#define THROW_WIN_FILE_ERROR(message, filename, exception, subtype) \
 		THROW_WIN_FILE_ERRNO(message, filename, GetLastError(), \
 			exception, subtype)
+	#define THROW_SOCKET_ERROR(message, exception, subtype) \
+		THROW_WIN_ERROR_NUMBER(message, WSAGetLastError(), exception, subtype)
 	#define EMU_ERRNO winerrno
 	#define THROW_EMU_ERROR(message, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
@@ -127,6 +131,8 @@
 		BOX_SYS_ERRNO_MESSAGE(error_number, stuff)
 	#define BOX_LOG_NATIVE_ERROR(stuff)   BOX_LOG_SYS_ERROR(stuff)
 	#define BOX_LOG_NATIVE_WARNING(stuff) BOX_LOG_SYS_WARNING(stuff)
+	#define THROW_SOCKET_ERROR(message, exception, subtype) \
+		THROW_SYS_ERROR(message, exception, subtype)
 	#define EMU_ERRNO errno
 	#define THROW_EMU_ERROR(message, exception, subtype) \
 		THROW_EXCEPTION_MESSAGE(exception, subtype, \
@@ -203,7 +209,7 @@ namespace Log
 		Category(const std::string& name)
 		: mName(name)
 		{ }
-		const std::string& ToString() { return mName; }
+		const std::string& ToString() const { return mName; }
 		bool operator==(const Category& other) { return mName == other.mName; }
 	};
 }
@@ -410,8 +416,48 @@ class Capture : public Logger
 	}
 };
 
-// Forward declaration
-class HideFileGuard;
+class LogLevelOverrideByFileGuard
+{
+	private:
+	std::list<std::string> mFileNames;
+	std::string mCategoryNamePrefix;
+	Log::Level mNewLevel;
+	bool mOverrideAllButSelected;
+	bool mInstalled;
+
+	public:
+	LogLevelOverrideByFileGuard(const std::string& rFileName,
+		const std::string& rCategoryNamePrefix, Log::Level NewLevel,
+		bool OverrideAllButSelected = false)
+	: mCategoryNamePrefix(rCategoryNamePrefix),
+	  mNewLevel(NewLevel),
+	  mOverrideAllButSelected(OverrideAllButSelected),
+	  mInstalled(false)
+	{
+		if(rFileName.size() > 0)
+		{
+			mFileNames.push_back(rFileName);
+		}
+	}
+	virtual ~LogLevelOverrideByFileGuard();
+	void Add(const std::string& rFileName)
+	{
+		mFileNames.push_back(rFileName);
+	}
+	void Install();
+	bool IsOverridden(Log::Level level, const std::string& file, int line,
+		const std::string& function, const Log::Category& category,
+		const std::string& message);
+	Log::Level GetNewLevel() { return mNewLevel; }
+	bool operator==(const LogLevelOverrideByFileGuard& rOther)
+	{
+		return (mFileNames == rOther.mFileNames) &&
+			(mCategoryNamePrefix == rOther.mCategoryNamePrefix) &&
+			(mNewLevel == rOther.mNewLevel) &&
+			(mOverrideAllButSelected == rOther.mOverrideAllButSelected);
+	}
+};
+
 
 // --------------------------------------------------------------------------
 //
@@ -434,7 +480,8 @@ class Logging
 	static Syslog*  spSyslog;
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
-	static std::auto_ptr<HideFileGuard> sapHideFileGuard;
+	static std::vector<LogLevelOverrideByFileGuard> sLogLevelOverrideByFileGuards;
+	friend class LogLevelOverrideByFileGuard;
 
 	public:
 	Logging ();
@@ -445,6 +492,9 @@ class Logging
 	static void FilterConsole (Log::Level level);
 	static void Add    (Logger* pNewLogger);
 	static void Remove (Logger* pOldLogger);
+	static bool ShouldLog(Log::Level default_level, Log::Level message_level,
+		const std::string& file, int line, const std::string& function,
+		const Log::Category& category, const std::string& message);
 	static void Log(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
@@ -660,36 +710,6 @@ class HideCategoryGuard : public Logger
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	virtual const char* GetType() { return "HideCategoryGuard"; }
-	virtual void SetProgramName(const std::string& rProgramName) { }
-};
-
-class HideFileGuard : public Logger
-{
-	private:
-	std::list<std::string> mFileNames;
-	HideFileGuard(const HideFileGuard& other); // no copying
-	HideFileGuard& operator=(const HideFileGuard& other); // no assignment
-	bool mHideAllButSelected;
-
-	public:
-	HideFileGuard(const std::string& rFileName, bool HideAllButSelected = false)
-	: mHideAllButSelected(HideAllButSelected)
-	{
-		mFileNames.push_back(rFileName);
-		Logging::Add(this);
-	}
-	~HideFileGuard()
-	{
-		Logging::Remove(this);
-	}
-	void Add(const std::string& rFileName)
-	{
-		mFileNames.push_back(rFileName);
-	}
-	virtual bool Log(Log::Level level, const std::string& file, int line,
-		const std::string& function, const Log::Category& category,
-		const std::string& message);
-	virtual const char* GetType() { return "HideFileGuard"; }
 	virtual void SetProgramName(const std::string& rProgramName) { }
 };
 

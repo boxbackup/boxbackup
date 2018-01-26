@@ -12,9 +12,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_PROCESS_H
+#	include <process.h> // for getpid() on Windows
+#endif
+
 #include "Archive.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
@@ -34,12 +40,15 @@
 #include "FileStream.h"
 #include "HousekeepStoreAccount.h"
 #include "MemBlockStream.h"
+#include "NamedLock.h" // for BOX_LOCK_TYPE_F_SETLK
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
 #include "RaidFileWrite.h"
+#include "S3Simulator.h"
 #include "SSLLib.h"
 #include "ServerControl.h"
+#include "SimpleDBClient.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
@@ -53,11 +62,15 @@
 #define ENCFILE_SIZE	2765
 
 // Make some test attributes
-#define ATTR1_SIZE 	245
-#define ATTR2_SIZE 	23
-#define ATTR3_SIZE 	122
+#define ATTR1_SIZE	245
+#define ATTR2_SIZE	23
+#define ATTR3_SIZE	122
 
 #define SHORT_TIMEOUT 5000
+
+#define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
+#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
 
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
@@ -139,7 +152,35 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 #define UPLOAD_FILE_TO_MOVE	8
 
 #define UNLINK_IF_EXISTS(filename) \
-	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
+	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
+
+int s3simulator_pid = 0;
+
+bool StartSimulator()
+{
+	s3simulator_pid = StartDaemon(s3simulator_pid,
+		"../../bin/s3simulator/s3simulator " + bbstored_args +
+		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
+	return s3simulator_pid != 0;
+}
+
+bool StopSimulator()
+{
+	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
+		"s3simulator.memleaks", true);
+	s3simulator_pid = 0;
+	return result;
+}
+
+bool kill_running_daemons()
+{
+#ifndef WIN32
+	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
+		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
+	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
+#endif
+	return true;
+}
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \
@@ -150,6 +191,45 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1); \
 	TEST_THAT_OR(create_account(10000, 20000), FAIL);
 
+bool setup_test_backupstore_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	if(spec_name == "s3")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<S3BackupAccountControl&>(control).
+			CreateAccount("test", 10000, 20000) == 0, FAIL);
+	}
+	else if(spec_name == "store")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<BackupStoreAccountControl&>(control).
+			CreateAccount(0, 10000, 20000) == 0, FAIL);
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Don't know how to create accounts for store type: " <<
+			spec_name);
+	}
+
+	return true;
+}
+
+#define SETUP_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+	SETUP_SPECIALISED(name); \
+	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL); \
+	try \
+	{ // left open for TEARDOWN_TEST_BACKUPSTORE_SPECIALISED()
+
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_backupstore()
 {
@@ -158,7 +238,7 @@ bool teardown_test_backupstore()
 	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
 	{
 		TEST_THAT_OR(check_reference_counts(), status = false);
-		TEST_THAT_OR(check_account(), status = false);
+		TEST_EQUAL_OR(0, check_account_for_errors(), status = false);
 	}
 
 	return status;
@@ -168,6 +248,46 @@ bool teardown_test_backupstore()
 	if (ServerIsAlive(bbstored_pid)) \
 		StopServer(); \
 	TEST_THAT(teardown_test_backupstore()); \
+	TEARDOWN();
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_backupstore_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	bool status = true;
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	TEST_THAT_OR(check_reference_counts(
+		fs.GetPermanentRefCountDatabase(true)), // ReadOnly
+		status = false);
+	TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
+	control.GetFileSystem().ReleaseLock();
+
+	return status;
+}
+
+#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+		if (ServerIsAlive(bbstored_pid)) \
+			StopServer(); \
+		if(control.GetCurrentFileSystem() != NULL) \
+		{ \
+			control.GetCurrentFileSystem()->ReleaseLock(); \
+		} \
+		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
+	} \
+	catch (BoxException &e) \
+	{ \
+		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
+			name << ": " << e.what()); \
+		if (ServerIsAlive(bbstored_pid)) \
+			StopServer(); \
+		if(control.GetCurrentFileSystem() != NULL) \
+		{ \
+			control.GetCurrentFileSystem()->ReleaseLock(); \
+		} \
+		TEST_THAT(teardown_test_backupstore_specialised(name, control)); \
+		throw; \
+	} \
 	TEARDOWN();
 
 // Nice random data for testing written files
@@ -267,6 +387,54 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 	// Got them all?
 	TEST_THAT(en == 0);
 	TEST_THAT(DIR_NUM == SkipEntries(e, FlagsMustBeSet, FlagsNotToBeSet));
+}
+
+std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
+{
+	std::string filename;
+	StoreStructure::MakeObjectFilename(ObjectID,
+		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
+		filename, false /* EnsureDirectoryExists */);
+	return RaidFileRead::Open(0, filename);
+}
+
+int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
+	const std::string& SpecialisationName, BackupAccountControl& control)
+{
+	if(SpecialisationName == "s3")
+	{
+		S3BackupFileSystem& fs
+			(dynamic_cast<S3BackupFileSystem&>(control.GetFileSystem()));
+		std::string local_path = "testfiles/store" +
+			(IsDirectory ? fs.GetDirectoryURI(ObjectID) :
+			 fs.GetFileURI(ObjectID));
+		int size = TestGetFileSize(local_path);
+		TEST_LINE(size != -1, "File does not exist: " << local_path);
+		return fs.GetSizeInBlocks(size);
+	}
+	else
+	{
+		// TODO: merge get_raid_file() into here
+		return get_raid_file(ObjectID)->GetDiscUsageInBlocks();
+	}
+}
+
+std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
+	const std::string& SpecialisationName, BackupFileSystem& fs)
+{
+	if(SpecialisationName == "s3")
+	{
+		S3BackupFileSystem& s3fs(dynamic_cast<S3BackupFileSystem&>(fs));
+		std::string local_path = "testfiles/store" +
+			(IsDirectory ? s3fs.GetDirectoryURI(ObjectID) :
+			 s3fs.GetFileURI(ObjectID));
+		return std::auto_ptr<IOStream>(new FileStream(local_path));
+	}
+	else
+	{
+		// TODO: merge get_raid_file() into here
+		return std::auto_ptr<IOStream>(get_raid_file(ObjectID).release());
+	}
 }
 
 bool test_filename_encoding()
@@ -482,7 +650,7 @@ void test_test_file(int t, IOStream &rStream)
 
 	free(data);
 	in.Close();
-	TEST_THAT(unlink("testfiles/test_download") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/test_download") == 0);
 }
 
 void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
@@ -537,7 +705,7 @@ void create_file_in_dir(std::string name, std::string source, int64_t parentId,
 			name_encoded,
 			upload));
 	int64_t objectId = stored->GetObjectID();
-	if (pRefCount)
+	if(pRefCount)
 	{
 		TEST_EQUAL(objectId, pRefCount->GetLastObjectIDUsed());
 		TEST_EQUAL(1, pRefCount->GetRefCount(objectId))
@@ -567,7 +735,7 @@ int64_t create_test_data_subdirs(BackupProtocolCallable &protocol,
 	BOX_TRACE("Creating subdirs, depth = " << depth << ", dirid = " <<
 		BOX_FORMAT_OBJECTID(subdirid));
 
-	if (pRefCount)
+	if(pRefCount)
 	{
 		TEST_EQUAL(subdirid, pRefCount->GetLastObjectIDUsed());
 		TEST_EQUAL(1, pRefCount->GetRefCount(subdirid))
@@ -774,15 +942,6 @@ bool check_files_same(const char *f1, const char *f2)
 	return same;
 }
 
-std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
-{
-	std::string filename;
-	StoreStructure::MakeObjectFilename(ObjectID,
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
-		filename, false /* EnsureDirectoryExists */);
-	return RaidFileRead::Open(0, filename);
-}
-
 int64_t create_directory(BackupProtocolCallable& protocol,
 	int64_t parent_dir_id = BACKUPSTORE_ROOT_DIRECTORY_ID);
 int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
@@ -835,6 +994,7 @@ bool test_temporary_refcount_db_is_independent()
 bool test_server_housekeeping()
 {
 	SETUP_TEST_BACKUPSTORE();
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
 	int encfile[ENCFILE_SIZE];
 	{
@@ -857,7 +1017,7 @@ bool test_server_housekeeping()
 		0, false);
 
 	int root_dir_blocks = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID)->GetDiscUsageInBlocks();
-	TEST_THAT(check_num_files(0, 0, 0, 1));
+	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
 		root_dir_blocks));
 
@@ -989,7 +1149,7 @@ bool test_server_housekeeping()
 	}
 
 	int file1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
-	TEST_THAT(check_num_files(1, 0, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
 		file1_blocks + root_dir_blocks));
 
@@ -1003,6 +1163,8 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	// Update expected reference count of this new object
+	set_refcount(patch1_id, 1);
 
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
@@ -1012,9 +1174,10 @@ bool test_server_housekeeping()
 	// the server code is not smart enough to realise that the file
 	// contents are identical, so it will create an empty patch.
 
-	TEST_THAT(check_num_files(1, 1, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Change the file and upload again, as a patch to the original file.
 	{
@@ -1033,26 +1196,29 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(4, patch2_id, "wrong ObjectID for newly uploaded "
 		"patch file");
+	set_refcount(patch2_id, 1);
 
 	// How many blocks used by the new file?
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
 	int patch2_blocks = get_raid_file(patch1_id)->GetDiscUsageInBlocks();
 
-	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
-	TEST_THAT(check_num_files(1, 2, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Upload not as a patch, but as a completely different file. This
 	// marks the previous file as old (because the filename is the same)
@@ -1066,31 +1232,34 @@ bool test_server_housekeeping()
 		);
 	TEST_EQUAL_LINE(5, replaced_id, "wrong ObjectID for newly uploaded "
 		"full file");
+	set_refcount(replaced_id, 1);
 
 	// How many blocks used by the new file? This time we need to check
 	// the new file, because it's not a patch.
 	int replaced_blocks = get_raid_file(replaced_id)->GetDiscUsageInBlocks();
 
-	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// Housekeeping should not change anything just yet
 	protocol.QueryFinished();
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
-	TEST_THAT(check_num_files(1, 3, 0, 1));
+	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// But if we reduce the limits, then it will
 	protocol.QueryFinished();
@@ -1100,12 +1269,17 @@ bool test_server_housekeeping()
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
 
-	TEST_THAT(check_num_files(1, 1, 0, 1));
+	// We expect housekeeping to have removed the two oldest versions:
+	set_refcount(store1objid, 0);
+	set_refcount(patch1_id, 0);
+
+	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
 		file1_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks)); // total
+	TEST_THAT(check_reference_counts());
 
 	// Check that deleting files is accounted for as well
 	protocol.QueryDeleteFile(
@@ -1113,12 +1287,13 @@ bool test_server_housekeeping()
 		store1name); // Filename
 
 	// The old version file is deleted as well!
-	TEST_THAT(check_num_files(0, 1, 2, 1));
+	TEST_THAT(check_num_files(fs, 0, 1, 2, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, // current
 		file1_blocks, // old
 		replaced_blocks + file1_blocks, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks));
+	TEST_THAT(check_reference_counts());
 
 	// Reduce limits again, check that removed files are subtracted from
 	// block counts.
@@ -1126,43 +1301,20 @@ bool test_server_housekeeping()
 	TEST_THAT(change_account_limits("0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account());
 	protocol.Reopen();
+	set_refcount(store1objid, 0);
 
-	TEST_THAT(check_num_files(0, 0, 0, 1));
+	// We expect housekeeping to have removed the two most recent versions
+	// of the now-deleted file:
+	set_refcount(patch2_id, 0);
+	set_refcount(replaced_id, 0);
+
+	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
-
-	// Used to not consume the stream
-	std::auto_ptr<IOStream> upload(new ZeroStream(1000));
-	TEST_COMMAND_RETURNS_ERROR(protocol, QueryStoreFile(
-			BACKUPSTORE_ROOT_DIRECTORY_ID,
-			0,
-			0, /* use for attr hash too */
-			99999, /* diff from ID */
-			uploads[0].name,
-			upload),
-		Err_DiffFromFileDoesNotExist);
-
-	// TODO FIXME These tests should not be here, but in
-	// test_server_commands. But make sure you use a network protocol,
-	// not a local one, when you move them.
-
-	// Try using GetFile on a directory
-	{
-		int64_t subdirid = create_directory(protocol);
-		TEST_COMMAND_RETURNS_ERROR(protocol,
-			QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, subdirid),
-			Err_FileDoesNotVerify);
-	}
-
-	// Try retrieving an object that doesn't exist. That used to return
-	// BackupProtocolSuccess(NoObject) for no apparent reason.
-	TEST_COMMAND_RETURNS_ERROR(protocol, QueryGetObject(store1objid + 1),
-		Err_DoesNotExist);
+	TEST_THAT(check_reference_counts());
 
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
 
-	ExpectedRefCounts.resize(3); // stop test failure in teardown_test_backupstore()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
@@ -1239,17 +1391,21 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 	return loginConf->GetClientStoreMarker();
 }
 
-bool test_multiple_uploads()
+bool test_multiple_uploads(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-	std::auto_ptr<BackupProtocolCallable> apProtocol =
-		connect_and_login(context);
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
-	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocolReadOnly(
+		new BackupProtocolLocal2(roContext, 0x01234567, true)); // ReadOnly
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
 	for(int l = 0; l < 3; ++l)
@@ -1267,19 +1423,19 @@ bool test_multiple_uploads()
 
 	// Read the dir from the readonly connection (make sure it gets in the cache)
 	// Command
-	protocolReadOnly.QueryListDirectory(
+	apProtocolReadOnly->QueryListDirectory(
 		BACKUPSTORE_ROOT_DIRECTORY_ID,
 		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		false /* no attributes */);
 	// Stream
-	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
-		protocolReadOnly.GetTimeout());
+	BackupStoreDirectory dir(apProtocolReadOnly->ReceiveStream(),
+		apProtocolReadOnly->GetTimeout());
 	TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 	// TODO FIXME dedent
 	{
-		TEST_THAT(check_num_files(0, 0, 0, 1));
+		TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
@@ -1320,22 +1476,22 @@ bool test_multiple_uploads()
 			if (t >= 13) expected_num_old_files++;
 			int expected_num_current_files = t + 1 - expected_num_old_files;
 
-			TEST_THAT(check_num_files(expected_num_current_files,
+			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
 
 			apProtocol->QueryFinished();
-			protocolReadOnly.QueryFinished();
-			TEST_THAT(run_housekeeping_and_check_account());
-			apProtocol = connect_and_login(context);
-			protocolReadOnly.Reopen();
+			apProtocolReadOnly->QueryFinished();
+			TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+			apProtocol->Reopen();
+			apProtocolReadOnly->Reopen();
 
-			TEST_THAT(check_num_files(expected_num_current_files,
+			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
 		}
 
 		// Add some attributes onto one of them
 		{
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 3, 3, 0, 1));
 			std::auto_ptr<IOStream> attrnew(
 				new MemBlockStream(attr3, sizeof(attr3)));
 			std::auto_ptr<BackupProtocolSuccess> set(apProtocol->QuerySetReplacementFileAttributes(
@@ -1344,14 +1500,14 @@ bool test_multiple_uploads()
 				uploads[UPLOAD_ATTRS_EN].name,
 				attrnew));
 			TEST_THAT(set->GetObjectID() == uploads[UPLOAD_ATTRS_EN].allocated_objid);
-			TEST_THAT(check_num_files(UPLOAD_NUM - 3, 3, 0, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 3, 3, 0, 1));
 		}
 
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Delete one of them (will implicitly delete an old version)
 		{
@@ -1359,24 +1515,14 @@ bool test_multiple_uploads()
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
 				uploads[UPLOAD_DELETE_EN].name));
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
-			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
-#ifdef _MSC_VER
-		BOX_TRACE("1");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
-
-#ifdef _MSC_VER
-		BOX_TRACE("2");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1405,17 +1551,12 @@ bool test_multiple_uploads()
 			test_test_file(t, *filestream);
 		}
 
-#ifdef _MSC_VER
-		BOX_TRACE("3");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		{
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
 			// Use the read only connection to verify that the directory is as we expect
 			printf("\n\n==== Reading directory using read-only connection\n");
-			check_dir_after_uploads(protocolReadOnly, attrtest);
+			check_dir_after_uploads(*apProtocolReadOnly, attrtest);
 			printf("done.\n\n");
 			// And on the read/write one
 			check_dir_after_uploads(*apProtocol, attrtest);
@@ -1423,11 +1564,6 @@ bool test_multiple_uploads()
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
-
-#ifdef _MSC_VER
-		BOX_TRACE("4");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
 
 		// Check diffing and rsync like stuff...
 		// Build a modified file
@@ -1446,41 +1582,18 @@ bool test_multiple_uploads()
 			::free(buf);
 		}
 
-		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
 		// Run housekeeping (for which we need to disconnect
 		// ourselves) and check that it doesn't change the numbers
 		// of files
-
-#ifdef _MSC_VER
-		BOX_TRACE("5");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-#ifdef _MSC_VER
-		BOX_TRACE("6");
-		system("dir testfiles\\0_0\\backup\\01234567");
-#endif
-		TEST_EQUAL(0, run_housekeeping(account));
-
-		// Also check that bbstoreaccounts doesn't change anything,
-		// using an external process instead of the internal one.
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS
-			" -c testfiles/bbstored.conf check 01234567 fix") == 0,
-			FAIL);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
-
-		TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
+		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
 		{
 			// Fetch the block index for this one
@@ -1503,13 +1616,19 @@ bool test_multiple_uploads()
 					NULL, // pointer to DiffTimer impl
 					&modtime, &isCompletelyDifferent));
 			TEST_THAT(isCompletelyDifferent == false);
+
 			// Sent this to a file, so we can check the size, rather than uploading it directly
 			{
 				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT);
 				patchstream->CopyStreamTo(patch);
 			}
+
+			// Release blockIndexStream to close the RaidFile, so that we can rename over it
+			blockIndexStream.reset();
+
 			// Make sure the stream is a plausible size for a patch containing only one new block
 			TEST_THAT(TestGetFileSize(TEST_FILE_FOR_PATCHING ".patch") < (8*1024));
+
 			// Upload it
 			int64_t patchedID = 0;
 			{
@@ -1529,32 +1648,51 @@ bool test_multiple_uploads()
 			set_refcount(patchedID, 1);
 
 			// Then download it to check it's OK
-			std::auto_ptr<BackupProtocolSuccess> getFile(apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
+			std::auto_ptr<BackupProtocolSuccess> getFile(
+				apProtocol->QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID, patchedID));
 			TEST_THAT(getFile->GetObjectID() == patchedID);
 			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			BackupStoreFile::DecodeFile(*filestream,
 				TEST_FILE_FOR_PATCHING ".downloaded", SHORT_TIMEOUT);
+
 			// Check it's the same
 			TEST_THAT(check_files_same(TEST_FILE_FOR_PATCHING ".downloaded", TEST_FILE_FOR_PATCHING ".mod"));
-			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 4, 2, 1));
+			TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 4, 2, 1));
 		}
 	}
 
 	apProtocol->QueryFinished();
-	protocolReadOnly.QueryFinished();
+	apProtocolReadOnly->QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-bool test_server_commands()
+bool test_server_commands(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	// Write the test file for create_file to upload:
+	write_test_file(0);
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
 	std::auto_ptr<BackupProtocolLocal2> apProtocol(
-		new BackupProtocolLocal2(0x01234567, "test",
-			"backup/01234567/", 0, false));
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	BackupProtocolLocal2 protocolReadOnly(roContext, 0x01234567, true); // ReadOnly
 
-	// Try using GetFile on an object ID that doesn't exist in the directory
+	// Try retrieving an object that doesn't exist. That used to return
+	// BackupProtocolSuccess(NoObject) for no apparent reason.
+	{
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryGetObject(2),
+			Err_DoesNotExist);
+	}
+
+	// Try using GetFile on an object ID that doesn't exist in the directory.
 	{
 		TEST_COMMAND_RETURNS_ERROR(*apProtocol,
 			QueryGetFile(BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -1562,12 +1700,53 @@ bool test_server_commands()
 			Err_DoesNotExistInDirectory);
 	}
 
+	// Try uploading a file that doesn't verify.
+	{
+		std::auto_ptr<IOStream> upload(new ZeroStream(1000));
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryStoreFile(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				0,
+				0, /* use for attr hash too */
+				0, /* diff from ID */
+				uploads[0].name,
+				upload),
+			Err_FileDoesNotVerify);
+	}
+
+	// TODO FIXME: in the case of S3 stores, we will have sent the request (but no data) before
+	// the client realises that the stream is invalid, and aborts. The S3 server will receive a
+	// PUT request for a zero-byte file, and have no idea that it's not a valid file, so it will
+	// store it. We should send a checksum (if possible) and a content-length (at least) to
+	// prevent this, and test that no file is stored instead of unlinking it here. Alternatively,
+	// the server could notice that the client closed the connection and didn't read the 200 OK
+	// response (but sent back an RST instead), and delete the file that it just created.
+	if(specialisation_name == "s3")
+	{
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/0x2.file"));
+	}
+
+	// Try uploading a file referencing another file which doesn't exist.
+	// This used to not consume the stream, leaving it unusable.
+	{
+		std::auto_ptr<IOStream> upload(new ZeroStream(1000));
+		TEST_COMMAND_RETURNS_ERROR(*apProtocol, QueryStoreFile(
+				BACKUPSTORE_ROOT_DIRECTORY_ID,
+				0,
+				0, /* use for attr hash too */
+				99999, /* diff from ID */
+				uploads[0].name,
+				upload),
+			Err_DiffFromFileDoesNotExist);
+	}
+
 	// BLOCK
 	// TODO FIXME dedent this block.
 	{
 		// Create a directory
 		int64_t subdirid = create_directory(*apProtocol);
-		TEST_THAT(check_num_files(0, 0, 0, 2));
+		// Ensure that store info is flushed out to disk, so we can check it:
+		rwContext.SaveStoreInfo(false); // !AllowDelay
+		TEST_THAT(check_num_files(fs, 0, 0, 0, 2));
 
 		// Try using GetFile on the directory
 		{
@@ -1579,10 +1758,7 @@ bool test_server_commands()
 
 		// Stick a file in it
 		int64_t subdirfileid = create_file(*apProtocol, subdirid);
-		TEST_THAT(check_num_files(1, 0, 0, 2));
-
-		BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-			"backup/01234567/", 0, true); // read-only
+		TEST_THAT(check_num_files(fs, 1, 0, 0, 2));
 
 		BOX_TRACE("Checking root directory using read-only connection");
 		{
@@ -1616,10 +1792,12 @@ bool test_server_commands()
 			}
 
 			// Check that the last entry looks right
+			TEST_THAT_OR(en != NULL, FAIL);
 			TEST_EQUAL(subdirid, en->GetObjectID());
 			TEST_THAT(en->GetName() == dirname);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_Dir, en->GetFlags());
-			int64_t actual_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+			int64_t actual_size = get_disc_usage_in_blocks(true, // IsDirectory
+				subdirid, specialisation_name, control);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_EQUAL(FAKE_MODIFICATION_TIME, en->GetModificationTime());
 		}
@@ -1646,7 +1824,8 @@ bool test_server_commands()
 			TEST_EQUAL(subdirfileid, en->GetObjectID());
 			TEST_THAT(en->GetName() == uploads[0].name);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_File, en->GetFlags());
-			int64_t actual_size = get_raid_file(subdirfileid)->GetDiscUsageInBlocks();
+			int64_t actual_size = get_disc_usage_in_blocks(false, // !IsDirectory
+				subdirfileid, specialisation_name, control);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetModificationTime() != 0);
 
@@ -1681,14 +1860,35 @@ bool test_server_commands()
 		{
 			std::auto_ptr<IOStream> attrnew(
 				new MemBlockStream(attr2, sizeof(attr2)));
-			std::auto_ptr<BackupProtocolSuccess> changereply(apProtocol->QueryChangeDirAttributes(
+			std::auto_ptr<BackupProtocolSuccess> changereply(
+				apProtocol->QueryChangeDirAttributes(
 					subdirid,
 					329483209443598LL,
 					attrnew));
 			TEST_THAT(changereply->GetObjectID() == subdirid);
 		}
 
-		// Check the new attributes
+		// Check the new attributes using the read-write connection
+		{
+			// Command
+			apProtocol->QueryListDirectory(
+				subdirid,
+				0,	// no flags
+				BackupProtocolListDirectory::Flags_EXCLUDE_EVERYTHING,
+				true /* get attributes */);
+			// Stream
+			BackupStoreDirectory dir(apProtocol->ReceiveStream(),
+				SHORT_TIMEOUT);
+			TEST_THAT(dir.GetNumberOfEntries() == 0);
+
+			// Attributes
+			TEST_THAT(dir.HasAttributes());
+			TEST_EQUAL(329483209443598LL, dir.GetAttributesModTime());
+			StreamableMemBlock attrtest(attr2, sizeof(attr2));
+			TEST_THAT(dir.GetAttributes() == attrtest);
+		}
+
+		// Check the new attributes using the read-only connection
 		{
 			// Command
 			protocolReadOnly.QueryListDirectory(
@@ -1710,7 +1910,7 @@ bool test_server_commands()
 
 		BackupStoreFilenameClear& oldName(uploads[0].name);
 		int64_t root_file_id = create_file(*apProtocol, BACKUPSTORE_ROOT_DIRECTORY_ID);
-		TEST_THAT(check_num_files(2, 0, 0, 2));
+		TEST_THAT(check_num_files(fs, 2, 0, 0, 2));
 
 		// Upload a new version of the file as well, to ensure that the
 		// old version is moved along with the current version.
@@ -1720,7 +1920,7 @@ bool test_server_commands()
 			0, // AttributesHash
 			oldName);
 		set_refcount(root_file_id, 1);
-		TEST_THAT(check_num_files(2, 1, 0, 2));
+		TEST_THAT(check_num_files(fs, 2, 1, 0, 2));
 
 		// Check that it's in the root directory (it won't be for long)
 		protocolReadOnly.QueryListDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -1876,11 +2076,11 @@ bool test_server_commands()
 
 		set_refcount(subsubdirid, 1);
 		set_refcount(subsubfileid, 1);
-		TEST_THAT(check_num_files(3, 1, 0, 3));
+		TEST_THAT(check_num_files(fs, 3, 1, 0, 3));
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
 		apProtocol->Reopen();
 		protocolReadOnly.Reopen();
 
@@ -1936,33 +2136,43 @@ bool test_server_commands()
 			}
 		}
 
-//}	skip:
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		// Create some nice recursive directories
-		TEST_THAT(check_reference_counts());
-
 		write_test_file(1);
 		int64_t dirtodelete;
 
 		{
-			std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-				BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-			std::auto_ptr<BackupStoreRefCountDatabase> apRefCount(
-				BackupStoreRefCountDatabase::Load(
-					apAccounts->GetEntry(0x1234567), true));
-
-
-	 		dirtodelete = create_test_data_subdirs(*apProtocol,
+			BackupStoreRefCountDatabase& rRefCount(
+				fs.GetPermanentRefCountDatabase(true)); // ReadOnly
+			dirtodelete = create_test_data_subdirs(*apProtocol,
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				"test_delete", 6 /* depth */, apRefCount.get());
+				"test_delete", 6 /* depth */, &rRefCount);
 		}
 
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+
+		// Close the refcount database and reopen it, check that the counts are
+		// still the same.
+		fs.CloseRefCountDatabase(
+			&fs.GetPermanentRefCountDatabase(true)); // ReadOnly
+
+		{
+			BackupStoreRefCountDatabase* pRefCount =
+				fs.GetCurrentRefCountDatabase();
+			TEST_EQUAL((BackupStoreRefCountDatabase *)NULL, pRefCount);
+			pRefCount = &fs.GetPermanentRefCountDatabase(true); // ReadOnly
+			TEST_EQUAL(pRefCount, fs.GetCurrentRefCountDatabase());
+			TEST_THAT(check_reference_counts(*pRefCount));
+		}
 
 		// And delete them
 		apProtocol->Reopen();
@@ -1976,8 +2186,9 @@ bool test_server_commands()
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(fs));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 		protocolReadOnly.Reopen();
 
 		// Get the root dir, checking for deleted items
@@ -2019,11 +2230,12 @@ bool test_server_commands()
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
-		TEST_THAT(run_housekeeping_and_check_account());
-		TEST_THAT(check_reference_counts());
+		TEST_THAT(run_housekeeping_and_check_account(fs));
+		TEST_THAT(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -2041,33 +2253,32 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 	return en->GetSizeInBlocks();
 }
 
-bool write_dir(BackupStoreDirectory& dir)
+bool test_directory_parent_entry_tracks_directory_size(
+	const std::string& specialisation_name, BackupAccountControl& control)
 {
-	std::string rfn;
-	StoreStructure::MakeObjectFilename(dir.GetObjectID(),
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
-		rfn, false); // EnsureDirectoryExists
-	RaidFileWrite rfw(0, rfn);
-	rfw.Open(true); // AllowOverwrite
-	dir.WriteToStream(rfw);
-	rfw.Commit(/* ConvertToRaidNow */ true);
-	return true;
-}
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-bool test_directory_parent_entry_tracks_directory_size()
-{
-	SETUP_TEST_BACKUPSTORE();
+#ifdef BOX_RELEASE_BUILD
+	BOX_NOTICE("skipping test: takes too long in release mode");
+#else
+	// Write the test file for create_file to upload:
+	write_test_file(0);
 
-	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
-		0, false);
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // read only
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+
+	BackupProtocolLocal2 protocol(rwContext, 0x01234567, false); // !ReadOnly
+	BackupProtocolLocal2 protocolReadOnly(roContext, 0x01234567, true); // ReadOnly
 
 	int64_t subdirid = create_directory(protocol);
 
 	// Get the root directory cached in the read-only connection, and
 	// test that the initial size is correct.
-	int old_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+	int old_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control);
 	TEST_THAT(old_size > 0);
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2087,8 +2298,11 @@ bool test_directory_parent_entry_tracks_directory_size()
 		std::ostringstream name;
 		name << "testfile_" << i;
 		last_added_filename = name.str();
+		// No need to catch exceptions here, because we do not expect to hit the account
+		// hard limit, and if we do it should cause the test to fail.
 		last_added_file_id = create_file(protocol, subdirid, name.str());
-		new_size = get_raid_file(subdirid)->GetDiscUsageInBlocks();
+		new_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+			control);
 	}
 
 	// Check that the root directory entry has been updated
@@ -2098,19 +2312,18 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
 		BackupStoreFilenameClear(last_added_filename));
-	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("0B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	set_refcount(last_added_file_id, 0);
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
-	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
-
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	// Check that the entry in the root directory was updated too
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2118,52 +2331,45 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Push the limits back up
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("1000B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "1000B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
 	// Now modify the root directory to remove its entry for this one
-	BackupStoreDirectory root(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+	BackupStoreDirectory root(
+		*get_object_stream(true, // IsDirectory
+			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en, return false);
 	BackupStoreDirectory::Entry enCopy(*en);
 	root.DeleteEntry(subdirid);
-	TEST_THAT(write_dir(root));
+	fs.PutDirectory(root);
 
-	// Add a directory, this should try to push the object size back up,
-	// which will try to modify the subdir's entry in its parent, which
-	// no longer exists, which should just log an error instead of
-	// aborting/segfaulting.
-	create_directory(protocol, subdirid);
+	// Add a directory, this should try to push the object size back up, which will try to
+	// modify the subdir's entry in its parent, which no longer exists, which should return
+	// an error, but only when the cache is flushed (which could be much later):
+	TEST_CHECK_THROWS(
+		create_directory(protocol, subdirid),
+		ConnectionException,
+		Protocol_UnexpectedReply);
+	TEST_PROTOCOL_ERROR_OR(protocol, Err_DoesNotExistInDirectory,);
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
-	enCopy.SetSizeInBlocks(get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	root.AddEntry(enCopy);
-	TEST_THAT(write_dir(root));
-
-	// We also have to remove the entry for lovely_directory created by
-	// create_directory(), because otherwise we can't create it again.
-	// (Perhaps it should not have been committed because we failed to
-	// update the parent, but currently it is.)
-	BackupStoreDirectory subdir(*get_raid_file(subdirid),
-		IOStream::TimeOutInfinite);
-	{
-		BackupStoreDirectory::Iterator i(subdir);
-		en = i.FindMatchingClearName(
-			BackupStoreFilenameClear("lovely_directory"));
-	}
-	TEST_THAT_OR(en, return false);
+	fs.PutDirectory(root);
 	protocol.Reopen();
-	protocol.QueryDeleteDirectory(en->GetObjectID());
-	set_refcount(en->GetObjectID(), 0);
 
 	// This should have fixed the error, so we should be able to add the
 	// entry now. This should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
-	TEST_EQUAL(new_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(new_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	TEST_EQUAL(new_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -2174,22 +2380,25 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocolReadOnly.QueryFinished();
-	TEST_THAT(change_account_limits("0B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocolReadOnly.Reopen();
 
 	// Check that the entry in the root directory was updated
-	TEST_EQUAL(old_size, get_raid_file(subdirid)->GetDiscUsageInBlocks());
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
+		control));
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	// Check that bbstoreaccounts check fix will detect and repair when
 	// a directory's parent entry has the wrong size for the directory.
-
 	protocol.QueryFinished();
 
-	root.ReadFromStream(*get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID),
+	root.ReadFromStream(
+		*get_object_stream(true, // IsDirectory
+			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
+			specialisation_name, fs),
 		IOStream::TimeOutInfinite);
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
@@ -2198,7 +2407,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	// Sleep to ensure that the directory file timestamp changes, so that
 	// the read-only connection will discard its cached copy.
 	safe_sleep(1);
-	TEST_THAT(write_dir(root));
+	fs.PutDirectory(root);
 
 	TEST_EQUAL(1234, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2208,21 +2417,22 @@ bool test_directory_parent_entry_tracks_directory_size()
 	safe_sleep(1);
 
 	protocolReadOnly.QueryFinished();
-	TEST_EQUAL(1, check_account_for_errors());
+	TEST_EQUAL(1, check_account_for_errors(fs));
 
 	protocolReadOnly.Reopen();
 	TEST_EQUAL(old_size, get_object_size(protocolReadOnly, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 	protocolReadOnly.QueryFinished();
+#endif // BOX_RELEASE_BUILD
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_cannot_open_multiple_writable_connections()
 {
 	SETUP_TEST_BACKUPSTORE();
 
-	// First try a local protocol. This works even on Windows.
+	// First try a local protocol (makes debugging easier):
 	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
 		"backup/01234567/", 0, false); // Not read-only
 
@@ -2262,7 +2472,7 @@ bool test_cannot_open_multiple_writable_connections()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_encoding()
+bool test_file_encoding()
 {
 	// Now test encoded files
 	// TODO: This test needs to check failure situations as well as everything working,
@@ -2365,17 +2575,17 @@ bool test_encoding()
 			size_t file_size = enc.GetPosition();
 			TEST_EQUAL(file_size, contents.GetSize());
 
-			for(int buffer_size = 1; ; buffer_size <<= 1)
+			for(size_t buffer_size = 1; ; buffer_size <<= 1)
 			{
 				enc.Seek(0, IOStream::SeekType_Absolute);
+				BackupStoreFile::VerifyStream verifier(enc);
 				CollectInBufferStream temp_copy;
-				BackupStoreFile::VerifyStream verifier(&temp_copy);
-				enc.CopyStreamTo(verifier, IOStream::TimeOutInfinite,
-					buffer_size);
+				verifier.CopyStreamTo(temp_copy,
+					IOStream::TimeOutInfinite, buffer_size);
 
 				// The block index is only validated on Close(), which
 				// CopyStreamTo() doesn't do.
-				verifier.Close();
+				verifier.Close(false); // !CloseReadFromStream
 
 				temp_copy.SetForReading();
 				TEST_EQUAL(file_size, temp_copy.GetSize());
@@ -2485,13 +2695,17 @@ bool test_symlinks()
 bool test_store_info()
 {
 	SETUP_TEST_BACKUPSTORE();
+	RaidBackupFileSystem fs(76, "test-info/", 0);
 
 	{
 		RaidFileWrite::CreateDirectory(0, "test-info");
-		BackupStoreInfo::CreateNew(76, "test-info/", 0, 3461231233455433LL, 2934852487LL);
-		TEST_CHECK_THROWS(BackupStoreInfo::CreateNew(76, "test-info/", 0, 0, 0), RaidFileException, CannotOverwriteExistingFile);
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
-		TEST_CHECK_THROWS(info->Save(), BackupStoreException, StoreInfoIsReadOnly);
+		BackupStoreInfo info(76, 3461231233455433LL, 2934852487LL);
+		fs.PutBackupStoreInfo(info);
+	}
+
+	{
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
+		TEST_CHECK_THROWS(fs.PutBackupStoreInfo(*info), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksUsed(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(1), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(1), BackupStoreException, StoreInfoIsReadOnly);
@@ -2499,28 +2713,33 @@ bool test_store_info()
 		TEST_CHECK_THROWS(info->AddDeletedDirectory(2), BackupStoreException, StoreInfoIsReadOnly);
 		TEST_CHECK_THROWS(info->SetAccountName("hello"), BackupStoreException, StoreInfoIsReadOnly);
 	}
+
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, false));
-		info->ChangeBlocksUsed(8);
-		info->ChangeBlocksInOldFiles(9);
-		info->ChangeBlocksInDeletedFiles(10);
-		info->ChangeBlocksUsed(-1);
-		info->ChangeBlocksInOldFiles(-4);
-		info->ChangeBlocksInDeletedFiles(-9);
-		TEST_CHECK_THROWS(info->ChangeBlocksUsed(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		TEST_CHECK_THROWS(info->ChangeBlocksInOldFiles(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		TEST_CHECK_THROWS(info->ChangeBlocksInDeletedFiles(-100), BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
-		info->AddDeletedDirectory(2);
-		info->AddDeletedDirectory(3);
-		info->AddDeletedDirectory(4);
-		info->RemovedDeletedDirectory(3);
-		info->SetAccountName("whee");
-		TEST_CHECK_THROWS(info->RemovedDeletedDirectory(9), BackupStoreException, StoreInfoDirNotInList);
-		info->Save();
+		BackupStoreInfo& info(fs.GetBackupStoreInfo(false)); // !ReadOnly
+		info.ChangeBlocksUsed(8);
+		info.ChangeBlocksInOldFiles(9);
+		info.ChangeBlocksInDeletedFiles(10);
+		info.ChangeBlocksUsed(-1);
+		info.ChangeBlocksInOldFiles(-4);
+		info.ChangeBlocksInDeletedFiles(-9);
+		TEST_CHECK_THROWS(info.ChangeBlocksUsed(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		TEST_CHECK_THROWS(info.ChangeBlocksInOldFiles(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		TEST_CHECK_THROWS(info.ChangeBlocksInDeletedFiles(-100),
+			BackupStoreException, StoreInfoBlockDeltaMakesValueNegative);
+		info.AddDeletedDirectory(2);
+		info.AddDeletedDirectory(3);
+		info.AddDeletedDirectory(4);
+		info.RemovedDeletedDirectory(3);
+		info.SetAccountName("whee");
+		TEST_CHECK_THROWS(info.RemovedDeletedDirectory(9),
+			BackupStoreException, StoreInfoDirNotInList);
+		fs.PutBackupStoreInfo(info);
 	}
 
 	{
-		std::auto_ptr<BackupStoreInfo> info(BackupStoreInfo::Load(76, "test-info/", 0, true));
+		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
 		TEST_THAT(info->GetBlocksUsed() == 7);
 		TEST_THAT(info->GetBlocksInOldFiles() == 5);
 		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
@@ -2576,6 +2795,33 @@ bool test_bbstoreaccounts_create()
 		"10000B 20000B") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
+	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL(0x01234567, info->GetAccountID());
+	TEST_EQUAL(1, info->GetLastObjectIDUsed());
+	TEST_EQUAL(2, info->GetBlocksUsed());
+	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
+	TEST_EQUAL(0, info->GetBlocksInOldFiles());
+	TEST_EQUAL(0, info->GetBlocksInDeletedFiles());
+	TEST_EQUAL(2, info->GetBlocksInDirectories());
+	TEST_EQUAL(0, info->GetDeletedDirectories().size());
+	TEST_EQUAL(10000, info->GetBlocksSoftLimit());
+	TEST_EQUAL(20000, info->GetBlocksHardLimit());
+	TEST_EQUAL(0, info->GetNumCurrentFiles());
+	TEST_EQUAL(0, info->GetNumOldFiles());
+	TEST_EQUAL(0, info->GetNumDeletedFiles());
+	TEST_EQUAL(1, info->GetNumDirectories());
+	TEST_EQUAL(true, info->IsAccountEnabled());
+	TEST_EQUAL(true, info->IsReadOnly());
+	TEST_EQUAL(0, info->GetClientStoreMarker());
+	TEST_EQUAL("", info->GetAccountName());
+
+	std::auto_ptr<RaidFileRead> root_stream =
+		get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
+	BackupStoreDirectory root_dir(*root_stream);
+	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
+
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
@@ -2606,12 +2852,12 @@ bool test_login_with_disabled_account()
 	// make sure something is written to it
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
 		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
+			apAccounts->GetEntry(0x1234567), true);
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
 		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID))
+	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
 	apReferences.reset();
 
 	// Test that login fails on a disabled account
@@ -2651,7 +2897,7 @@ bool test_login_with_no_refcount_db()
 	// Delete the refcount database and try to log in again. Check that
 	// we're locked out of the account until housekeeping has recreated
 	// the refcount db.
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
 		"test", "backup/01234567/", 0, false), // Not read-only
 		BackupStoreException, CorruptReferenceCountDatabase);
@@ -2676,7 +2922,7 @@ bool test_login_with_no_refcount_db()
 	// because housekeeping may fix the refcount database while we're
 	// stepping through.
 	TEST_THAT_THROWONFAIL(StartServer());
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(connect_and_login(context),
 		ConnectionException, Protocol_UnexpectedReply);
 
@@ -2751,16 +2997,26 @@ bool test_housekeeping_deletes_files()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_account_limits_respected()
+bool test_account_limits_respected(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
 	// Set a really small hard limit
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf setlimit 01234567 "
-		"2B 2B") == 0, FAIL);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	if(specialisation_name == "s3")
+	{
+		control.SetLimit("1B", "1B");
+	}
+	else
+	{
+		control.SetLimit("2B", "2B");
+	}
 
 	// Try to upload a file and create a directory, both of which would exceed the
 	// current account limits, and check that each command returns an error.
@@ -2768,8 +3024,8 @@ bool test_account_limits_respected()
 		write_test_file(3);
 
 		// Open a connection to the server
-		std::auto_ptr<BackupProtocolCallable> apProtocol(
-			connect_and_login(context));
+		std::auto_ptr<BackupProtocolLocal2> apProtocol(
+			new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
 		BackupStoreFilenameClear fnx("exceed-limit");
 		int64_t modtime = 0;
 		std::auto_ptr<IOStream> upload(BackupStoreFile::EncodeFile("testfiles/test3", BACKUPSTORE_ROOT_DIRECTORY_ID, fnx, &modtime));
@@ -2799,7 +3055,7 @@ bool test_account_limits_respected()
 		apProtocol->QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 int multi_server()
@@ -2873,7 +3129,7 @@ bool test_open_files_with_limited_win32_permissions()
 	return true;
 }
 
-void compare_backupstoreinfo_values_to_expected
+bool compare_backupstoreinfo_values_to_expected
 (
 	const std::string& test_phase,
 	const info_StreamFormat_1& expected,
@@ -2883,6 +3139,8 @@ void compare_backupstoreinfo_values_to_expected
 	const MemBlockStream& extra_data = MemBlockStream(/* empty */)
 )
 {
+	int num_failures_initial = num_failures;
+
 	TEST_EQUAL_LINE(ntohl(expected.mAccountID), actual.GetAccountID(),
 		test_phase << " AccountID");
 	#define TEST_INFO_EQUAL(property) \
@@ -2935,16 +3193,19 @@ void compare_backupstoreinfo_values_to_expected
 	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
 		actual.GetExtraData().GetBuffer(), extra_data.GetSize()),
 		test_phase << " extra data has wrong contents");
+
+	return (num_failures == num_failures_initial);
 }
 
 bool test_read_old_backupstoreinfo_files()
 {
 	SETUP_TEST_BACKUPSTORE();
 
+	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+
 	// Create an account for the test client
-	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(0x1234567,
-		"backup/01234567/", 0, /* ReadOnly */ false);
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+	std::auto_ptr<BackupStoreInfo> apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL_LINE(true, apInfoReadOnly->IsAccountEnabled(),
 		"'bbstoreaccounts create' should have set AccountEnabled flag");
 
 	info_StreamFormat_1 info_v1;
@@ -2975,16 +3236,22 @@ bool test_read_old_backupstoreinfo_files()
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
 
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
-	compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
-		*apInfo, "" /* no name by default */,
-		true /* enabled by default */);
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
+			*apInfoReadOnly, "" /* no name by default */,
+			true /* enabled by default */));
 
-	apInfo->SetAccountName("bonk");
+	BackupStoreInfo* pInfoReadWrite =
+		&(fs.GetBackupStoreInfo(false, true)); // !ReadOnly, Refresh
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("loaded from v1", info_v1,
+			*pInfoReadWrite, "" /* no name by default */,
+			true /* enabled by default */));
 
-	// Save the info again
-	apInfo->Save(/* allowOverwrite */ true);
+	// Save the info again, with a new account name
+	pInfoReadWrite->SetAccountName("bonk");
+	fs.PutBackupStoreInfo(*pInfoReadWrite);
 
 	// Check that it was saved in the new Archive format
 	std::auto_ptr<RaidFileRead> rfr(RaidFileRead::Open(0, info_filename, 0));
@@ -3000,25 +3267,29 @@ bool test_read_old_backupstoreinfo_files()
 	rfr.reset();
 
 	// load it, and check that all values are loaded properly
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
-	compare_backupstoreinfo_values_to_expected("loaded in v1, resaved in v2",
-		info_v1, *apInfo, "bonk", true);
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected(
+			"loaded in v1, resaved in v2",
+			info_v1, *apInfoReadOnly, "bonk", true));
 
 	// Check that the new AccountEnabled flag is saved properly
-	apInfo->SetAccountEnabled(false);
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
-	compare_backupstoreinfo_values_to_expected("saved in v2, loaded in v2",
-		info_v1, *apInfo, "bonk", false /* as modified above */);
-	apInfo->SetAccountEnabled(true);
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ true);
-	compare_backupstoreinfo_values_to_expected("resaved in v2 with "
-		"account enabled", info_v1, *apInfo, "bonk",
-		true /* as modified above */);
+	pInfoReadWrite->SetAccountEnabled(false);
+	fs.PutBackupStoreInfo(*pInfoReadWrite);
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved in v2, loaded in v2",
+			info_v1, *apInfoReadOnly, "bonk", false /* as modified above */));
+
+	pInfoReadWrite->SetAccountEnabled(true);
+	fs.PutBackupStoreInfo(*pInfoReadWrite);
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("resaved in v2 with "
+			"account enabled", info_v1, *apInfoReadOnly, "bonk",
+			true /* as modified above */));
 
 	// Now save the info in v2 format without the AccountEnabled flag
 	// (boxbackup 0.11 format) and check that the flag is set to true
@@ -3029,36 +3300,41 @@ bool test_read_old_backupstoreinfo_files()
 	magic = htonl(INFO_MAGIC_VALUE_2);
 	apArchive.reset(new Archive(*rfw, IOStream::TimeOutInfinite));
 	rfw->Write(&magic, sizeof(magic));
-	apArchive->Write(apInfo->GetAccountID());
+	apArchive->Write(apInfoReadOnly->GetAccountID());
 	apArchive->Write(std::string("test"));
-	apArchive->Write(apInfo->GetClientStoreMarker());
-	apArchive->Write(apInfo->GetLastObjectIDUsed());
-	apArchive->Write(apInfo->GetBlocksUsed());
-	apArchive->Write(apInfo->GetBlocksInCurrentFiles());
-	apArchive->Write(apInfo->GetBlocksInOldFiles());
-	apArchive->Write(apInfo->GetBlocksInDeletedFiles());
-	apArchive->Write(apInfo->GetBlocksInDirectories());
-	apArchive->Write(apInfo->GetBlocksSoftLimit());
-	apArchive->Write(apInfo->GetBlocksHardLimit());
-	apArchive->Write(apInfo->GetNumCurrentFiles());
-	apArchive->Write(apInfo->GetNumOldFiles());
-	apArchive->Write(apInfo->GetNumDeletedFiles());
-	apArchive->Write(apInfo->GetNumDirectories());
-	apArchive->Write((int64_t) apInfo->GetDeletedDirectories().size());
-	apArchive->Write(apInfo->GetDeletedDirectories()[0]);
-	apArchive->Write(apInfo->GetDeletedDirectories()[1]);
+	apArchive->Write(apInfoReadOnly->GetClientStoreMarker());
+	apArchive->Write(apInfoReadOnly->GetLastObjectIDUsed());
+	apArchive->Write(apInfoReadOnly->GetBlocksUsed());
+	apArchive->Write(apInfoReadOnly->GetBlocksInCurrentFiles());
+	apArchive->Write(apInfoReadOnly->GetBlocksInOldFiles());
+	apArchive->Write(apInfoReadOnly->GetBlocksInDeletedFiles());
+	apArchive->Write(apInfoReadOnly->GetBlocksInDirectories());
+	apArchive->Write(apInfoReadOnly->GetBlocksSoftLimit());
+	apArchive->Write(apInfoReadOnly->GetBlocksHardLimit());
+	apArchive->Write(apInfoReadOnly->GetNumCurrentFiles());
+	apArchive->Write(apInfoReadOnly->GetNumOldFiles());
+	apArchive->Write(apInfoReadOnly->GetNumDeletedFiles());
+	apArchive->Write(apInfoReadOnly->GetNumDirectories());
+	apArchive->Write((int64_t) apInfoReadOnly->GetDeletedDirectories().size());
+	apArchive->Write(apInfoReadOnly->GetDeletedDirectories()[0]);
+	apArchive->Write(apInfoReadOnly->GetDeletedDirectories()[1]);
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
 
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
-	compare_backupstoreinfo_values_to_expected("saved in v2 without "
-		"AccountEnabled", info_v1, *apInfo, "test", true);
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved in v2 without "
+			"AccountEnabled", info_v1, *apInfoReadOnly, "test", true));
 	// Default for missing AccountEnabled should be true
+
+	pInfoReadWrite = &(fs.GetBackupStoreInfo(false, true)); // !ReadOnly, Refresh
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved in v2 without "
+			"AccountEnabled", info_v1, *pInfoReadWrite, "test", true));
 
 	// Rewrite using full length, so that the first 4 bytes of extra data
 	// doesn't get swallowed by "extra data".
-	apInfo->Save(/* allowOverwrite */ true);
+	fs.PutBackupStoreInfo(*pInfoReadWrite);
 
 	// Append some extra data after the known account values, to simulate a
 	// new addition to the store format. Check that this extra data is loaded
@@ -3077,48 +3353,58 @@ bool test_read_old_backupstoreinfo_files()
 	extra_data.CopyStreamTo(*rfw);
 	rfw->Commit(/* ConvertToRaidNow */ true);
 	rfw.reset();
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0,
-		/* ReadOnly */ false);
-	TEST_EQUAL_LINE(extra_data.GetSize(), apInfo->GetExtraData().GetSize(),
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL_LINE(extra_data.GetSize(), apInfoReadOnly->GetExtraData().GetSize(),
 		"wrong amount of extra data loaded from info file");
 	TEST_EQUAL_LINE(0, memcmp(extra_data.GetBuffer(),
-		apInfo->GetExtraData().GetBuffer(), extra_data.GetSize()),
+		apInfoReadOnly->GetExtraData().GetBuffer(), extra_data.GetSize()),
 		"extra data loaded from info file has wrong contents");
+
 	// Save the file and load again, check that the extra data is still there
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
-	compare_backupstoreinfo_values_to_expected("saved in future format "
-		"with extra_data", info_v1, *apInfo, "test", true, extra_data);
+	pInfoReadWrite = &(fs.GetBackupStoreInfo(false, true)); // !ReadOnly, Refresh
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved in future format "
+			"with extra_data", info_v1, *pInfoReadWrite, "test", true,
+			extra_data));
+	fs.PutBackupStoreInfo(*pInfoReadWrite);
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved in future format "
+			"with extra_data", info_v1, *apInfoReadOnly, "test", true,
+			extra_data));
 
 	// Check that the new bbstoreaccounts command sets the flag properly
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
-	TEST_EQUAL_LINE(false, apInfo->IsAccountEnabled(),
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL_LINE(false, apInfoReadOnly->IsAccountEnabled(),
 		"'bbstoreaccounts disabled no' should have reset AccountEnabled flag");
 	TEST_THAT_OR(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0, FAIL);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
-	TEST_EQUAL_LINE(true, apInfo->IsAccountEnabled(),
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_EQUAL_LINE(true, apInfoReadOnly->IsAccountEnabled(),
 		"'bbstoreaccounts disabled yes' should have set AccountEnabled flag");
 
 	// Check that BackupStoreInfo::CreateForRegeneration saves all the
 	// expected properties, including any extra data for forward
 	// compatibility
 	extra_data.Seek(0, IOStream::SeekType_Absolute);
-	apInfo = BackupStoreInfo::CreateForRegeneration(
-		apInfo->GetAccountID(), "spurtle" /* rAccountName */,
-		"backup/01234567/" /* rRootDir */, 0 /* DiscSet */,
-		apInfo->GetLastObjectIDUsed(),
-		apInfo->GetBlocksUsed(),
-		apInfo->GetBlocksInCurrentFiles(),
-		apInfo->GetBlocksInOldFiles(),
-		apInfo->GetBlocksInDeletedFiles(),
-		apInfo->GetBlocksInDirectories(),
-		apInfo->GetBlocksSoftLimit(),
-		apInfo->GetBlocksHardLimit(),
+	apInfoReadOnly = BackupStoreInfo::CreateForRegeneration(
+		apInfoReadOnly->GetAccountID(), "spurtle" /* rAccountName */,
+		apInfoReadOnly->GetLastObjectIDUsed(),
+		apInfoReadOnly->GetBlocksUsed(),
+		apInfoReadOnly->GetBlocksInCurrentFiles(),
+		apInfoReadOnly->GetBlocksInOldFiles(),
+		apInfoReadOnly->GetBlocksInDeletedFiles(),
+		apInfoReadOnly->GetBlocksInDirectories(),
+		apInfoReadOnly->GetBlocksSoftLimit(),
+		apInfoReadOnly->GetBlocksHardLimit(),
 		false /* AccountEnabled */,
 		extra_data);
 	// CreateForRegeneration always sets the ClientStoreMarker to 0
@@ -3127,18 +3413,23 @@ bool test_read_old_backupstoreinfo_files()
 	info_v1.mNumberDeletedDirectories = 0;
 
 	// check that the store info has the correct values in memory
-	compare_backupstoreinfo_values_to_expected("stored by "
-		"BackupStoreInfo::CreateForRegeneration", info_v1, *apInfo,
-		"spurtle", false /* AccountEnabled */, extra_data);
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("stored by "
+			"BackupStoreInfo::CreateForRegeneration", info_v1,
+			*apInfoReadOnly, "spurtle", false /* AccountEnabled */,
+			extra_data));
 	// Save the file and load again, check that the extra data is still there
-	apInfo->Save(/* allowOverwrite */ true);
-	apInfo = BackupStoreInfo::Load(0x1234567, "backup/01234567/", 0, true);
-	compare_backupstoreinfo_values_to_expected("saved by "
-		"BackupStoreInfo::CreateForRegeneration and reloaded", info_v1,
-		*apInfo, "spurtle", false /* AccountEnabled */, extra_data);
+	fs.PutBackupStoreInfo(*apInfoReadOnly);
+
+	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
+	TEST_THAT(
+		compare_backupstoreinfo_values_to_expected("saved by "
+			"BackupStoreInfo::CreateForRegeneration and reloaded", info_v1,
+			*apInfoReadOnly, "spurtle", false /* AccountEnabled */,
+			extra_data));
 
 	// Delete the account to stop teardown_test_backupstore checking it for errors.
-	apInfo.reset();
+	apInfoReadOnly.reset();
 	TEST_THAT(delete_account());
 
 	TEARDOWN_TEST_BACKUPSTORE();
@@ -3232,6 +3523,142 @@ bool test_read_write_attr_streamformat()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
+bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3control)
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	// Test that S3BackupFileSystem returns a RevisionID based on the ETag (MD5
+	// checksum) of the file.
+	// rand() is platform-specific, so we can't rely on it to generate files with a
+	// particular ETag, so we write the file ourselves instead.
+	{
+		FileStream fs("testfiles/store/subdir/0.file", O_CREAT | O_WRONLY | O_BINARY);
+		for(int i = 0; i < 455; i++)
+		{
+			char c = (char)i;
+			fs.Write(&c, 1);
+		}
+	}
+
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	S3Client client(s3config);
+	HTTPResponse response = client.HeadObject("/subdir/0.file");
+	client.CheckResponse(response, "Failed to get file /subdir/0.file");
+
+	std::string etag = response.GetHeaderValue("etag");
+	TEST_EQUAL("\"447baac70b0149224b4f48daedf5266f\"", etag);
+
+	S3BackupFileSystem fs(config, "/subdir/", DEFAULT_S3_CACHE_DIR, client);
+	int64_t revision_id = 0, expected_id = 0x447baac70b014922;
+	TEST_THAT(fs.ObjectExists(0, &revision_id));
+	TEST_EQUAL(expected_id, revision_id);
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
+
+// Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
+bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
+{
+	SETUP_TEST_BACKUPSTORE();
+
+	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	S3Client s3client(s3config);
+	SimpleDBClient client(s3config);
+
+	// There should be no locks at the beginning. In fact the domain should not even
+	// exist: the client should create it itself.
+	std::vector<std::string> expected_domains;
+	TEST_THAT(test_equal_lists(expected_domains, client.ListDomains()));
+
+	SimpleDBClient::str_map_t expected;
+
+	// Create a client in a scope, so it will be destroyed when the scope ends.
+	{
+		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+
+		// Check that it hasn't acquired a lock yet.
+		TEST_CHECK_THROWS(
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/"),
+			HTTPException, SimpleDBItemNotFound);
+
+		box_time_t before = GetCurrentBoxTime();
+		// If this fails, it will throw an exception:
+		fs.GetLock();
+		box_time_t after = GetCurrentBoxTime();
+
+		// Check that it has now acquired a lock.
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		expected["locked"] = "true";
+
+		std::ostringstream locker_buf;
+		locker_buf << fs.GetCurrentUserName() << "@" << fs.GetCurrentHostName() <<
+			"(" << getpid() << ")";
+		TEST_EQUAL(locker_buf.str(), fs.GetSimpleDBLockValue());
+		expected["locker"] = locker_buf.str();
+
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		expected["pid"] = pid_buf.str();
+
+		char hostname_buf[1024];
+		TEST_EQUAL(0, gethostname(hostname_buf, sizeof(hostname_buf)));
+		TEST_EQUAL(hostname_buf, fs.GetCurrentHostName());
+		expected["hostname"] = hostname_buf;
+
+		TEST_THAT(fs.GetSinceTime() >= before);
+		TEST_THAT(fs.GetSinceTime() <= after);
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		TEST_THAT(test_equal_maps(expected, attributes));
+
+		// Try to acquire another one, check that it fails.
+		S3BackupFileSystem fs2(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		TEST_CHECK_THROWS(
+			fs2.GetLock(),
+			BackupStoreException, CouldNotLockStoreAccount);
+
+		// And that the lock was not disturbed
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// Check that when the S3BackupFileSystem went out of scope, it released the lock
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And that we can acquire it again:
+	{
+		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		fs.GetLock();
+
+		expected["locked"] = "true";
+		std::ostringstream since_buf;
+		since_buf << fs.GetSinceTime();
+		expected["since"] = since_buf.str();
+
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	// And release it again:
+	expected["locked"] = "";
+	{
+		SimpleDBClient::str_map_t attributes =
+			client.GetAttributes("boxbackup_locks", "localhost/subdir/");
+		TEST_THAT(test_equal_maps(expected, attributes));
+	}
+
+	TEARDOWN_TEST_BACKUPSTORE();
+}
+
+
 int test(int argc, const char *argv[])
 {
 	TEST_THAT(test_open_files_with_limited_win32_permissions());
@@ -3274,31 +3701,75 @@ int test(int argc, const char *argv[])
 		for(int l = 0; l < ATTR3_SIZE; ++l) {attr3[l] = r.next();}
 	}
 
-	TEST_THAT(test_filename_encoding());
-	TEST_THAT(test_temporary_refcount_db_is_independent());
-	TEST_THAT(test_bbstoreaccounts_create());
-	TEST_THAT(test_bbstoreaccounts_delete());
-	TEST_THAT(test_backupstore_directory());
-	TEST_THAT(test_directory_parent_entry_tracks_directory_size());
-	TEST_THAT(test_cannot_open_multiple_writable_connections());
-	TEST_THAT(test_encoding());
-	TEST_THAT(test_symlinks());
-	TEST_THAT(test_store_info());
-
 	context.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
 
+	std::auto_ptr<Configuration> s3config = load_config_file(
+		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
+	// Use an auto_ptr so we can release it, and thus the lock, before stopping the
+	// daemon on which locking relies:
+	std::auto_ptr<S3BackupAccountControl> ap_s3control(
+		new S3BackupAccountControl(*s3config));
+
+	std::auto_ptr<Configuration> storeconfig = load_config_file(
+		DEFAULT_BBSTORED_CONFIG_FILE, BackupConfigFileVerify);
+	BackupStoreAccountControl storecontrol(*storeconfig, 0x01234567);
+
+	TEST_THAT(kill_running_daemons());
+	TEST_THAT(StartSimulator());
+	TEST_THAT(test_s3backupfilesystem(*s3config, *ap_s3control));
+	TEST_THAT(test_simpledb_locking(*s3config, *ap_s3control));
+
+	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
+	test_specialisation specialisations;
+	specialisations["s3"] = ap_s3control.get();
+	specialisations["store"] = &storecontrol;
+
+#define RUN_SPECIALISED_TEST(name, pControl, function) \
+	TEST_THAT(function(name, *(pControl)));
+
+	TEST_THAT(test_filename_encoding());
+	TEST_THAT(test_temporary_refcount_db_is_independent());
+	TEST_THAT(test_bbstoreaccounts_create());
+	TEST_THAT(test_bbstoreaccounts_delete());
+	TEST_THAT(test_backupstore_directory());
+
+	// Run all tests that take a BackupAccountControl argument twice, once with an
+	// S3BackupAccountControl and once with a BackupStoreAccountControl.
+
+	for(test_specialisation::iterator i = specialisations.begin();
+		i != specialisations.end(); i++)
+	{
+		RUN_SPECIALISED_TEST(i->first, i->second,
+			test_directory_parent_entry_tracks_directory_size);
+	}
+
+	TEST_THAT(test_cannot_open_multiple_writable_connections());
+	TEST_THAT(test_file_encoding());
+	TEST_THAT(test_symlinks());
+	TEST_THAT(test_store_info());
+
 	TEST_THAT(test_login_without_account());
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 	TEST_THAT(test_server_housekeeping());
-	TEST_THAT(test_server_commands());
-	TEST_THAT(test_account_limits_respected());
-	TEST_THAT(test_multiple_uploads());
+	TEST_THAT(test_multiple_uploads("store", *specialisations["store"]));
+
+	for(test_specialisation::iterator i = specialisations.begin();
+		i != specialisations.end(); i++)
+	{
+		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
+	}
+
 	TEST_THAT(test_housekeeping_deletes_files());
 	TEST_THAT(test_read_write_attr_streamformat());
+
+	// Release lock before shutting down the simulator:
+	ap_s3control.reset();
+	TEST_THAT(StopSimulator());
 
 	return finish_test_suite();
 }

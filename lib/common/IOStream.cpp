@@ -143,8 +143,15 @@ bool IOStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int T
 		int bytesRead = Read(buffer, bytesToGo, Timeout);
 		if(bytesRead == 0)
 		{
-			// Timeout or something
-			return false;
+			if(errno == EINTR)
+			{
+				THROW_EXCEPTION(CommonException, SignalReceived);
+			}
+			else
+			{
+				// Timeout or something
+				return false;
+			}
 		}
 		// Increment things
 		bytesToGo -= bytesRead;
@@ -188,23 +195,25 @@ IOStream::pos_type IOStream::BytesLeftToRead()
 //
 // Function
 //		Name:    IOStream::CopyStreamTo(IOStream &, int Timeout)
-//		Purpose: Copies the entire stream to another stream (reading from this,
-//				 writing to rCopyTo). Returns whether the copy completed (ie
-//				 StreamDataLeft() returns false)
+//		Purpose: Copies the entire stream to another stream (reading
+//			 from this, writing to rCopyTo). Returns the number
+//			 of bytes copied. Throws an exception if a network
+//			 timeout occurs.
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
+IOStream::pos_type IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 {
 	// Make sure there's something to do before allocating that buffer
 	if(!StreamDataLeft())
 	{
-		return true;	// complete, even though nothing happened
+		return 0;
 	}
 
 	// Buffer
 	MemoryBlockGuard<char*> buffer(BufferSize);
-	
+	IOStream::pos_type bytes_copied = 0;
+
 	// Get copying!
 	while(StreamDataLeft())
 	{
@@ -212,17 +221,20 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 		int bytes = Read(buffer, BufferSize, Timeout);
 		if(bytes == 0 && StreamDataLeft())
 		{
-			return false;	// incomplete, timed out
+			THROW_EXCEPTION_MESSAGE(CommonException, IOStreamTimedOut,
+				"Timed out copying stream");
 		}
 		
 		// Write some data
 		if(bytes != 0)
 		{
-			rCopyTo.Write(buffer, bytes);
+			rCopyTo.Write(buffer, bytes, Timeout);
 		}
+
+		bytes_copied += bytes;
 	}
-	
-	return true;	// completed
+
+	return bytes_copied;	// completed
 }
 
 // --------------------------------------------------------------------------

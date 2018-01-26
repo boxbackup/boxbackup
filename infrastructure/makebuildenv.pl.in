@@ -1,4 +1,6 @@
 #!@PERL@
+
+use warnings;
 use strict;
 use Symbol;
 
@@ -41,19 +43,42 @@ my %env_flags;
 
 # print "Flag: $_\n" for(keys %env_flags);
 
+sub substitute_make_vars($$)
+{
+	my ($input, $vars) = @_;
+	$vars->{_PERL} = '@PERL@';
+
+	# substitute variables, repeatedly
+	while(1)
+	{
+		my $did_subst = 0;
+
+		for my $k (keys %$vars)
+		{
+			$did_subst = 1 if $input =~ s/\$\($k\)/$vars->{$k}/g;
+		}
+
+		last unless $did_subst;
+	}
+
+	return $input;
+}
+
 # seed autogen code
 print "Seeding autogen code...\n";
 open FINDAUTOGEN,"find . -follow -name Makefile.extra |" or die "Can't use find for locating files";
 while(<FINDAUTOGEN>)
 {
 	chomp;
+
 	my $file = $_;
 	$file =~ m~\A(.+)/[^/]+\Z~;
 	my $dir = $1;
 	open FL,$file or die "Can't open $_ for reading";
+
 	my %vars;
-	$vars{_PERL} = "@PERL@";
 	my $do_cmds = 0;
+
 	while(<FL>)
 	{
 		chomp;
@@ -78,22 +103,11 @@ while(<FINDAUTOGEN>)
 			if($do_cmds)
 			{
 				$do_cmds = 2; # flag something has been done
-				
-				# subsitute variables, repeatedly
-				my $c = $_;
+
+				# substitute variables, repeatedly
+				my $c = substitute_make_vars($_, \%vars);
 				$c =~ s/\A\s+//;
-				while(1)
-				{
-					my $did_subst = 0;
-					
-					for my $k (keys %vars)
-					{
-						$did_subst = 1 if $c =~ s/\$\($k\)/$vars{$k}/g;
-					}
-					
-					last unless $did_subst;
-				}
-				
+
 				# run command
 				unless (0 == system("(cd $dir; $c)"))
 				{
@@ -111,11 +125,6 @@ print "done\n\n";
 
 # open test mail program template file
 my $test_template_file = 'infrastructure/buildenv-testmain-template.cpp';
-open FL,$test_template_file or die "Can't open test template file\n";
-my $test_template;
-read FL,$test_template,-s $test_template_file;
-close FL;
-
 
 # extra platform defines
 my $extra_platform_defines = '';
@@ -149,7 +158,7 @@ mkdir "debug",0755;
 
 # is the library code in another directory?
 my $external_lib = readlink('lib');
-if($external_lib ne '')
+if(defined $external_lib and $external_lib ne '')
 {
 	# adjust to root of the library distribution
 	$external_lib =~ s!/lib\Z!!;
@@ -196,7 +205,7 @@ for(@modules_files)
 	# clean up line
 	chomp; s/\A\s+//; s/#.*\Z//; s/\s+\Z//; s/\s+/ /g;
 	next unless m/\S/;
-	
+
 	# omit bits on some platforms?
 	if(m/\AEND-OMIT/)
 	{
@@ -215,21 +224,24 @@ for(@modules_files)
 		}
 		next;
 	}
-	
+
 	# split up...
 	my ($mod, @deps_i) = split / /;
-	
+
 	# ignore this module?
 	next if ignore_module($mod);
-	
+
 	# deps for this platform
 	my @deps;
 	for(@deps_i)
 	{
 		my ($dep,$exclude_from) = split /!/;
+		$exclude_from = '' if not defined $exclude_from;
+
 		# generic library translation
 		$dep = $env_flags{'LIBTRANS_'.$dep} if exists($env_flags{'LIBTRANS_'.$dep});
 		next if $dep eq '';
+
 		if($exclude_from =~ m/\A\+(.+)\Z/)
 		{
 			$exclude_from = $1;
@@ -250,10 +262,10 @@ for(@modules_files)
 			push @deps,$dep if $inc
 		}
 	}
-	
+
 	# check directory exists
 	die "Module $mod can't be found\n" unless -d $mod;
-	
+
 	# and put in lists
 	push @modules,$mod;
 	my @md;	# module dependencies
@@ -271,15 +283,18 @@ for(@modules_files)
 	}
 	$module_dependency{$mod} = [@implicit_deps,@md];
 	$module_library_link_opts{$mod} = [@lo];
-	
+
 	# make directories, but not if we're using an external library and this a library module
 	my ($s,$d) = split /\//,$mod;
-	if ($s ne 'lib' or $external_lib eq '')
+	if (defined $s and ($s ne 'lib' or not defined $external_lib))
 	{
 		mkdir "release/$s",0755;
-		mkdir "release/$s/$d",0755;
 		mkdir "debug/$s",0755;
-		mkdir "debug/$s/$d",0755;
+		if (defined $d)
+		{
+			mkdir "release/$s/$d",0755;
+			mkdir "debug/$s/$d",0755;
+		}
 	}
 }
 
@@ -320,7 +335,7 @@ for my $mod (@modules, @implicit_deps)
 	# add in items from autogen directories, and create output directories
 	{
 		my @autogen_items;
-		
+
 		for my $di (@items)
 		{
 			if($di =~ m/\Aautogen/ && -d "$mod/$di")
@@ -364,8 +379,6 @@ for my $mod (@modules, @implicit_deps)
 		while($f =~ m/\#include\s+"([^"]+?)"/g)
 		{
 			my $i = $1;
-			# ignore autogen exceptions
-			next if $i =~ m/\Aautogen_.+?Exception.h\Z/;
 			# record dependency
 			${$header_dependency{$h}}{$i} = 1 if exists $hfiles{$i};
 		}
@@ -380,6 +393,7 @@ $default_cxxflags =~ s/ -O2//g;
 my $debug_base_dir = 'debug';
 my $release_base_dir = 'release';
 my $debugger = '@with_debugger@';
+my $perl = '@PERL@';
 
 my $release_flags = "-O2";
 if ($target_windows)
@@ -415,7 +429,7 @@ WINDRES = @WINDRES@
 
 # Work around a mistake in QDBM (using <angled> includes for a file not in the
 # system path) by adding it to the include path with -I.
-DEFAULT_CFLAGS = $autoconf_cppflags $default_cflags $autoconf_cxxflags \\
+DEFAULT_CFLAGS = $autoconf_cppflags $default_cflags \\
 	$extra_platform_defines $platform_compile_line_extra \\
 	-DBOX_VERSION="\\"$product_version\\"" -Iqdbm
 DEFAULT_CXXFLAGS = $autoconf_cppflags $default_cxxflags $autoconf_cxxflags \\
@@ -488,7 +502,7 @@ my %library_targets;
 for my $mod (@implicit_deps, @modules)
 {
 	print $mod,"\n";
-	
+
 	my ($type,$name) = split /\//,$mod;
 	if (not $name)
 	{
@@ -529,16 +543,10 @@ for my $mod (@implicit_deps, @modules)
 	# add additional files for tests
 	if($type eq 'test')
 	{
-		my $testmain = $test_template;
-		$testmain =~ s/TEST_NAME/$name/g;
-		open TESTMAIN,">$mod/_main.cpp" or die "Can't open test main file for $mod for writing\n";
-		print TESTMAIN $testmain;
-		close TESTMAIN;
-		
 		# test file...
 		sub writetestfile
 		{
-			my ($filename,$runcmd,$module) = @_;		
+			my ($filename,$runcmd,$module) = @_;
 
 			open TESTFILE,">$filename" or die "Can't open " .
 				"test script file for $module for writing\n";
@@ -615,7 +623,7 @@ __E
 			print TESTFILE "exit \$exit_status\n";
 			close TESTFILE;
 		}
-		
+
 		writetestfile("$mod/t", "GLIBCXX_FORCE_NEW=1 ".
 			'./_test' . $platform_exe_ext . ' "$@"', $mod);
 
@@ -628,10 +636,10 @@ __E
 		{
 			writetestfile("$mod/t-gdb",
 				"echo 'No debugger was detected by configure script'\n".
-				"exit 2");
+				"exit 2", "#");
 		}
 	}
-	
+
 	my @all_deps_for_module;
 
 	{
@@ -662,7 +670,7 @@ __E
 				$d_done{$dep} = 1;
 			}
 		}
-	}	
+	}
 
 	# get the list of library things to add -- in order of dependency 
 	# so things link properly
@@ -708,13 +716,30 @@ __E
 #
 ${makefile_ifdef_prefix}ifdef RELEASE
 TARGET = $release_base_dir/$mod/$end_target_file
+TEST_DEST = ../../$release_base_dir/$mod
+TEST_MODE = RELEASE
 ${makefile_ifdef_prefix}else
 TARGET = $debug_base_dir/$mod/$end_target_file
+TEST_DEST = ../../$debug_base_dir/$mod
+TEST_MODE = DEBUG
 ${makefile_ifdef_prefix}endif
+
+TESTFILES_DEST = \$(TEST_DEST)/testfiles
 
 .PHONY: default
 default:
 	\$(MAKE) -C ../.. \$(TARGET)
+
+.PHONY: prepare
+prepare: default
+	../../runtest.pl -n ${name} \$(TEST_MODE)
+	test ! -r \$(TESTFILES_DEST) || chmod -R a+rwx \$(TESTFILES_DEST)
+	rm -rf \$(TESTFILES_DEST)
+	cp -p -R testfiles \$(TEST_DEST)
+
+.PHONY: test
+test: default
+	../../runtest.pl ${name} \$(TEST_MODE)
 
 .PHONY: clean
 clean:
@@ -727,9 +752,15 @@ __E
 	close MINI_MODULE_MAKEFILE;
 
 	opendir DIR, $mod;
-	my @items = readdir DIR;
+	my @files = readdir DIR;
 	closedir DIR;
-	
+	my @items = map {"$mod/$_"} @files;
+
+	if($type eq 'test')
+	{
+		push @items, $test_template_file;
+	}
+
 	# add in items from autogen directories, and create output directories
 	{
 		my @autogen_items;
@@ -747,7 +778,7 @@ __E
 					next if m/\A\./;
 					push @autogen_items,"$di/$_"
 				}
-				
+
 				# output directories
 				mkdir "release/$mod/$di",0755;
 				mkdir "debug/$mod/$di",0755;
@@ -755,14 +786,14 @@ __E
 		}
 		@items = (@items, @autogen_items);
 	}
-	
+
 	# first, obtain a list of dependencies within the .h files
 	my %headers;
 	for my $h (grep /\.h\Z/i, @items)
 	{
-		open FL,"$mod/$h";
+		open FL,"$h" or die "$h: $!";
 		my $f;
-		read FL,$f,-s "$mod/$h";
+		read FL,$f,-s "$h";
 		close FL;
 
 		while($f =~ m/\#include\s+"([^"]+?)"/g)
@@ -770,44 +801,106 @@ __E
 			${$headers{$h}}{$1} = 1 if exists $hfiles{$1};
 		}
 	}
-	
+
+	# need to see if the extra makefile fragments require extra object files
+	# or include any more makefiles
+	my @objs_extra;
+	my @makefile_includes;
+	my %autogen_targets_global;
+	my %autogen_targets_platform;
+
+	my %makefile_to_autogen = (
+		"$mod/Makefile.extra" => \%autogen_targets_global,
+		"$mod/Makefile.extra.$build_os" => \%autogen_targets_platform,
+	);
+
+	while (my ($makefile, $autogens) = each %makefile_to_autogen)
+	{
+		additional_objects_from_make_fragment($makefile, \@objs_extra,
+			\@makefile_includes, $autogens);
+	}
+
+	while (my ($makefile, $autogens) = each %makefile_to_autogen)
+	{
+		$makefile =~ s|^$mod/||g or die "$makefile should start with $mod";
+		while (my ($outputs, $inputs) = each %$autogens)
+		{
+			my @prefixed_inputs  = map {"$mod/$_"} (split /\s+/, $inputs);
+			my @prefixed_outputs = map {"$mod/$_"} (split /\s+/, $outputs);
+
+			# If any inputs contain .., it will break Make's dependency tracking, so
+			# convert paths to canonical form:
+			sub canonicalise($)
+			{
+				my ($current_value) = @_;
+				my $previous_value = '';
+				while($current_value ne $previous_value)
+				{
+					$previous_value = $current_value;
+					$current_value =~ s@([^/]+)/\.\./@@;
+				}
+				return $current_value;
+			}
+			@prefixed_inputs  = map {canonicalise($_)} (@prefixed_inputs);
+
+			# Delegate to the extra sub-makefile:
+			print MASTER_MAKEFILE "\n";
+			print MASTER_MAKEFILE "@prefixed_outputs: @prefixed_inputs\n";
+			# Since the command produces all $outputs, to avoid a spurious "target
+			# is up to date" message for the 2nd+ targets, we only make the first:
+			my $first_output = $outputs;
+			$first_output =~ s/\s+.*//;
+			print MASTER_MAKEFILE "\t\$(MAKE) _PERL='$perl' -C $mod -f $makefile $first_output\n";
+		}
+	}
+
+	print MASTER_MAKEFILE "\n";
+
 	# write the recipes for debug and release builds of each file
 	foreach my $var_prefix ('DEBUG', 'RELEASE')
 	{
 		my $make;
 
-		# then... do the cpp files...
-		my @obj_base;
+		# Then, do the cpp files. Ensure that @objs_extra (from Makefile.extra) are listed
+		# first in the output dependencies (@objs), since any changed to their own
+		# dependencies (e.g. a Protocol.txt file) must cause them to be rebuilt before we
+		# attempt to compile any other source files, otherwise those other files might not
+		# compile (due to newly defined Commands not existing in the autogen_Protocol.h
+		# file yet) which could cause us to fail to even try to build the later dependencies
+		# that would fix the problem.
+		my @objs = @objs_extra;
+
 		for my $file (@items)
 		{
-			my $is_c = $file =~ m/\A(.+)\.c\Z/i;
-			my $is_cpp = $file =~ m/\A(.+)\.cpp\Z/i;
-			my $is_rc  = $file =~ m/\A(.+)\.rc\Z/i;
-			my $base = $1;
+			my $is_c   = $file =~ m@(([^/]+)\.c)\Z@i;
+			my $is_cpp = $file =~ m@(([^/]+)\.cpp)\Z@i;
+			my $is_rc  = $file =~ m@(([^/]+)\.rc)\Z@i;
+			my $basename = $1;
+			my $base = $2;
 
 			# Don't try to compile .rc files except on Windows:
 			next if not $is_c and not $is_cpp and not ($is_rc and $target_windows);
 			next if $file =~ /\A\._/; # Temp Mac OS Resource hack
 
 			# store for later
-			push @obj_base, $base;
-		
+			push @objs, $base;
+
 			# get the file...
-			open FL, "$mod/$file";
+			open FL, $file or die "$file: $!";
 			my $f;
-			read FL, $f, -s "$mod/$file";
+			read FL, $f, -s $file;
 			close FL;
-			
+
 			my %dep;
 
 			while($f =~ m/\#include\s+"([^"]+?)"/g)
 			{
 				insert_dep($1, \%dep) if exists $hfiles{$1};
 			}
-			
+
 			# output filename
 			my $out_name = "\$(${var_prefix}_OUTBASE)/$mod/$base.o";
-			
+
 			# write the line for this cpp file
 			my @dep_paths = map 
 			{ 
@@ -817,19 +910,19 @@ __E
 			}
 			keys %dep;
 
-			$make .= "$out_name: $mod/$file @dep_paths\n";
+			$make .= "$out_name: $file @dep_paths\n";
 
 			if ($is_c)
 			{
 				$make .= "\t\$(_CC) \$(${var_prefix}_CFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $mod/$file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
-			if ($is_cpp)
+			elsif ($is_cpp)
 			{
 				$make .= "\t\$(_CXX) \$(${var_prefix}_CXXFLAGS) ".
 					"\$(${type}_${name}_includes) -DBOX_MODULE=\"\\\"$mod\\\"\" " .
-					"-c $mod/$file -o $out_name\n\n";
+					"-c $file -o $out_name\n\n";
 			}
 			elsif ($is_rc)
 			{
@@ -841,23 +934,15 @@ __E
 			}
 		}
 
-		# need to see if the extra makefile fragments require extra object files
-		# or include any more makefiles
-		my @objs = @obj_base;
-		my @makefile_includes;
-		
-		additional_objects_from_make_fragment("$mod/Makefile.extra", \@objs, \@makefile_includes);
-		additional_objects_from_make_fragment("$mod/Makefile.extra.$build_os", \@objs, \@makefile_includes);
-
 		my $prefixed_end_target = "\$(${var_prefix}_OUTBASE)/$mod/$end_target_file";
-		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} sort @objs);
+		my $o_file_list = join(' ',map {"\$(${var_prefix}_OUTBASE)/$mod/$_.o"} @objs);
 		my @prefixed_lib_files = map {"\$(${var_prefix}_OUTBASE)/$_"} @lib_files;
 		my @prefixed_dep_targets = map {"\$(${var_prefix}_OUTBASE)/$_"} @dep_targets;
 
 		print MASTER_MAKEFILE "$prefixed_end_target: $o_file_list";
 		print MASTER_MAKEFILE " @prefixed_dep_targets" unless $target_is_library;
 		print MASTER_MAKEFILE "\n";
-		
+
 		if ($target_windows)
 		{
 			foreach my $dep (@all_deps_for_module)
@@ -882,26 +967,26 @@ __E
 			# work out library options
 			# need to be... least used first, in absolute order they appear in the modules.txt file
 			my @libops;
-			
+
 			sub libops_fill
 			{
 				my ($module, $libops_ref) = @_;
-				
+
 				my $library_link_opts = $module_library_link_opts{$module};
 				if ($library_link_opts)
 				{
 					push @$libops_ref, @$library_link_opts;
 				}
-				
+
 				my $deps = $module_dependency{$module};
 				foreach my $dep (@$deps)
 				{
 					libops_fill($dep, $libops_ref);
 				}
 			}
-			
+
 			libops_fill($mod,\@libops);
-			
+
 			my $lo = '';
 			my %ldone;
 			for(@libops)
@@ -910,7 +995,7 @@ __E
 				$lo .= ' '.$_;
 				$ldone{$_} = 1;
 			}
-		
+
 			# link line...
 			print MASTER_MAKEFILE "\t\$(_LINK) \$(LDFLAGS) " .
 				"-o $prefixed_end_target $o_file_list " .
@@ -947,27 +1032,6 @@ realclean_${type}_${name}: clean_${type}_${name}
 __E
 	push @all_clean_targets, "clean_${type}_${name}";
 	push @all_realclean_targets, "realclean_${type}_${name}";
-
-	my $includes = "";
-	
-	if(-e "$mod/Makefile.extra")
-	{
-		$includes .= ".include <$mod/Makefile.extra>\n\n";
-	}
-	if(-e "$mod/Makefile.extra.$build_os")
-	{
-		$includes .= ".include <$mod/Makefile.extra.$build_os>\n\n";
-	}
-
-	if(!$bsd_make)
-	{
-		# need to post process this into a GNU makefile
-		$includes =~ s/\A\.\s*(ifdef|else|endif|ifndef)/$1/;
-		$includes =~ s/\A\.\s*include\s+<(.+?)>/include $1/;
-		$includes =~ s/-D\s+(\w+)/$1=1/g;
-	}
-
-	print MASTER_MAKEFILE $includes;
 }
 
 my @parcels;
@@ -1003,7 +1067,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 	{
 		chomp; s/#.+\Z//; s/\s+\Z//; s/\s+/ /g;
 		next unless m/\S/;
-		
+
 		# omit bits on some platforms?
 		next if m/\AEND-OMIT/;
 		if(m/\AOMIT:(.+)/)
@@ -1012,7 +1076,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			{
 				while(<PARCELS>)
 				{
-					last if m/\AEND-OMIT/;	
+					last if m/\AEND-OMIT/;
 				}
 			}
 			next;
@@ -1043,7 +1107,7 @@ open PARCELS,"parcels.txt" or die "Can't open parcels file";
 			next;
 		}
 		next if (m'\AEND-EXCEPT');
-		
+
 		# new parcel, or a new parcel definition?
 		if(m/\A\s+(.+)\Z/)
 		{
@@ -1218,7 +1282,7 @@ $make_target: @parcel_deps
 EOF
 
 	push @parcel_targets, "build-$parcel";
-	
+
 	for(@{$parcel_contents{$parcel}})
 	{
 		my @args = split /\s+/;
@@ -1284,11 +1348,11 @@ EOF
 	}
 
 	unless ($target_windows)
-	{	
+	{
 		close SCRIPT;
 		chmod 0755,"parcels/scripts/install-$parcel";
 	}
-	
+
 	my $root = BoxPlatform::parcel_root($parcel);
 
 	unless ($target_windows)
@@ -1297,14 +1361,42 @@ EOF
 	}
 
 	print MASTER_MAKEFILE "\t(cd parcels; tar cf - $root | gzip -9 - > $root.tgz )\n";
-	
+
 	print MASTER_MAKEFILE "\n";
 
 	unless ($target_windows)
-	{	
+	{
 		print MASTER_MAKEFILE "install-$parcel:\n";
 		print MASTER_MAKEFILE "\t(cd $dir; ./install-$parcel)\n\n";
 	}
+}
+
+# There doesn't seem to be an easy way to get the list of files configured with AC_CONFIG_FILES
+# out of Autoconf, so we open config.status and parse it ourselves.
+my @configured_files;
+open CONFIG_STATUS, "< config.status" or die "config.status: $!";
+while (my $line = <CONFIG_STATUS>)
+{
+	if($line =~ m/^config_files=" +([^"]*)"/)
+	{
+		@configured_files = split / +/, $1;
+	}
+}
+close CONFIG_STATUS;
+if (not @configured_files)
+{
+	die "Failed to find value of config_files in config.status";
+}
+
+# Output targets to regenerate the output if the inputs change
+foreach my $output (@configured_files)
+{
+	my $input = $output . ".in";
+	print MASTER_MAKEFILE <<EOF;
+$output: $input
+	./config.status $output
+
+EOF
 }
 
 print MASTER_MAKEFILE <<EOF;
@@ -1362,10 +1454,10 @@ if($modules_omitted)
 sub insert_dep
 {
 	my ($h,$dep_r) = @_;
-	
+
 	# stop random recusion
 	return if exists $$dep_r{$h};
-	
+
 	# insert more depencies
 	insert_dep($_,$dep_r) for keys %{$header_dependency{$h}};
 
@@ -1376,16 +1468,23 @@ sub insert_dep
 
 sub additional_objects_from_make_fragment
 {
-	my ($fn,$objs_r,$include_r) = @_;
-	
+	my ($fn,$objs_r,$include_r,$autogen_targets_r) = @_;
+
 	if(-e $fn)
 	{
 		open FL,$fn or die "Can't open $fn";
-		
+		my %vars;
+
 		while(<FL>)
 		{
 			chomp;
-			if(m/link-extra:\s*(.+)\Z/)
+			if(m/\A(.+)\s+=\s+(.+)\Z/)
+			{
+				# is a variable
+				$vars{$1} = $2;
+				next;
+			}
+			elsif(m/link-extra:\s*(.+)\Z/)
 			{
 				my $extra = $1;
 				do
@@ -1404,12 +1503,19 @@ sub additional_objects_from_make_fragment
 			{
 				push @$include_r,$1
 			}
+			elsif(m/^(\S.*\S)\s*:\s*(\S.*\S)\s*$/)
+			{
+				my $outputs = $1;
+				my $inputs = $2;
+				$outputs = substitute_make_vars($outputs, \%vars);
+				$inputs  = substitute_make_vars($inputs,  \%vars);
+				$autogen_targets_r->{$outputs} = $inputs;
+			}
 		}
-		
+
 		close FL;
 	}
 }
-
 
 sub ignore_module
 {

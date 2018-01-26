@@ -13,12 +13,16 @@
 	#include <unistd.h>
 #endif
 
-#include <sys/types.h>
 #include <errno.h>
 #include <string.h>
 
-#ifndef WIN32
+#include <sys/types.h>
+
+#ifdef WIN32
+	#include <ws2tcpip.h> // for InetNtop
+#else
 	#include <poll.h>
+	#include <arpa/inet.h> // for inet_ntop
 #endif
 
 #ifdef HAVE_UCRED_H
@@ -182,13 +186,44 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	}
 	
 	// Connect it
+	std::string name_pretty;
+	if(Type == Socket::TypeUNIX)
+	{
+		// For a UNIX socket, the path is all we need to show the user:
+		name_pretty = rName;
+	}
+	else
+	{
+		// For an IP socket, try to include the resolved IP address as well as the hostname:
+		std::ostringstream name_oss;
+		char name_buf[256];
+#ifdef WIN32
+		const char* addr_str = InetNtop(sockDomain, &addr.sa_generic, name_buf,
+			sizeof(name_buf));
+#else
+		const char* addr_str = inet_ntop(sockDomain, &addr.sa_generic, name_buf,
+			sizeof(name_buf));
+#endif
+		name_oss << rName << " (";
+		if(addr_str == NULL)
+		{
+			name_oss << "failed to convert IP address to string";
+		}
+		else
+		{
+			name_oss << addr_str;
+		}
+		name_oss << ")";
+		name_pretty = name_oss.str();
+	}
+
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
 		// Dispose of the socket
 		try
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
-				BOX_SOCKET_ERROR_MESSAGE(Type, rName, Port,
+				BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
 				"Failed to connect to socket"));
 		}
 		catch(ServerException &e)
@@ -228,7 +263,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 
 	if(Timeout != IOStream::TimeOutInfinite)
 	{
-		struct pollfd p;
+		EMU_STRUCT_POLLFD p;
 		p.fd = mSocketHandle;
 		p.events = POLLIN;
 		p.revents = 0;
@@ -238,15 +273,12 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 			// error
 			if(errno == EINTR)
 			{
-				// Signal. Just return 0 bytes
-				return 0;
+				THROW_EXCEPTION(CommonException, SignalReceived);
 			}
 			else
 			{
-				// Bad!
-				BOX_LOG_SYS_ERROR("Failed to poll socket");
-				THROW_EXCEPTION(ServerException,
-					SocketPollError)
+				THROW_SYS_ERROR("Failed to poll socket", ServerException,
+					SocketPollError);
 			}
 			break;
 			
@@ -276,8 +308,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 		else
 		{
 			// Other error
-			BOX_LOG_SYS_ERROR("Failed to read from socket");
-			THROW_EXCEPTION(ConnectionException,
+			THROW_SOCKET_ERROR("Failed to read from socket", ConnectionException,
 				SocketReadError);
 		}
 	}
@@ -295,7 +326,7 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 bool SocketStream::Poll(short Events, int Timeout)
 {
 	// Wait for data to send.
-	struct pollfd p;
+	EMU_STRUCT_POLLFD p;
 	p.fd = GetSocketHandle();
 	p.events = Events;
 	p.revents = 0;
@@ -362,7 +393,7 @@ void SocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 		{
 			// Error.
 			mWriteClosed = true;	// assume can't write again
-			THROW_SYS_ERROR("Failed to write to socket",
+			THROW_SOCKET_ERROR("Failed to write to socket",
 				ConnectionException, SocketWriteError);
 		}
 
@@ -566,6 +597,6 @@ void SocketStream::CheckForMissingTimeout(int Timeout)
 	if (Timeout == IOStream::TimeOutInfinite)
 	{
 		BOX_WARNING("Network operation started with no timeout!");
-		DumpStackBacktrace();
+		OPTIONAL_DO_BACKTRACE;
 	}
 }

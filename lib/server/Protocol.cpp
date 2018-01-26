@@ -118,7 +118,8 @@ void Protocol::Handshake()
 		int bytesRead = mapConn->Read(readInto, bytesToRead, GetTimeout());
 		if(bytesRead == 0)
 		{
-			THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+			THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+				"Timed out waiting " << GetTimeout() << " ms to read handshake");
 		}
 		readInto += bytesRead;
 		bytesToRead -= bytesRead;
@@ -162,7 +163,8 @@ void Protocol::CheckAndReadHdr(void *hdr)
 	if(!mapConn->ReadFullBuffer(hdr, sizeof(PW_ObjectHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+		THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+			"Timed out waiting " << mTimeout << " ms to read message header");
 	}
 }
 
@@ -205,7 +207,8 @@ std::auto_ptr<Message> Protocol::ReceiveInternal()
 	if(!mapConn->ReadFullBuffer(mpBuffer, objSize - sizeof(objHeader),
 		0 /* not interested in bytes read if this fails */, mTimeout))
 	{
-		THROW_EXCEPTION(ConnectionException, Protocol_Timeout)
+		THROW_EXCEPTION_MESSAGE(ConnectionException, Protocol_Timeout,
+			"Timed out waiting " << mTimeout << " ms to read message contents");
 	}
 
 	// Setup ready to read out data from the buffer
@@ -763,10 +766,22 @@ void Protocol::SendStream(IOStream &rStream)
 	else
 	{
 		// Fixed size stream, send it all in one go
-		if(!rStream.CopyStreamTo(*mapConn, GetTimeout(),
-			4096 /* slightly larger buffer */))
+		try
 		{
-			THROW_EXCEPTION(ConnectionException, Protocol_TimeOutWhenSendingStream)
+			rStream.CopyStreamTo(*mapConn, GetTimeout(),
+				4096 /* slightly larger buffer */);
+		}
+		catch(CommonException &e)
+		{
+			if(EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
+			{
+				THROW_EXCEPTION_MESSAGE(ConnectionException,
+					Protocol_TimeOutWhenSendingStream, e.GetMessage());
+			}
+			else
+			{
+				throw;
+			}
 		}
 	}
 	// Make sure everything is written

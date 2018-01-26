@@ -45,7 +45,7 @@ Syslog*     Logging::spSyslog  = NULL;
 Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
 const Log::Category Logging::UNCATEGORISED("Uncategorised");
-std::auto_ptr<HideFileGuard> Logging::sapHideFileGuard;
+std::vector<LogLevelOverrideByFileGuard> Logging::sLogLevelOverrideByFileGuards;
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
@@ -280,12 +280,43 @@ void Console::SetShowPID(bool enabled)
 	sShowPID = enabled;
 }
 
+bool Logging::ShouldLog(Log::Level default_level, Log::Level message_level,
+	const std::string& file, int line, const std::string& function, const Log::Category& category,
+	const std::string& message)
+{
+	// Based on http://stackoverflow.com/a/40947954/648162 and
+	// http://stackoverflow.com/a/41367919/648162, but since we have to do this at runtime for
+	// each logging call, don't do the strrchr unless we have at least one override configured
+	// (otherwise it's never used, and a waste of CPU):
+	const char* current_file = NULL;
+	if(Logging::sLogLevelOverrideByFileGuards.begin() !=
+		Logging::sLogLevelOverrideByFileGuards.end())
+	{
+		current_file = strrchr(file.c_str(), DIRECTORY_SEPARATOR_ASCHAR) + 1;
+	}
+
+	Log::Level level_filter = default_level;
+	for(std::vector<LogLevelOverrideByFileGuard>::iterator
+		i = Logging::sLogLevelOverrideByFileGuards.begin();
+		i != Logging::sLogLevelOverrideByFileGuards.end(); i++)	
+	{
+		if(i->IsOverridden(message_level, current_file, line, function, category, message))
+		{
+			level_filter = i->GetNewLevel();
+		}
+	}
+
+	// Should log if the message level is less than the filter level, otherwise not.
+	return (message_level <= level_filter);
+}
+
 bool Console::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
-	if (level > GetLevel())
+	if(!Logging::ShouldLog(GetLevel(), level, file, line, function, category, message))
 	{
+		// Skip the rest of this logger, but continue with the others
 		return true;
 	}
 	
@@ -365,8 +396,9 @@ bool Syslog::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
-	if (level > GetLevel())
+	if(!Logging::ShouldLog(GetLevel(), level, file, line, function, category, message))
 	{
+		// Skip the rest of this logger, but continue with the others
 		return true;
 	}
 	
@@ -587,15 +619,39 @@ int Logging::OptionParser::ProcessOption(signed int option)
 	{
 		case 'L':
 		{
-			if(sapHideFileGuard.get())
+			std::string arg_value(optarg);
+			std::string::size_type equals_pos = arg_value.find('=');
+			if(equals_pos == std::string::npos)
 			{
-				sapHideFileGuard->Add(optarg);
+				BOX_FATAL("Option -L argument should be 'filename[/category]=level'");
+				return 2;
+			}
+
+			std::string key = arg_value.substr(0, equals_pos);
+			std::string filename, category;
+			std::string::size_type slash_pos = key.find('/');
+			if(slash_pos == std::string::npos)
+			{
+				// If no category is supplied, assume that the entire key is the filename
+				filename = key;
 			}
 			else
 			{
-				sapHideFileGuard.reset(new HideFileGuard(
-					optarg, true)); // HideAllButSelected
+				filename = key.substr(0, slash_pos);
+				category = key.substr(slash_pos + 1);
 			}
+
+			std::string level_name = arg_value.substr(equals_pos + 1);
+			Log::Level level = Logging::GetNamedLevel(level_name);
+			if (level == Log::INVALID)
+			{
+				BOX_FATAL("Invalid logging level: " << level_name);
+				return 2;
+			}
+
+			sLogLevelOverrideByFileGuards.push_back(
+				LogLevelOverrideByFileGuard(filename, category, level, false) // !OverrideAllButSelected
+			);
 		}
 		break;
 
@@ -713,9 +769,16 @@ int Logging::OptionParser::ProcessOption(signed int option)
 // --------------------------------------------------------------------------
 std::string Logging::OptionParser::GetUsageString()
 {
-	return
-	"  -L <file>  Filter out log messages except from specified file, can repeat\n"
-	"             (for example, -L " __FILE__ ")\n"
+	// Based on http://stackoverflow.com/a/40947954/648162 and
+	// http://stackoverflow.com/a/41367919/648162:
+	const char* current_file = strrchr(__FILE__, DIRECTORY_SEPARATOR_ASCHAR) + 1;
+
+	std::ostringstream buf;
+	buf <<
+	"  -L [<file>][/<category>]=<level>  Override log level for specified file or\n"
+	"             category (for example, -L '" << current_file << "/Configuration=trace').\n"
+	"             <category> can be one of: {Uncategorised, Backtrace,\n"
+	"             Configuration, RaidFileRead, FileSystem/Locking}\n"
 	"  -N         Truncate log file at startup and on backup start\n"
 	"  -P         Show process ID (PID) in console output\n"
 	"  -q         Run more quietly, reduce verbosity level by one, can repeat\n"
@@ -726,6 +789,7 @@ std::string Logging::OptionParser::GetUsageString()
 	"  -v         Run more verbosely, increase verbosity level by one, can repeat\n"
 	"  -V         Run at maximum verbosity, log everything to console and system\n"
 	"  -W <level> Set verbosity to error/warning/notice/info/trace/everything\n";
+	return buf.str();
 }
 
 bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
@@ -740,27 +804,46 @@ bool HideCategoryGuard::Log(Log::Level level, const std::string& file, int line,
 	return (i == mCategories.end());
 }
 
-bool HideFileGuard::Log(Log::Level level, const std::string& file, int line,
+LogLevelOverrideByFileGuard::~LogLevelOverrideByFileGuard()
+{
+	if(mInstalled)
+	{
+		auto this_pos = std::find(Logging::sLogLevelOverrideByFileGuards.begin(),
+			Logging::sLogLevelOverrideByFileGuards.end(), *this);
+		ASSERT(this_pos != Logging::sLogLevelOverrideByFileGuards.end());
+		Logging::sLogLevelOverrideByFileGuards.erase(this_pos);
+	}
+}
+
+void LogLevelOverrideByFileGuard::Install()
+{
+	ASSERT(!mInstalled);
+	Logging::sLogLevelOverrideByFileGuards.push_back(*this);
+	mInstalled = true;
+}
+
+bool LogLevelOverrideByFileGuard::IsOverridden(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
 	std::list<std::string>::iterator i = std::find(mFileNames.begin(),
 		mFileNames.end(), file);
-	bool allow_log_message;
-	if(mHideAllButSelected)
+
+	// Return true if filename is in our list, i.e. its level is overridden, or if there
+	// are no filenames in the list (which corresponds to a wildcard match on filename):
+	bool override_matches = (i != mFileNames.end()) || mFileNames.empty();
+
+	// If we have a category, then that must match as well:
+	if(override_matches && !mCategoryNamePrefix.empty())
 	{
-		// Return true if filename is in our list, to allow further
-		// logging (thus, return false if it's not in our list, i.e. we
-		// found nothing, to suppress it).
-		allow_log_message = (i != mFileNames.end());
+		override_matches = StartsWith(mCategoryNamePrefix, category.ToString());
 	}
-	else
+
+	if(mOverrideAllButSelected)
 	{
-		// Return false if filename is in our list, to suppress further
-		// logging (thus, return true if it's not in our list, i.e. we
-		// found nothing, to allow it).
-		allow_log_message = (i == mFileNames.end());
+		override_matches = !override_matches;
 	}
-	return allow_log_message;
+
+	return override_matches;
 }
 

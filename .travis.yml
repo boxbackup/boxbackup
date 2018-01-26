@@ -27,6 +27,7 @@ addons:
       - time
       - xsltproc
       - zlib1g-dev
+      - libboost-dev
 
 env:
   - TEST_TARGET=debug
@@ -43,6 +44,11 @@ matrix:
     # No point testing both GCC and Clang on Mac OS X, as they're the same thing.
     - os: osx
       compiler: gcc
+
+branches:
+  except:
+    # Exclude tags created by AppVeyor for releases (binary builds)
+    - /^BoxBackup-/
 
 script:
   - env EXTRA_MAKE_ARGS=-j2 ./infrastructure/travis-build.sh

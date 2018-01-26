@@ -216,7 +216,9 @@ public:
 	{
 		if(mTcpNiceMode)
 		{
+#ifdef ENABLE_TCP_NICE
 			mpNice->SetEnabled(enabled);
+#endif
 		}
 	}
 
@@ -246,7 +248,9 @@ private:
 	int mMaximumDiffingTime;
 	ProgressNotifier &mrProgressNotifier;
 	bool mTcpNiceMode;
+#ifdef ENABLE_TCP_NICE
 	NiceSocketStream *mpNice;
+#endif
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

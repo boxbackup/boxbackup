@@ -10,11 +10,24 @@
 #ifndef TEST__H
 #define TEST__H
 
+// for printf:
+#include <stdio.h>
+
 #include <cstring>
 #include <list>
 #include <map>
 
 #include "Configuration.h"
+
+#ifndef TEST_EXECUTABLE
+#	ifdef _MSC_VER
+		// Our CMakeFiles compile tests to different executable filenames,
+		// e.g. test_common.exe instead of _test.exe.
+		#define TEST_EXECUTABLE BOX_MODULE ".exe"
+#	else
+		#define TEST_EXECUTABLE "./_test"
+#	endif
+#endif // TEST_EXECUTABLE
 
 #ifdef WIN32
 #define BBACKUPCTL      "..\\..\\bin\\bbackupctl\\bbackupctl.exe"
@@ -38,13 +51,23 @@ extern int num_tests_selected;
 extern int old_failure_count;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
+extern bool bbackupd_args_overridden, bbstored_args_overridden;
 extern std::list<std::string> run_only_named_tests;
 extern std::string current_test_name;
 extern std::map<std::string, std::string> s_test_status;
 
+#ifdef WIN32
+extern HANDLE sTestChildDaemonJobObject;
+#endif
+
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP() \
-	if (!setUp(__FUNCTION__)) return true; \
+	if (!setUp(__FUNCTION__, "")) return true; \
+	try \
+	{ // left open for TEARDOWN()
+
+#define SETUP_SPECIALISED(specialisation) \
+	if (!setUp(__FUNCTION__, specialisation)) return true; \
 	try \
 	{ // left open for TEARDOWN()
 
@@ -53,17 +76,17 @@ extern std::map<std::string, std::string> s_test_status;
 	} \
 	catch (BoxException &e) \
 	{ \
-		BOX_NOTICE(__FUNCTION__ << " errored: " << e.what()); \
+		BOX_NOTICE(current_test_name << " errored: " << e.what()); \
 		num_failures++; \
 		tearDown(); \
-		s_test_status[__FUNCTION__] = "ERRORED"; \
+		s_test_status[current_test_name] = "ERRORED"; \
 		return false; \
 	}
 
 //! End the current test. Only use within a test function, because it just returns false!
 #define FAIL { \
 	std::ostringstream os; \
-	os << "failed at " << __FUNCTION__ << ":" << __LINE__; \
+	os << "failed at " << current_test_name << ":" << __LINE__; \
 	s_test_status[current_test_name] = os.str(); \
 	return fail(); \
 }
@@ -167,16 +190,12 @@ extern std::map<std::string, std::string> s_test_status;
 	\
 	if(_exp_str != _found_str) \
 	{ \
-		std::ostringstream _ossl; \
-		_ossl << _line; \
-		std::string _line_str = _ossl.str(); \
-		printf("Expected <%s> but found <%s> in <%s>\n", \
-			_exp_str.c_str(), _found_str.c_str(), _line_str.c_str()); \
-		\
 		std::ostringstream _oss3; \
-		_oss3 << #_found << " != " << #_expected << " in " << _line; \
-		\
-		TEST_FAIL_WITH_MESSAGE(_oss3.str().c_str()); \
+		_oss3 << #_found << " != " << #_expected << ": " \
+			"expected <" << _exp_str << "> " \
+			"but found <" << _found_str << "> " \
+			"in <" << _line << ">"; \
+		TEST_FAIL_WITH_MESSAGE(_oss3.str()); \
 	} \
 }
 
@@ -202,7 +221,7 @@ extern std::map<std::string, std::string> s_test_status;
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
 //! Sets up (cleans up) test environment at the start of every test.
-bool setUp(const char* function_name);
+bool setUp(const std::string& function_name, const std::string& specialisation);
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool tearDown();
@@ -243,14 +262,10 @@ void safe_sleep(int seconds);
 std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	const ConfigurationVerify& verify);
 
-#ifndef TEST_EXECUTABLE
-#	ifdef _MSC_VER
-		// Our CMakeFiles compile tests to different executable filenames,
-		// e.g. test_common.exe instead of _test.exe.
-		#define TEST_EXECUTABLE BOX_MODULE ".exe"
-#	else
-		#define TEST_EXECUTABLE "./_test"
-#	endif
-#endif // TEST_EXECUTABLE
+bool test_equal_lists(const std::vector<std::string>& expected_items,
+	const std::vector<std::string>& actual_items);
+
+typedef std::map<std::string, std::string> str_map_t;
+bool test_equal_maps(const str_map_t& expected_attrs, const str_map_t& actual_attrs);
 
 #endif // TEST__H

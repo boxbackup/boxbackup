@@ -57,15 +57,9 @@
 #endif
 
 // Slight hack; disable interception in raidfile test on Darwin and Windows
-#if defined __APPLE__ || defined WIN32
+#if defined WIN32
 	// TODO: Replace with autoconf test
 	#define PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
-#endif
-
-// Disable memory testing under Darwin, it just doesn't like it very much.
-#ifdef __APPLE__
-	// TODO: We really should get some decent leak detection code.
-	#define PLATFORM_DISABLE_MEM_LEAK_TESTING
 #endif
 
 // Darwin also has a weird idea of permissions and dates on symlinks:
@@ -87,15 +81,7 @@
 	#define PLATFORM_CANNOT_FIND_PEER_UID_OF_UNIX_SOCKET
 #endif
 
-#ifdef HAVE_DEFINE_PRAGMA
-	// set packing to one bytes (can't use push/pop on gcc)
-	#define BEGIN_STRUCTURE_PACKING_FOR_WIRE	#pragma pack(1)
-
-	// Use default packing
-	#define END_STRUCTURE_PACKING_FOR_WIRE		#pragma pack()
-#else
-	#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#endif
+#define STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
 
 // Handle differing xattr APIs
 #if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW

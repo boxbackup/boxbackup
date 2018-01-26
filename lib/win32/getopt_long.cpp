@@ -68,7 +68,7 @@
 
 #include "box_getopt.h"
 
-#ifdef REPLACE_GETOPT // until end of file
+#if REPLACE_GETOPT // until end of file
 
 int	opterr = 1;		/* if error message should be printed */
 int	optind = 1;		/* index into parent argv vector */
@@ -430,7 +430,7 @@ start:
 	}
 
 	if ((optchar = (int)*place++) == (int)':' ||
-	    optchar == (int)'-' && *place != '\0' ||
+	    (optchar == (int)'-' && *place != '\0') ||
 	    (oli = strchr(options, optchar)) == NULL) {
 		/*
 		 * If the user specified "-" and  '-' isn't listed in

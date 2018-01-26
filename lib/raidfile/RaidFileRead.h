@@ -56,16 +56,19 @@ public:
 	static bool FileExists(int SetNumber, const std::string &rFilename, int64_t *pRevisionID = 0);
 	static bool DirectoryExists(const RaidFileDiscSet &rSet, const std::string &rDirName);
 	static bool DirectoryExists(int SetNumber, const std::string &rDirName);
-	enum
+	typedef enum
 	{
 		DirReadType_FilesOnly = 0,
 		DirReadType_DirsOnly = 1
-	};
-	static bool ReadDirectoryContents(int SetNumber, const std::string &rDirName, int DirReadType, std::vector<std::string> &rOutput);
+	} DirReadType_t;
+	static bool ReadDirectoryContents(int SetNumber, const std::string &rDirName,
+		DirReadType_t DirReadType, std::vector<std::string> &rOutput);
 
 	// Common IOStream interface implementation
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual bool StreamClosed();
 	virtual pos_type BytesLeftToRead();
 

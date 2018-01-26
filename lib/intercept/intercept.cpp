@@ -598,6 +598,11 @@ lstat(const char *file_name, STAT_STRUCT *buf)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
 		lstat_real = (lstat_t*)find_function("__lxstat");
+	#elif defined HAVE_LSTAT64
+		// If lstat64 is defined, assume that the OS uses it (instead
+		// of stat) by default now that the 64-bit transition is
+		// basically complete.
+		lstat_real = (lstat_t*)find_function("lstat64");
 	#else
 		lstat_real = (lstat_t*)find_function("lstat");
 	#endif
@@ -642,6 +647,11 @@ stat(const char *file_name, STAT_STRUCT *buf)
 	{
 	#ifdef LINUX_WEIRD_LSTAT
 		stat_real = (lstat_t*)find_function("__xstat");
+	#elif defined HAVE_STAT64
+		// If stat64 is defined, assume that the OS uses it (instead
+		// of stat) by default now that the 64-bit transition is
+		// basically complete.
+		stat_real = (lstat_t*)find_function("stat64");
 	#else
 		stat_real = (lstat_t*)find_function("stat");
 	#endif

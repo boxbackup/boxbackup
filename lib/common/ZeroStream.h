@@ -19,15 +19,17 @@ private:
 
 public:
 	ZeroStream(IOStream::pos_type mSize);
-	
+
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type BytesLeftToRead();
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
+	using IOStream::Write;
+
 	virtual pos_type GetPosition() const;
 	virtual void Seek(IOStream::pos_type Offset, int SeekType);
 	virtual void Close();
-	
+
 	virtual bool StreamDataLeft();
 	virtual bool StreamClosed();
 

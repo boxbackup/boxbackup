@@ -61,7 +61,7 @@ void BackupStoreDaemon::HousekeepingProcess()
 		if(secondsToGo < 1) secondsToGo = 1;
 		if(secondsToGo > 60) secondsToGo = 60;
 		int32_t millisecondsToGo = ((int)secondsToGo) * 1000;
-	
+
 		// Check to see if there's any message pending
 		CheckForInterProcessMsg(0 /* no account */, millisecondsToGo);
 	}
@@ -103,9 +103,9 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 	{
 		mpAccountDatabase->GetAllAccountIDs(accounts);
 	}
-			
+
 	SetProcessTitle("housekeeping, active");
-			
+
 	// Check them all
 	for(std::vector<int32_t>::const_iterator i = accounts.begin(); i != accounts.end(); ++i)
 	{
@@ -128,10 +128,11 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				// Happens automatically when tagWithClientID
 				// goes out of scope.
 			}
-			
+
+			RaidBackupFileSystem fs(*i, rootDir, discSet);
+
 			// Do housekeeping on this account
-			HousekeepStoreAccount housekeeping(*i, rootDir,
-				discSet, this);
+			HousekeepStoreAccount housekeeping(fs, this);
 			housekeeping.DoHousekeeping();
 		}
 		catch(BoxException &e)
@@ -156,7 +157,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 				"aborting run for this account: "
 				"unknown exception");
 		}
-	
+
 		int64_t timeNow = GetCurrentBoxTime();
 		time_t secondsToGo = BoxTimeToSeconds(
 			(mLastHousekeepingRun + housekeepingInterval) - 
@@ -174,7 +175,7 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 			break;
 		}
 	}
-		
+
 	BOX_INFO("Finished housekeeping");
 
 	// Placed here for accuracy, if StopRun() is true, for example.
@@ -183,12 +184,15 @@ void BackupStoreDaemon::RunHousekeepingIfNeeded()
 
 void BackupStoreDaemon::OnIdle()
 {
-	if (!IsSingleProcess())
+	if(IsForkPerClient())
 	{
+		// Housekeeping will be done by a specialised child process.
 		return;
 	}
 
-	if (!mHousekeepingInited)
+	// Housekeeping will be done in the main process, in idle time.
+
+	if(!mHousekeepingInited)
 	{
 		HousekeepingInit();
 		mHousekeepingInited = true;
@@ -216,45 +220,77 @@ bool BackupStoreDaemon::CheckForInterProcessMsg(int AccountNum, int MaximumWaitT
 	// First, check to see if it's EOF -- this means something has gone wrong, and the housekeeping should terminate.
 	if(mInterProcessComms.IsEOF())
 	{
+		BOX_INFO("Housekeeping process was hungup by main daemon, terminating");
 		SetTerminateWanted();
 		return true;
 	}
 
 	// Get a line, and process the message
 	std::string line;
-	if(mInterProcessComms.GetLine(line, false /* no pre-processing */, MaximumWaitTime))
+
+	try
 	{
-		BOX_TRACE("Housekeeping received command '" << line <<
-			"' over interprocess comms");
-	
-		int account = 0;
-	
-		if(line == "h")
+		HideExceptionMessageGuard hide_exceptions;
+		line = mInterProcessComms.GetLine(false /* no pre-processing */,
+			MaximumWaitTime);
+	}
+	catch(BoxException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, CommonException, SignalReceived) ||
+			EXCEPTION_IS_TYPE(e, CommonException, IOStreamTimedOut))
 		{
-			// HUP signal received by main process
-			SetReloadConfigWanted();
-			return true;
+			// No special handling, just return empty-handed. We will be called again.
+			return false;
 		}
-		else if(line == "t")
+		else if(EXCEPTION_IS_TYPE(e, CommonException, GetLineEOF))
 		{
-			// Terminate signal received by main process
+			// This means something has gone wrong with the main server process, and the
+			// housekeeping process should also terminate.
+			BOX_INFO("Housekeeping process was hungup by main daemon, terminating");
 			SetTerminateWanted();
 			return true;
 		}
-		else if(sscanf(line.c_str(), "r%x", &account) == 1)
+		else
 		{
-			// Main process is trying to lock an account -- are we processing it?
-			if(account == AccountNum)
-			{
-				// Yes! -- need to stop now so when it retries to get the lock, it will succeed
-				BOX_INFO("Housekeeping on account " <<
-					BOX_FORMAT_ACCOUNT(AccountNum) <<
-					"giving way to client connection");
-				return true;
-			}
+			throw;
 		}
 	}
-	
+
+	BOX_TRACE("Housekeeping received command '" << line <<
+		"' over interprocess comms");
+
+	int account = 0;
+
+	if(line == "h")
+	{
+		// HUP signal received by main process
+		SetReloadConfigWanted();
+		return true;
+	}
+	else if(line == "t")
+	{
+		// Terminate signal received by main process
+		SetTerminateWanted();
+		return true;
+	}
+	else if(sscanf(line.c_str(), "r%x", &account) == 1)
+	{
+		// Main process is trying to lock an account -- are we processing it?
+		if(account == AccountNum)
+		{
+			// Yes! -- need to stop now so when it retries to get the lock, it will succeed
+			BOX_INFO("Housekeeping on account " <<
+				BOX_FORMAT_ACCOUNT(AccountNum) <<
+				"giving way to client connection");
+			return true;
+		}
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal, "Housekeeping received "
+			"unexpected command from main daemon: " << line);
+	}
+
 	return false;
 }
 

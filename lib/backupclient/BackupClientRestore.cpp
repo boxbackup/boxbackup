@@ -30,7 +30,7 @@
 #include "BackupStoreFile.h"
 #include "CollectInBufferStream.h"
 #include "FileStream.h"
-#include "Utils.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 
 #include "MemLeakFindOn.h"
 
@@ -238,7 +238,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	// Create the local directory, if not already done.
 	// Path and owner set later, just use restrictive owner mode.
 
-	int exists;
+	object_exists_t exists;
 
 	try
 	{
@@ -277,7 +277,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					"out of the way of restored directory. "
 					"Use specific restore with ID to "
 					"restore this object.");
-				if(::unlink(rLocalDirectoryName.c_str()) != 0)
+				if(EMU_UNLINK(rLocalDirectoryName.c_str()) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to delete "
 						"file '" << 
@@ -334,7 +334,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 			}
 		#endif
 
-		int parentExists;
+		object_exists_t parentExists;
 
 		try
 		{
@@ -379,9 +379,9 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 				return Restore_TargetPathNotFound;
 
 			default:
-				BOX_ERROR("Failed to restore: unknown "
-					"result from ObjectExists('" <<
-					parentDirectoryName << "')");
+				BOX_ERROR("Failed to restore: unexpected result from "
+					"ObjectExists('" << parentDirectoryName << "'): " <<
+					parentExists);
 				return Restore_UnknownError;
 		}
 	}
@@ -513,11 +513,10 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 				// files already there.
 				if(ObjectExists(localFilename)
 					!= ObjectExists_NoObject &&
-					::unlink(localFilename.c_str()) != 0)
+					EMU_UNLINK(localFilename.c_str()) != 0)
 				{
-					BOX_LOG_SYS_ERROR("Failed to delete "
-						"file '" << localFilename << 
-						"'");
+					BOX_LOG_SYS_ERROR("Failed to delete file "
+						"'" << localFilename << "'");
 
 					if (Params.ContinueAfterErrors)
 					{
@@ -856,7 +855,7 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	params.mRestoreResumeInfoFilename += ".boxbackupresume";
 
 	// Target exists?
-	int targetExistance = ObjectExists(LocalDirectoryName);
+	object_exists_t targetExistance = ObjectExists(LocalDirectoryName);
 
 	// Does any resumption information exist?
 	bool doingResume = false;
@@ -912,7 +911,7 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	}
 	
 	// Delete the resume information file
-	::unlink(params.mRestoreResumeInfoFilename.c_str());
+	EMU_UNLINK(params.mRestoreResumeInfoFilename.c_str());
 
 	return params.ContinuedAfterError ? Restore_CompleteWithErrors
 		: Restore_Complete;

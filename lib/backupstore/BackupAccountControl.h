@@ -13,18 +13,29 @@
 #include <string>
 
 #include "BackupStoreAccountDatabase.h"
-#include "HTTPResponse.h"
+#include "BackupFileSystem.h"
 #include "S3Client.h"
+#include "UnixUser.h"
 
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
+class NamedLock;
+class UnixUser;
 
 class BackupAccountControl
 {
 protected:
 	const Configuration& mConfig;
 	bool mMachineReadableOutput;
+	std::auto_ptr<BackupFileSystem> mapFileSystem;
+
+	virtual void OpenAccount(bool readWrite) { }
+	virtual int GetBlockSize()
+	{
+		return mapFileSystem->GetBlockSize();
+	}
+	virtual int SetLimit(int64_t softlimit, int64_t hardlimit);
 
 public:
 	BackupAccountControl(const Configuration& config,
@@ -32,60 +43,89 @@ public:
 	: mConfig(config),
 	  mMachineReadableOutput(machineReadableOutput)
 	{ }
+	virtual ~BackupAccountControl() { }
 	void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit);
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);
-	int PrintAccountInfo(const BackupStoreInfo& info, int BlockSize);
+	virtual int SetLimit(const char *SoftLimitStr, const char *HardLimitStr);
+	virtual int SetAccountName(const std::string& rNewAccountName);
+	virtual int PrintAccountInfo();
+	virtual int SetAccountEnabled(bool enabled);
+	virtual BackupFileSystem& GetFileSystem() = 0;
+	virtual BackupFileSystem* GetCurrentFileSystem() { return mapFileSystem.get(); }
+	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
+		const std::string& AccountName);
 };
 
-class S3BackupFileSystem
+
+class BackupStoreAccountControl : public BackupAccountControl
 {
 private:
-	std::string mBasePath;
-	S3Client& mrClient;
+	int32_t mAccountID;
+	std::string mRootDir;
+	int mDiscSetNum;
+	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
+
 public:
-	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
-		S3Client& rClient)
-	: mBasePath(BasePath),
-	  mrClient(rClient)
+	BackupStoreAccountControl(const Configuration& config, int32_t AccountID,
+		bool machineReadableOutput = false)
+	: BackupAccountControl(config, machineReadableOutput),
+	  mAccountID(AccountID),
+	  mDiscSetNum(0)
 	{ }
-	std::string GetDirectoryURI(int64_t ObjectID);
-	std::auto_ptr<HTTPResponse> GetDirectory(BackupStoreDirectory& rDir);
-	int PutDirectory(BackupStoreDirectory& rDir);
+	virtual int GetBlockSize()
+	{
+		return BlockSizeOfDiscSet(mDiscSetNum);
+	}
+	int BlockSizeOfDiscSet(int discSetNum);
+	int DeleteAccount(bool AskForConfirmation);
+	int CheckAccount(bool FixErrors, bool Quiet,
+		bool ReturnNumErrorsFound = false);
+	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit, int32_t HardLimit);
+	int HousekeepAccountNow();
+	virtual BackupFileSystem& GetFileSystem()
+	{
+		if(mapFileSystem.get())
+		{
+			return *mapFileSystem;
+		}
+
+		// We don't know whether the caller wants a write-locked filesystem or
+		// not, but they can lock it themselves if they want to.
+		OpenAccount(false); // !ReadWrite
+		return *mapFileSystem;
+	}
+protected:
+	virtual void OpenAccount(bool readWrite);
 };
 
 class S3BackupAccountControl : public BackupAccountControl
 {
 private:
-	std::string mBasePath;
 	std::auto_ptr<S3Client> mapS3Client;
-	std::auto_ptr<S3BackupFileSystem> mapFileSystem;
+	// mapFileSystem is inherited from BackupAccountControl
+
 public:
 	S3BackupAccountControl(const Configuration& config,
 		bool machineReadableOutput = false);
-	std::string GetFullPath(const std::string ObjectPath) const
+	virtual ~S3BackupAccountControl()
 	{
-		return mBasePath + ObjectPath;
+		// Destroy mapFileSystem before mapS3Client, because it may need it
+		// for cleanup.
+		mapFileSystem.reset();
 	}
-	std::string GetFullURL(const std::string ObjectPath) const;
 	int CreateAccount(const std::string& name, int32_t SoftLimit, int32_t HardLimit);
 	int GetBlockSize() { return 4096; }
-	HTTPResponse GetObject(const std::string& name)
+
+	virtual BackupFileSystem& GetFileSystem()
 	{
-		return mapS3Client->GetObject(GetFullPath(name));
-	}
-	HTTPResponse PutObject(const std::string& name, IOStream& rStreamToSend,
-		const char* pContentType = NULL)
-	{
-		return mapS3Client->PutObject(GetFullPath(name), rStreamToSend,
-			pContentType);
+		ASSERT(mapFileSystem.get() != NULL);
+		return *mapFileSystem;
 	}
 };
 
 // max size of soft limit as percent of hard limit
 #define MAX_SOFT_LIMIT_SIZE		97
-#define S3_INFO_FILE_NAME		"boxbackup.info"
-#define S3_NOTIONAL_BLOCK_SIZE		1048576
 
 #endif // BACKUPACCOUNTCONTROL__H
 

@@ -2,9 +2,14 @@
 
 #include "emu.h"
 
+#include <assert.h>
+#include <string.h> // for strlen()
+
+#include <iomanip>
+#include <sstream>
+
 #ifdef WIN32
 
-#include <assert.h>
 #include <fcntl.h>
 #include <process.h>
 #include <windows.h>
@@ -15,7 +20,6 @@
 
 #include <string>
 #include <list>
-#include <sstream>
 
 // message resource definitions for syslog()
 #include "messages.h"
@@ -1141,7 +1145,15 @@ struct dirent *readdir(DIR *dp)
 					NULL, NULL);
 				//den->d_name = (char *)dp->info.name;
 				den->d_name = &tempbuff[0];
-				den->d_type = dp->info.dwFileAttributes;
+				den->win_attrs = dp->info.dwFileAttributes;
+				if(dp->info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				{
+					den->d_type = DT_DIR;
+				}
+				else
+				{
+					den->d_type = DT_REG;
+				}
 			}
 			else // FindNextFileW failed
 			{
@@ -1222,7 +1234,7 @@ int closedir(DIR *dp)
 //		Created: 25th October 2004
 //
 // --------------------------------------------------------------------------
-int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
+int poll(EMU_STRUCT_POLLFD *ufds, unsigned long nfds, int timeout)
 {
 	try
 	{
@@ -1247,7 +1259,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 
 		for (unsigned long i = 0; i < nfds; i++)
 		{
-			struct pollfd* ufd = &(ufds[i]);
+			EMU_STRUCT_POLLFD* ufd = &(ufds[i]);
 
 			if (ufd->events & POLLIN)
 			{
@@ -1273,7 +1285,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		{
 			// int errval = WSAGetLastError();
 
-			struct pollfd* pufd = ufds;
+			EMU_STRUCT_POLLFD* pufd = ufds;
 			for (unsigned long i = 0; i < nfds; i++)
 			{
 				pufd->revents = POLLERR;
@@ -1285,7 +1297,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 		{
 			for (unsigned long i = 0; i < nfds; i++)
 			{
-				struct pollfd *ufd = &(ufds[i]);
+				EMU_STRUCT_POLLFD *ufd = &(ufds[i]);
 
 				if (FD_ISSET(ufd->fd, &readfd))
 				{
@@ -1519,7 +1531,7 @@ void syslog(int loglevel, const char *frmt, ...)
 	assert(len >= 0);
 	if (len < 0) 
 	{
-		printf("%s\r\n", buffer);
+		printf("<syslog(): message too long> %s\r\n", buffer);
 		fflush(stdout);
 		return;
 	}
@@ -1531,7 +1543,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	if (gSyslogH == INVALID_HANDLE_VALUE)
 	{
-		printf("%s\r\n", buffer);
+		printf("<syslog(): invalid handle> %s\r\n", buffer);
 		fflush(stdout);
 		return;
 	}
@@ -2027,4 +2039,32 @@ bool ConvertTime_tToFileTime(const time_t from, FILETIME *pTo)
 }
 
 #endif // WIN32
+
+// MSVC < 12 (2013) does not have strtoull(), and _strtoi64 is signed only (truncates all values
+// greater than 1<<63 to _I64_MAX, so we roll our own using std::istringstream
+// <http://stackoverflow.com/questions/1070497/c-convert-hex-string-to-signed-integer>
+uint64_t box_strtoui64(const char *nptr, const char **endptr, int base)
+{
+	std::istringstream iss((std::string(nptr)));
+	uint64_t result;
+
+	assert(base == 0 || base == 8 || base == 10 || base == 16);
+	iss >> std::setbase(base);
+	iss >> result;
+
+	if(endptr != NULL)
+	{
+		if(iss.eof())
+		{
+			*endptr = nptr + strlen(nptr);
+		}
+		else
+		{
+			assert(iss.tellg() >= 0);
+			*endptr = nptr + iss.tellg();
+		}
+	}
+
+	return result;
+}
 

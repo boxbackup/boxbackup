@@ -21,11 +21,7 @@
 #include "BackupStoreException.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreInfo.h"
-#include "BufferedStream.h"
 #include "CollectInBufferStream.h"
-#include "FileStream.h"
-#include "InvisibleTempFileStream.h"
-#include "RaidFileController.h"
 #include "StreamableMemBlock.h"
 
 #include "MemLeakFindOn.h"
@@ -71,7 +67,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolReplyable::HandleException(Bo
 	}
 	else if (e.GetType() == BackupStoreException::ExceptionType)
 	{
-		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify)
+		// Slightly broken or really broken, both thrown by VerifyStream:
+		if(e.GetSubType() == BackupStoreException::AddedFileDoesNotVerify ||
+			e.GetSubType() == BackupStoreException::BadBackupStoreFile)
 		{
 			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
 		}
@@ -226,7 +224,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 		"(name=" << rContext.GetAccountName() << ")");
 
 	// Let the context know about it
-	rContext.ReceivedFinishCommand();
+	rContext.CleanUp();
 
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolFinished);
 }
@@ -348,132 +346,22 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetObject::DoCommand(BackupPr
 std::auto_ptr<BackupProtocolMessage> BackupProtocolGetFile::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
-
-	// Check the objects exist
-	if(!rContext.ObjectExists(mObjectID)
-		|| !rContext.ObjectExists(mInDirectory))
-	{
-		return PROTOCOL_ERROR(Err_DoesNotExist);
-	}
-
-	// Get the directory it's in
-	const BackupStoreDirectory &rdir(rContext.GetDirectory(mInDirectory));
-
-	// Find the object within the directory
-	BackupStoreDirectory::Entry *pfileEntry = rdir.FindEntryByID(mObjectID);
-	if(pfileEntry == 0)
-	{
-		return PROTOCOL_ERROR(Err_DoesNotExistInDirectory);
-	}
-
-	// The result
 	std::auto_ptr<IOStream> stream;
 
-	// Does this depend on anything?
-	if(pfileEntry->GetDependsNewer() != 0)
+	try
 	{
-		// File exists, but is a patch from a new version. Generate the older version.
-		std::vector<int64_t> patchChain;
-		int64_t id = mObjectID;
-		BackupStoreDirectory::Entry *en = 0;
-		do
-		{
-			patchChain.push_back(id);
-			en = rdir.FindEntryByID(id);
-			if(en == 0)
-			{
-				BOX_ERROR("Object " <<
-					BOX_FORMAT_OBJECTID(mObjectID) <<
-					" in dir " <<
-					BOX_FORMAT_OBJECTID(mInDirectory) <<
-					" for account " <<
-					BOX_FORMAT_ACCOUNT(rContext.GetClientID()) <<
-					" references object " <<
-					BOX_FORMAT_OBJECTID(id) <<
-					" which does not exist in dir");
-				return PROTOCOL_ERROR(Err_PatchConsistencyError);
-			}
-			id = en->GetDependsNewer();
-		}
-		while(en != 0 && id != 0);
-
-		// OK! The last entry in the chain is the full file, the others are patches back from it.
-		// Open the last one, which is the current from file
-		std::auto_ptr<IOStream> from(rContext.OpenObject(patchChain[patchChain.size() - 1]));
-
-		// Then, for each patch in the chain, do a combine
-		for(int p = ((int)patchChain.size()) - 2; p >= 0; --p)
-		{
-			// ID of patch
-			int64_t patchID = patchChain[p];
-
-			// Open it a couple of times
-			std::auto_ptr<IOStream> diff(rContext.OpenObject(patchID));
-			std::auto_ptr<IOStream> diff2(rContext.OpenObject(patchID));
-
-			// Choose a temporary filename for the result of the combination
-			std::ostringstream fs;
-			fs << rContext.GetAccountRoot() << ".recombinetemp." << p;
-			std::string tempFn =
-				RaidFileController::DiscSetPathToFileSystemPath(
-					rContext.GetStoreDiscSet(), fs.str(),
-					p + 16);
-
-			// Open the temporary file
-			std::auto_ptr<IOStream> combined(
-				new InvisibleTempFileStream(
-					tempFn, O_RDWR | O_CREAT | O_EXCL |
-					O_BINARY | O_TRUNC));
-
-			// Do the combining
-			BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
-
-			// Move to the beginning of the combined file
-			combined->Seek(0, IOStream::SeekType_Absolute);
-
-			// Then shuffle round for the next go
-			if (from.get()) from->Close();
-			from = combined;
-		}
-
-		// Now, from contains a nice file to send to the client. Reorder it
-		{
-			// Write nastily to allow this to work with gcc 2.x
-			std::auto_ptr<IOStream> t(BackupStoreFile::ReorderFileToStreamOrder(from.get(), true /* take ownership */));
-			stream = t;
-		}
-
-		// Release from file to avoid double deletion
-		from.release();
+		stream = rContext.GetFile(mObjectID, mInDirectory);
 	}
-	else
+	catch(BackupStoreException &e)
 	{
-		// Simple case: file already exists on disc ready to go
-
-		// Open the object
-		std::auto_ptr<IOStream> object(rContext.OpenObject(mObjectID));
-		BufferedStream buf(*object);
-
-		// Verify it
-		if(!BackupStoreFile::VerifyEncodedFileFormat(buf))
+		if(EXCEPTION_IS_TYPE(e, BackupStoreException, ObjectDoesNotExist))
 		{
-			return PROTOCOL_ERROR(Err_FileDoesNotVerify);
+			return PROTOCOL_ERROR(Err_DoesNotExist);
 		}
-
-		// Reset stream -- seek to beginning
-		object->Seek(0, IOStream::SeekType_Absolute);
-
-		// Reorder the stream/file into stream order
+		else
 		{
-			// Write nastily to allow this to work with gcc 2.x
-			std::auto_ptr<IOStream> t(BackupStoreFile::ReorderFileToStreamOrder(object.get(), true /* take ownership */));
-			stream = t;
+			throw;
 		}
-
-		// Object will be deleted when the stream is deleted,
-		// so can release the object auto_ptr here to avoid
-		// premature deletion
-		object.release();
 	}
 
 	// Stream the reordered stream to the peer
@@ -957,10 +845,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 	// Get store info from context
 	const BackupStoreInfo &rinfo(rContext.GetBackupStoreInfo());
 
-	// Find block size
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(rinfo.GetDiscSetNumber()));
-
 	// Return info
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolAccountUsage(
 		rinfo.GetBlocksUsed(),
@@ -969,7 +853,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 		rinfo.GetBlocksInDirectories(),
 		rinfo.GetBlocksSoftLimit(),
 		rinfo.GetBlocksHardLimit(),
-		rdiscSet.GetBlockSize()
+		rContext.GetBlockSize()
 	));
 }
 
@@ -1007,10 +891,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	// Get store info from context
 	const BackupStoreInfo &info(rContext.GetBackupStoreInfo());
 
-	// Find block size
-	RaidFileController &rcontroller(RaidFileController::GetController());
-	RaidFileDiscSet &rdiscSet(rcontroller.GetDiscSet(info.GetDiscSetNumber()));
-
 	// Return info
 	BackupProtocolAccountUsage2* usage = new BackupProtocolAccountUsage2();
 	std::auto_ptr<BackupProtocolMessage> reply(usage);
@@ -1018,7 +898,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	COPY(AccountName);
 	usage->SetAccountEnabled(info.IsAccountEnabled());
 	COPY(ClientStoreMarker);
-	usage->SetBlockSize(rdiscSet.GetBlockSize());
+	usage->SetBlockSize(rContext.GetBlockSize());
 	COPY(LastObjectIDUsed);
 	COPY(BlocksUsed);
 	COPY(BlocksInCurrentFiles);

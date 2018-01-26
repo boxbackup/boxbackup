@@ -118,10 +118,6 @@ public:
 		{
 			// Child task, dump leaks to trace, which we make sure is on
 			#ifdef BOX_MEMORY_LEAK_TESTING
-				#ifndef BOX_RELEASE_BUILD
-					TRACE_TO_SYSLOG(true);
-					TRACE_TO_STDOUT(true);
-				#endif
 				memleakfinder_traceblocksinsection();
 			#endif
 
@@ -208,7 +204,7 @@ public:
 								}
 
 								// unlink anything there
-								::unlink(c[1].c_str());
+								EMU_UNLINK(c[1].c_str());
 								
 								psocket->Listen(Socket::TypeUNIX, c[1].c_str());
 							#endif // WIN32
@@ -258,9 +254,9 @@ public:
 					// Was there one (there should be...)
 					if(connection.get())
 					{
-						// Since this is a template parameter, the if() will be optimised out by the compiler
 						#ifndef WIN32 // no fork on Win32
-						if(ForkToHandleRequests && !IsSingleProcess())
+						// Since this is a template parameter, the if() will be optimised out by the compiler
+						if(IsForkPerClient())
 						{
 							pid_t pid = ::fork();
 							switch(pid)
@@ -306,7 +302,20 @@ public:
 						#endif // !WIN32
 							// Just handle in this process
 							SetProcessTitle("handling");
-							HandleConnection(connection);
+
+							try
+							{
+								HandleConnection(connection);
+							}
+							catch(BoxException &e)
+							{
+								// When only a single process is handling requests, then don't rethrow the
+								// exception, since that would kill the entire server process. Instead,
+								// just log it and keep going.
+								BOX_ERROR("Failed to process a request in single-process mode: "
+									"caught exception: " << e.what());
+							}
+
 							SetProcessTitle("idle");										
 						#ifndef WIN32
 						}
@@ -318,16 +327,17 @@ public:
 
 				#ifndef WIN32
 				// Clean up child processes (if forking daemon)
-				if(ForkToHandleRequests && !IsSingleProcess())
+				if(IsForkPerClient())
 				{
 					WaitForChildren();
 				}
 				#endif // !WIN32
 			}
 		}
-		catch(...)
+		catch(std::exception &e)
 		{
 			DeleteSockets();
+			// Allow the exception to kill the worker process, if uncaught higher up:
 			throw;
 		}
 		
@@ -400,11 +410,7 @@ protected:
 	// depends on the forking model in case someone changes it later.
 	bool WillForkToHandleRequests()
 	{
-		#ifdef WIN32
-		return false;
-		#else
-		return ForkToHandleRequests && !IsSingleProcess();
-		#endif // WIN32
+		return IsForkPerClient();
 	}
 
 private:

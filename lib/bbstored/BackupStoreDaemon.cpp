@@ -96,7 +96,7 @@ const char *BackupStoreDaemon::DaemonName() const
 // --------------------------------------------------------------------------
 std::string BackupStoreDaemon::DaemonBanner() const
 {
-	return BANNER_TEXT("Backup Store Server");
+	return BANNER_TEXT("store server (bbstored)");
 }
 
 
@@ -171,14 +171,17 @@ void BackupStoreDaemon::Run()
 	mExtendedLogging = false;
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
+	int housekeeping_pid;
 	
 	// Fork off housekeeping daemon -- must only do this the first
 	// time Run() is called.  Housekeeping runs synchronously on Win32
 	// because IsSingleProcess() is always true
 	
 #ifndef WIN32
-	if(!IsSingleProcess() && !mHaveForkedHousekeeping)
+	if(IsForkPerClient() && !mHaveForkedHousekeeping)
 	{
+		// Housekeeping will be done by a specialised child process.
+
 		// Open a socket pair for communication
 		int sv[2] = {-1,-1};
 		if(::socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, sv) != 0)
@@ -188,7 +191,8 @@ void BackupStoreDaemon::Run()
 		int whichSocket = 0;
 		
 		// Fork
-		switch(::fork())
+		housekeeping_pid = ::fork();
+		switch(housekeeping_pid)
 		{
 		case -1:
 			{
@@ -259,6 +263,39 @@ void BackupStoreDaemon::Run()
 		if(IsTerminateWanted())
 		{
 			mInterProcessCommsSocket.Write("t\n", 2);
+
+#ifndef WIN32 // waitpid() only works with fork(), and thus not on Windows
+			// Wait for housekeeping to finish, and report its status, otherwise it
+			// can remain running and write to the console after the main process has
+			// died, which can confuse the tests.
+			int child_state;
+			if(waitpid(housekeeping_pid, &child_state, 0) == -1)
+			{
+				BOX_LOG_SYS_ERROR("Failed to wait for housekeeping child process "
+					"to finish");
+			}
+			else if(WIFEXITED(child_state))
+			{
+				if(WEXITSTATUS(child_state) == 0)
+				{
+					BOX_TRACE("Housekeeping child process exited normally");
+				}
+				else
+				{
+					BOX_ERROR("Housekeeping child process exited with "
+						"status " << WEXITSTATUS(child_state));
+				}
+			}
+			else if(WIFSIGNALED(child_state))
+			{
+				BOX_ERROR("Housekeeping child process terminated with signal " <<
+					WTERMSIG(child_state));
+			}
+			else
+			{
+				BOX_ERROR("Housekeeping child process terminated in unexpected manner");
+			}
+#endif // !WIN32
 		}
 	}
 }
@@ -331,7 +368,7 @@ void BackupStoreDaemon::Connection2(std::auto_ptr<SocketStreamTLS> apStream)
 	// Create a context, using this ID
 	BackupStoreContext context(id, this, GetConnectionDetails());
 
-	if (mpTestHook)
+	if(mpTestHook)
 	{
 		context.SetTestHook(*mpTestHook);
 	}

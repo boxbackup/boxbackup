@@ -67,22 +67,18 @@ Daemon::Daemon()
 	: mReloadConfigWanted(false),
 	  mTerminateWanted(false),
 	#ifdef WIN32
-	  mSingleProcess(true),
-	  mRunInForeground(true),
+	  mDaemonize(false),
+	  mForkPerClient(false),
 	  mKeepConsoleOpenAfterFork(true),
 	#else
-	  mSingleProcess(false),
-	  mRunInForeground(false),
+	  mDaemonize(true),
+	  mForkPerClient(true),
 	  mKeepConsoleOpenAfterFork(false),
 	#endif
 	  mHaveConfigFile(false),
 	  mLogFileLevel(Log::INVALID),
 	  mAppName(DaemonName())
 {
-	// In debug builds, switch on assert failure logging to syslog
-	ASSERT_FAILS_TO_SYSLOG_ON
-	// And trace goes to syslog too
-	TRACE_TO_SYSLOG(true)
 }
 
 // --------------------------------------------------------------------------
@@ -112,9 +108,9 @@ Daemon::~Daemon()
 std::string Daemon::GetOptionString()
 {
 	return std::string("c:"
-	#ifndef WIN32
+#ifndef WIN32
 		"DF"
-	#endif
+#endif
 		"hkKo:O:") + Logging::OptionParser::GetOptionString();
 }
 
@@ -131,8 +127,8 @@ void Daemon::Usage()
 	"             argument is the configuration file, or else the default \n"
 	"             [" << GetConfigFileName() << "]\n"
 #ifndef WIN32
-	"  -D         Debugging mode, do not fork, one process only, one client only\n"
-	"  -F         Do not fork into background, but fork to serve multiple clients\n"
+	"  -D         Do not daemonize (fork into background)\n"
+	"  -F         Do not fork a new process for each client\n"
 #endif
 	"  -k         Keep console open after fork, keep writing log messages to it\n"
 	"  -K         Stop writing log messages to console while daemon is running\n"
@@ -166,13 +162,13 @@ int Daemon::ProcessOption(signed int option)
 #ifndef WIN32
 		case 'D':
 		{
-			mSingleProcess = true;
+			mDaemonize = false;
 		}
 		break;
 
 		case 'F':
 		{
-			mRunInForeground = true;
+			mForkPerClient = false;
 		}
 		break;
 #endif // !WIN32
@@ -297,11 +293,6 @@ int Daemon::ProcessOptions(int argc, const char *argv[])
 	{
 		mConfigFileName = argv[optind]; optind++;
 		mHaveConfigFile = true;
-	}
-
-	if (argc > optind && ::strcmp(argv[optind], "SINGLEPROCESS") == 0)
-	{
-		mSingleProcess = true; optind++;
 	}
 
 	if (argc > optind)
@@ -447,8 +438,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	std::string pidFileName;
 
-	bool asDaemon = !mSingleProcess && !mRunInForeground;
-
 	try
 	{
 		if (!Configure(rConfigFileName))
@@ -490,7 +479,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 			daemonUser.ChangeProcessUser();
 		}
 
-		if(asDaemon)
+		if(mDaemonize)
 		{
 			// Let's go... Daemonise...
 			switch(::fork())
@@ -568,11 +557,11 @@ int Daemon::Main(const std::string &rConfigFileName)
 #endif // !WIN32
 
 		// Write PID to file
-		char pid[32];
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		std::string pid_str = pid_buf.str();
 
-		int pidsize = snprintf(pid, sizeof(pid), "%d", (int)getpid());
-
-		if(::write(pidFile, pid, pidsize) != pidsize)
+		if(::write(pidFile, pid_str.c_str(), pid_str.size()) != pid_str.size())
 		{
 			BOX_LOG_SYS_FATAL("Failed to write PID file: " <<
 				pidFileName);
@@ -587,7 +576,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		#endif // BOX_MEMORY_LEAK_TESTING
 	
-		if(asDaemon && !mKeepConsoleOpenAfterFork)
+		if(mDaemonize && !mKeepConsoleOpenAfterFork)
 		{
 #ifndef WIN32
 			// Close standard streams
@@ -611,10 +600,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 			{
 				::close(devnull);
 			}
-
-			// And definitely don't try and send anything to those file descriptors
-			// -- this has in the past sent text to something which isn't expecting it.
-			TRACE_TO_STDOUT(false);
 #endif // ! WIN32
 			Logging::ToConsole(false);
 		}
@@ -640,20 +625,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 		BOX_FATAL("Failed to start: unknown error");
 		return 1;
 	}
-
-#ifdef WIN32
-	// Under win32 we must initialise the Winsock library
-	// before using sockets
-
-	WSADATA info;
-
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR)
-	{
-		// will not run without sockets
-		BOX_FATAL("Failed to initialise Windows Sockets");
-		THROW_EXCEPTION(CommonException, Internal)
-	}
-#endif
 
 	int retcode = 0;
 	
@@ -698,7 +669,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		
 		// Delete the PID file
-		::unlink(pidFileName.c_str());
+		EMU_UNLINK(pidFileName.c_str());
 		
 		// Log
 		BOX_NOTICE("Terminating daemon");
@@ -726,7 +697,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 #else
 	// Should clean up here, but it breaks memory leak tests.
 	/*
-	if(asDaemon)
+	if(mDaemonize)
 	{
 		// we are running in the child by now, and should not return
 		mapConfiguration.reset();

@@ -9,7 +9,9 @@
 
 #include "Box.h"
 
-#include <stdlib.h>
+#include <cctype> // for std::isalnum
+#include <cstdlib>
+#include <ostream>
 
 #include "HTTPQueryDecoder.h"
 
@@ -157,3 +159,41 @@ void HTTPQueryDecoder::Finish()
 }
 
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    HTTPQueryDecoder::URLEncode()
+//		Purpose: URL-encode a value according to Amazon's rules,
+//			 which are similar to RFC 3986.
+//		Created: 2015-11-15
+//
+// --------------------------------------------------------------------------
+
+std::string HTTPQueryDecoder::URLEncode(const std::string& value)
+{
+	std::ostringstream out;
+	for(std::string::const_iterator i = value.begin(); i != value.end(); i++)
+	{
+		// Do not URL encode any of the unreserved characters that RFC 3986
+		// defines: A-Z, a-z, 0-9, hyphen ( - ), underscore ( _ ), period ( . ),
+		// and tilde ( ~ ).
+		if(std::isalnum(*i) || *i == '-' || *i == '_' || *i == '.' || *i == '~')
+		{
+			out << *i;
+		}
+		else
+		{
+			// Percent encode all other characters with %XY, where X and Y are
+			// hex characters 0-9 and uppercase A-F.
+			out << "%" <<
+				std::hex <<
+				std::uppercase <<
+				std::internal <<
+				std::setw(2) <<
+				std::setfill('0') <<
+				(int)(unsigned char)(*i) <<
+				std::dec;
+		}
+	}
+	return out.str();
+}

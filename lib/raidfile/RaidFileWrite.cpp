@@ -57,7 +57,8 @@ RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename)
 	: mSetNumber(SetNumber),
 	  mFilename(Filename),
 	  mOSFileHandle(-1), // not valid file handle
-	  mRefCount(-1) // unknown refcount
+	  mRefCount(-1), // unknown refcount
+	  mAllowOverwrite(false) // safe default
 {
 }
 
@@ -76,7 +77,8 @@ RaidFileWrite::RaidFileWrite(int SetNumber, const std::string &Filename,
 	: mSetNumber(SetNumber),
 	  mFilename(Filename),
 	  mOSFileHandle(-1),		// not valid file handle
-	  mRefCount(refcount)
+	  mRefCount(refcount),
+	  mAllowOverwrite(false) // safe default
 {
 	// Can't check for zero refcount here, because it's legal
 	// to create a RaidFileWrite to delete an object with zero refcount.
@@ -142,7 +144,9 @@ void RaidFileWrite::Open(bool AllowOverwrite)
 	{
 		THROW_EXCEPTION(RaidFileException, AlreadyOpen)
 	}
-	
+
+	mAllowOverwrite = AllowOverwrite;
+
 	// Get disc set
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(mSetNumber));
@@ -329,7 +333,10 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 		THROW_EXCEPTION(RaidFileException, NotOpen)
 	}
 
-	if (mRefCount == 0)
+	// It's allowed to create a file with no references, but you must pass
+	// AllowOverwrite = false when opening it to assert that it doesn't already
+	// exist. You cannot modify an existing file with no references.
+	if(mRefCount == 0 && mAllowOverwrite)
 	{
 		THROW_FILE_ERROR("Attempted to modify object file with "
 			"no references", mTempFilename, RaidFileException,
@@ -358,7 +365,7 @@ void RaidFileWrite::Commit(bool ConvertToRaidNow)
 
 #ifdef WIN32
 	// need to delete the target first
-	if(::unlink(renameTo.c_str()) != 0)
+	if(EMU_UNLINK(renameTo.c_str()) != 0)
 	{
 		DWORD errorNumber = GetLastError();
 		if (errorNumber != ERROR_FILE_NOT_FOUND)
@@ -421,9 +428,9 @@ void RaidFileWrite::Discard()
 #ifdef WIN32
 	// On Win32 we must close it first
 	if (::close(mOSFileHandle) != 0 ||
-		::unlink(writeFilename.c_str()) != 0)
+		EMU_UNLINK(writeFilename.c_str()) != 0)
 #else // !WIN32
-	if (::unlink(writeFilename.c_str()) != 0 ||
+	if (EMU_UNLINK(writeFilename.c_str()) != 0 ||
 		::close(mOSFileHandle) != 0)
 #endif // !WIN32
 	{
@@ -520,15 +527,12 @@ void RaidFileWrite::TransformToRaidStorage()
 	// Then open them all for writing (in strict order)
 	try
 	{
-#if HAVE_DECL_O_EXLOCK
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_BINARY)> parity(parityFilenameW.c_str());
-#else
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe1(stripe1FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> stripe2(stripe2FilenameW.c_str());
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_EXCL | O_BINARY)> parity(parityFilenameW.c_str());
-#endif
+		FileStream stripe1(stripe1FilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
+		FileStream stripe2(stripe2FilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
+		FileStream parity(parityFilenameW, O_WRONLY | O_CREAT | O_EXCL | O_BINARY, 0755,
+			FileStream::EXCLUSIVE);
 
 		// Then... read in data...
 		int bytesRead = -1;
@@ -608,10 +612,7 @@ void RaidFileWrite::TransformToRaidStorage()
 				}
 
 				// Write block
-				if(::write(parity, parityBuffer, parityWriteSize) != parityWriteSize)
-				{
-					THROW_EXCEPTION(RaidFileException, OSError)
-				}
+				parity.Write(parityBuffer, parityWriteSize);
 			}
 
 			// Write stripes
@@ -622,10 +623,14 @@ void RaidFileWrite::TransformToRaidStorage()
 				int toWrite = (l == (blocksToDo - 1))
 								?(bytesRead - ((blocksToDo-1)*blockSize))
 								:blockSize;
-				if(::write(((l&1)==0)?stripe1:stripe2, writeFrom, toWrite) != toWrite)
+				if((l & 1) == 0)
 				{
-					THROW_EXCEPTION(RaidFileException, OSError)
-				}			
+					stripe1.Write(writeFrom, toWrite);
+				}
+				else
+				{
+					stripe2.Write(writeFrom, toWrite);
+				}
 
 				// Next block
 				writeFrom += blockSize;
@@ -634,10 +639,12 @@ void RaidFileWrite::TransformToRaidStorage()
 			// Count of blocks done
 			blocksDone += blocksToDo;
 		}
+
 		// Error on read?
 		if(bytesRead == -1)
 		{
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_FILE_ERROR("Failed to read from temporary RAID file", writeFilename,
+				RaidFileException, OSError);
 		}
 		
 		// Special case for zero length files
@@ -652,13 +659,8 @@ void RaidFileWrite::TransformToRaidStorage()
 		{
 			ASSERT(sizeof(writeFileStat.st_size) <= sizeof(RaidFileRead::FileSizeType));
 			RaidFileRead::FileSizeType sw = box_hton64(writeFileStat.st_size);
-			ASSERT((::lseek(parity, 0, SEEK_CUR) % blockSize) == 0);
-			if(::write(parity, &sw, sizeof(sw)) != sizeof(sw))
-			{
-				BOX_LOG_SYS_ERROR("Failed to write to file: " <<
-					writeFilename);
-				THROW_EXCEPTION(RaidFileException, OSError)
-			}
+			ASSERT((parity.GetPosition() % blockSize) == 0);
+			parity.Write(&sw, sizeof(sw));
 		}
 
 		// Then close the written files (note in reverse order of opening)
@@ -667,10 +669,10 @@ void RaidFileWrite::TransformToRaidStorage()
 		stripe1.Close();
 
 #ifdef WIN32
-		// Must delete before renaming
+		// Must delete any existing file before renaming over it
 		#define CHECK_UNLINK(file) \
 		{ \
-			if (::unlink(file) != 0 && errno != ENOENT) \
+			if (EMU_UNLINK(file) != 0 && errno != ENOENT) \
 			{ \
 				THROW_EMU_ERROR("Failed to unlink raidfile " \
 					"stripe: " << file, RaidFileException, \
@@ -688,29 +690,28 @@ void RaidFileWrite::TransformToRaidStorage()
 			|| ::rename(stripe2FilenameW.c_str(), stripe2Filename.c_str()) != 0
 			|| ::rename(parityFilenameW.c_str(), parityFilename.c_str()) != 0)
 		{
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_ERROR("Failed to rename file", RaidFileException, OSError);
 		}
 
 		// Close the write file
 		writeFile.Close();
 
 		// Finally delete the write file
-		if(::unlink(writeFilename.c_str()) != 0)
+		if(EMU_UNLINK(writeFilename.c_str()) != 0)
 		{
-			BOX_LOG_SYS_ERROR("Failed to delete file: " <<
-				writeFilename);
-			THROW_EXCEPTION(RaidFileException, OSError)
+			THROW_SYS_FILE_ERROR("Failed to delete file", writeFilename,
+				RaidFileException, OSError);
 		}
 	}
 	catch(...)
 	{
 		// Unlink all the dodgy files
-		::unlink(stripe1Filename.c_str());
-		::unlink(stripe2Filename.c_str());
-		::unlink(parityFilename.c_str());
-		::unlink(stripe1FilenameW.c_str());
-		::unlink(stripe2FilenameW.c_str());
-		::unlink(parityFilenameW.c_str());
+		EMU_UNLINK(stripe1Filename.c_str());
+		EMU_UNLINK(stripe2Filename.c_str());
+		EMU_UNLINK(parityFilename.c_str());
+		EMU_UNLINK(stripe1FilenameW.c_str());
+		EMU_UNLINK(stripe2FilenameW.c_str());
+		EMU_UNLINK(parityFilenameW.c_str());
 		
 		// and send the error on its way
 		throw;
@@ -754,7 +755,7 @@ void RaidFileWrite::Delete()
 
 	// Attempt to delete it
 	bool deletedSomething = false;
-	if(::unlink(writeFilename.c_str()) == 0)
+	if(EMU_UNLINK(writeFilename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
@@ -769,15 +770,15 @@ void RaidFileWrite::Delete()
 	std::string stripe1Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 0 % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string stripe2Filename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 1 % TRANSFORM_NUMBER_DISCS_REQUIRED));
 	std::string parityFilename(RaidFileUtil::MakeRaidComponentName(rdiscSet, mFilename, 2 % TRANSFORM_NUMBER_DISCS_REQUIRED));
-	if(::unlink(stripe1Filename.c_str()) == 0)
+	if(EMU_UNLINK(stripe1Filename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
-	if(::unlink(stripe2Filename.c_str()) == 0)
+	if(EMU_UNLINK(stripe2Filename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}
-	if(::unlink(parityFilename.c_str()) == 0)
+	if(EMU_UNLINK(parityFilename.c_str()) == 0)
 	{
 		deletedSomething = true;
 	}

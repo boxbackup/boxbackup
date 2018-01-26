@@ -127,17 +127,17 @@ void HTTPServer::Run()
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    HTTPServer::Connection(SocketStream &) 
+//		Name:    HTTPServer::Connection(SocketStream &)
 //		Purpose: As interface, handle connection
 //		Created: 26/3/04
 //
 // --------------------------------------------------------------------------
 void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 {
-	// Create a get line object to use
+	// Create an IOStreamGetLine object to help read the request in.
 	IOStreamGetLine getLine(*apConn);
 
-	// Notify dervived claases
+	// Notify derived classes
 	HTTPConnectionOpening();
 
 	bool handleRequests = true;
@@ -190,9 +190,9 @@ void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 			// Stop now
 			handleRequests = false;
 		}
-	
-		// Send the response (omit any content if this is a HEAD method request)
-		response.Send(request.GetMethod() == HTTPRequest::Method_HEAD);
+
+		// Send the response
+		response.Send(mTimeout);
 	}
 
 	// Notify derived classes
@@ -214,17 +214,16 @@ void HTTPServer::SendInternalErrorResponse(const std::string& rErrorMsg,
 {
 	#define ERROR_HTML_1 "<html><head><title>Internal Server Error</title></head>\n" \
 			"<h1>Internal Server Error</h1>\n" \
-			"<p>An error, type "
-	#define ERROR_HTML_2 " occured when processing the request.</p>" \
-			"<p>Please try again later.</p>" \
+			"<p>An error occurred while processing the request:</p>\n<pre>"
+	#define ERROR_HTML_2 "</pre>\n<p>Please try again later.</p>" \
 			"</body>\n</html>\n"
 
 	// Generate the error page
-	// rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
+	rResponse.SetResponseCode(HTTPResponse::Code_InternalServerError);
 	rResponse.SetContentType("text/html");
-	rResponse.Write(ERROR_HTML_1, sizeof(ERROR_HTML_1) - 1);
-	rResponse.IOStream::Write(rErrorMsg.c_str());
-	rResponse.Write(ERROR_HTML_2, sizeof(ERROR_HTML_2) - 1);
+	rResponse.Write(ERROR_HTML_1);
+	rResponse.Write(rErrorMsg);
+	rResponse.Write(ERROR_HTML_2);
 }
 
 

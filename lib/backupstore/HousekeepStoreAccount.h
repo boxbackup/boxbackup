@@ -17,6 +17,7 @@
 #include "BackupStoreRefCountDatabase.h"
 
 class BackupStoreDirectory;
+class BackupFileSystem;
 
 class HousekeepingCallback
 {
@@ -36,28 +37,28 @@ class HousekeepingCallback
 class HousekeepStoreAccount
 {
 public:
-	HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot,
-		int StoreDiscSet, HousekeepingCallback* pHousekeepingCallback);
+	HousekeepStoreAccount(BackupFileSystem& FileSystem,
+		HousekeepingCallback* pHousekeepingCallback);
 	~HousekeepStoreAccount();
-	
+
 	bool DoHousekeeping(bool KeepTryingForever = false);
 	int GetErrorCount() { return mErrorCount; }
-	
+
 private:
 	// utility functions
-	void MakeObjectFilename(int64_t ObjectID, std::string &rFilenameOut);
-
 	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
+	void RemoveReferenceAndMaybeDeleteFile(int64_t FileID, int64_t DirID,
+		const std::string& reason, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteEmptyDirectories(BackupStoreInfo& rBackupStoreInfo);
 	void DeleteEmptyDirectory(int64_t dirId, std::vector<int64_t>& rToExamine,
 		BackupStoreInfo& rBackupStoreInfo);
 	BackupStoreRefCountDatabase::refcount_t DeleteFile(int64_t InDirectory,
 		int64_t ObjectID,
 		BackupStoreDirectory &rDirectory,
-		const std::string &rDirectoryFilename,
 		BackupStoreInfo& rBackupStoreInfo);
 	void UpdateDirectorySize(BackupStoreDirectory &rDirectory,
+		IOStream::pos_type old_size_in_blocks,
 		IOStream::pos_type new_size_in_blocks);
 
 	typedef struct
@@ -69,29 +70,28 @@ private:
 		int32_t mVersionAgeWithinMark;	// 0 == current, 1 latest old version, etc
 		bool    mIsFlagDeleted; // false for files flagged "Old"
 	} DelEn;
-	
+
 	struct DelEnCompare
 	{
 		bool operator()(const DelEn &x, const DelEn &y);
 	};
-	
-	int mAccountID;
-	std::string mStoreRoot;
-	int mStoreDiscSet;
+
+	BackupFileSystem& mrFileSystem;
 	HousekeepingCallback* mpHousekeepingCallback;
-	
+
 	int64_t mDeletionSizeTarget;
-	
+
+	std::vector<std::pair<int64_t, int64_t> > mDefiniteDeletions;
 	std::set<DelEn, DelEnCompare> mPotentialDeletions;
 	int64_t mPotentialDeletionsTotalSize;
 	int64_t mMaxSizeInPotentialDeletions;
-	
+
 	// List of directories which are empty, and might be good for deleting
 	std::vector<int64_t> mEmptyDirectories;
 
 	// Count of errors found and fixed
 	int64_t mErrorCount;
-	
+
 	// The re-calculated blocks used stats
 	int64_t mBlocksUsed;
 	int64_t mBlocksInOldFiles;
@@ -103,14 +103,14 @@ private:
 	int64_t mBlocksInOldFilesDelta;
 	int64_t mBlocksInDeletedFilesDelta;
 	int64_t mBlocksInDirectoriesDelta;
-	
+
 	// Deletion count
 	int64_t mFilesDeleted;
 	int64_t mEmptyDirectoriesDeleted;
 
 	// New reference count list
-	std::auto_ptr<BackupStoreRefCountDatabase> mapNewRefs;
-	
+	BackupStoreRefCountDatabase* mpNewRefs;
+
 	// Poll frequency
 	int mCountUntilNextInterprocessMsgCheck;
 

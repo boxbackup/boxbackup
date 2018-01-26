@@ -12,7 +12,7 @@
 
 #include <string>
 
-#include "GetLine.h"
+#include "LineBuffer.h"
 #include "IOStream.h"
 
 // --------------------------------------------------------------------------
@@ -23,7 +23,7 @@
 //		Created: 2003/07/24
 //
 // --------------------------------------------------------------------------
-class IOStreamGetLine : public GetLine
+class IOStreamGetLine : public LineBuffer
 {
 public:
 	IOStreamGetLine(IOStream &Stream);
@@ -32,14 +32,6 @@ private:
 	IOStreamGetLine(const IOStreamGetLine &rToCopy);
 
 public:
-	bool GetLine(std::string &rOutput, bool Preprocess = false, int Timeout = IOStream::TimeOutInfinite);
-	std::string GetLine()
-	{
-		std::string output;
-		GetLine(output);
-		return output;
-	}
-
 	// Call to detach, setting file pointer correctly to last bit read.
 	// Only works for lseek-able file descriptors.
 	void DetachFile();

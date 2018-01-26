@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HAVE_EXECINFO_H
+#	include <execinfo.h>
+#endif
+
 #ifdef HAVE_PROCESS_H
 #	include <process.h>
 #endif
@@ -33,15 +37,24 @@
 #include <set>
 
 #include "MemLeakFinder.h"
+#include "Utils.h"
 
 static bool memleakfinder_initialised = false;
 bool memleakfinder_global_enable = false;
+
+#if !defined BOX_RELEASE_BUILD && defined HAVE_EXECINFO_H
+#	define BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+#endif
 
 typedef struct
 {
 	size_t size;
 	const char *file;
 	int line;
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+	void  *stack_frames[20];
+	size_t stack_size;
+#endif
 } MallocBlockInfo;
 
 typedef struct
@@ -50,6 +63,10 @@ typedef struct
 	const char *file;
 	int line;
 	bool array;
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+	void  *stack_frames[20];
+	size_t stack_size;
+#endif
 } ObjectInfo;
 
 namespace
@@ -529,8 +546,8 @@ void memleakfinder_reportleaks_file(FILE *file)
 	{
 		if(is_leak(i->first))
 		{
-			::fprintf(file, "Block %p size %d allocated at "
-				"%s:%d\n", i->first, i->second.size,
+			::fprintf(file, "Block %p size %lu allocated at "
+				"%s:%d\n", i->first, (unsigned long)i->second.size,
 				i->second.file, i->second.line);
 		}
 	}
@@ -540,10 +557,17 @@ void memleakfinder_reportleaks_file(FILE *file)
 	{
 		if(is_leak(i->first))
 		{
-			::fprintf(file, "Object%s %p size %d allocated at "
+			::fprintf(file, "Object%s %p size %lu allocated at "
 				"%s:%d\n", i->second.array?" []":"",
-				i->first, i->second.size, i->second.file,
+				i->first, (unsigned long)i->second.size, i->second.file,
 				i->second.line);
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+			if(file == stdout)
+			{
+				DumpStackBacktrace(__FILE__, i->second.stack_size,
+					i->second.stack_frames);
+			}
+#endif
 		}
 	}
 }
@@ -628,6 +652,9 @@ void add_object_block(void *block, size_t size, const char *file, int line, bool
 		i.file = file;
 		i.line = line;
 		i.array = array;
+#ifdef BOX_MEMORY_LEAK_BACKTRACE_ENABLED
+		i.stack_size = backtrace(i.stack_frames, 20);
+#endif
 		sObjectBlocks[block] = i;
 		
 		if(sTrackObjectsInSection)
@@ -723,6 +750,32 @@ void operator delete[](void *ptr) throw ()
 }
 
 void operator delete(void *ptr) throw ()
+{
+	internal_delete(ptr);
+}
+
+/*
+    We need to implement a placement operator delete too:
+
+    "If the object is being created as part of a new expression, and an exception
+    is thrown, the object’s memory is deallocated by calling the appropriate
+    deallocation function. If the object is being created with a placement new
+    operator, the corresponding placement delete operator is called—that is, the
+    delete function that takes the same additional parameters as the placement new
+    operator. If no matching placement delete is found, no deallocation takes
+    place."
+
+    So to avoid memory leaks, we need to implement placement delete operators that
+    correspond to our placement new, which we use for leak detection (ironically)
+    in debug builds.
+*/
+
+void operator delete(void *ptr, const char *file, int line)
+{
+	internal_delete(ptr);
+}
+
+void operator delete[](void *ptr, const char *file, int line)
 {
 	internal_delete(ptr);
 }

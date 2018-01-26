@@ -10,27 +10,46 @@ solaris*)
   ;;
 esac
 
+# If the compiler supports it, force errors on unknown flags, so that detection works:
+AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
+	[cxxflags_force_error="-Werror=unknown-warning-option"])
+
+# Reduce compiler flag checking to a one-liner, needed for CMake to parse them
+AC_DEFUN([BOX_CHECK_CXX_FLAG],
+	# GCC suppresses warnings for -Wno-* flags unless another error occurs,
+	# so we need to use the opposite flag for detection purpose
+	_ac_detect_flag="$2"
+	_ac_detect_flag=${_ac_detect_flag:-$1}
+	AX_CHECK_COMPILE_FLAG($_ac_detect_flag,
+		[cxxflags_strict="$cxxflags_strict $1"],,
+		$cxxflags_force_error)
+)
+
 # Enable some compiler flags if the compiler supports them. This gives better warnings
 # and detects some problems early.
-AX_CHECK_COMPILE_FLAG(-Wall, [cxxflags_strict="$cxxflags_strict -Wall"])
-# -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
-# to disable it for now so that we can concentrate on real errors:
-dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-AX_CHECK_COMPILE_FLAG(-Werror=return-type,
-	[cxxflags_strict="$cxxflags_strict -Werror=return-type"])
-AX_CHECK_COMPILE_FLAG(-Werror=delete-non-virtual-dtor,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-non-virtual-dtor"])
-AX_CHECK_COMPILE_FLAG(-Werror=undefined-bool-conversion,
-	[cxxflags_strict="$cxxflags_strict -Werror=undefined-bool-conversion"])
-# We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
-dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
-dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
+BOX_CHECK_CXX_FLAG(-Wall)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=narrowing)
+BOX_CHECK_CXX_FLAG(-Werror=parentheses)
+BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
+BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
+BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
+BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
-AX_CHECK_COMPILE_FLAG(-Werror=delete-incomplete,
-	[cxxflags_strict="$cxxflags_strict -Werror=delete-incomplete"])
-AX_CHECK_COMPILE_FLAG(-Wno-deprecated-declarations,
-	[cxxflags_strict="$cxxflags_strict -Wno-deprecated-declarations"])
+BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+# Using Boost properly seems to need C++0x, or at least the "auto" type.
+# We don't need CMake to parse this, because it has built-in feature detecting macros
+# which we use instead:
+AX_CHECK_COMPILE_FLAG(-std=c++0x,
+	[cxxflags_strict="$cxxflags_strict -std=c++0x"])
+# And if we're going to do that, we don't want warnings about std::auto_ptr being deprecated:
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations, -Wdeprecated-declarations)
+# We also get copious warnings from the 'register' storage class specifier in the system
+# headers (ntohl and friends) which we can't do much about, so disable it:
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-register, -Wdeprecated-register)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
@@ -147,8 +166,8 @@ Upgrade or read the documentation for alternatives]])
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
-AC_CHECK_HEADERS([syslog.h time.h unistd.h])
+AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h lmcons.h netdb.h process.h pwd.h])
+AC_CHECK_HEADERS([signal.h syslog.h time.h unistd.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
 AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/stat.h sys/time.h])
 AC_CHECK_HEADERS([sys/types.h sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
@@ -190,6 +209,21 @@ else
   have_regex_support=no
 fi
 
+# Check for Boost PropertyTree (XML and JSON support for lib/httpserver)
+AX_BOOST_BASE(,
+	# ax_check_boost.m4 thwarts our attempts to modify CPPFLAGS and
+	# LDFLAGS by restoring them AFTER running ACTION-IF-FOUND. But we
+	# can fight back by updating the _SAVED variables instead, and use
+	# the fact that we know that CPPFLAGS and LDFLAGS are still set with
+	# the correct values for Boost, to preserve them by overwriting
+	# CPPFLAGS_SAVED and LDFLAGS_SAVED.
+	[CPPFLAGS_SAVED="$CPPFLAGS"
+	 LDFLAGS_SAVED="$LDFLAGS"],
+	[AC_MSG_ERROR([[cannot find Boost, try installing libboost-dev]])])
+
+AC_CHECK_HEADER([boost/property_tree/ptree.hpp],,
+	[AC_MSG_ERROR([[cannot find Boost::PropertyTree, try installing libboost-dev]])])
+
 ### Checks for typedefs, structures, and compiler characteristics.
 
 AC_CHECK_TYPES([u_int8_t, u_int16_t, u_int32_t, u_int64_t])
@@ -222,8 +256,8 @@ AC_CHECK_DECLS([O_BINARY],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([ENOTSUP],,, [[#include <sys/errno.h>]])
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
-AC_CHECK_DECLS([SOL_TCP],,, [[#include <netinet/tcp.h>]])
-AC_CHECK_DECLS([TCP_INFO],,, [[#include <netinet/tcp.h>]])
+AC_CHECK_DECLS([IPPROTO_TCP],,, [[#include <netinet/in.h>]])
+AC_CHECK_DECLS([SOL_TCP,TCP_INFO,TCP_CONNECTION_INFO],,, [[#include <netinet/tcp.h>]])
 AC_CHECK_DECLS([SYS_open, SYS_openat],,, [[#include <sys/syscall.h>]])
 
 if test -n "$have_sys_socket_h"; then
@@ -294,9 +328,8 @@ AX_CHECK_MALLOC_WORKAROUND
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
-AC_FUNC_STAT
-AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid gettimeofday lchown])
-AC_CHECK_FUNCS([setproctitle utimensat])
+AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid getpwuid gettimeofday lchown])
+AC_CHECK_FUNCS([setproctitle utimensat stat64 lstat64 __lxstat __lxstat64])
 AC_SEARCH_LIBS([setproctitle], [bsd])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
@@ -343,6 +376,7 @@ fi
 AC_CHECK_FUNCS([flock fcntl])
 AC_CHECK_DECLS([O_EXLOCK],,, [[#include <fcntl.h>]])
 AC_CHECK_DECLS([F_SETLK],,, [[#include <fcntl.h>]])
+AC_CHECK_DECLS([F_OFD_SETLK],,, [[#include <fcntl.h>]])
 
 case $target_os in
 mingw32*) ;;
@@ -356,6 +390,8 @@ then
 fi
 ;;
 esac
+
+AC_CHECK_DECLS([GetUserNameA],,, [[#include <windows.h>]])
 
 AC_CHECK_PROGS(default_debugger, [lldb gdb])
 AC_ARG_WITH([debugger],

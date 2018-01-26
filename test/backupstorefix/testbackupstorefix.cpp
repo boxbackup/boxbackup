@@ -43,7 +43,7 @@
 
 #include "MemLeakFindOn.h"
 
-/* 
+/*
 
 Errors checked:
 
@@ -75,9 +75,12 @@ int discSetNum = 0;
 std::map<std::string, int32_t> nameToID;
 std::map<int32_t, bool> objectIsDir;
 
-#define RUN_CHECK	\
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567"); \
-	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf check 01234567 fix");
+#define RUN_CHECK \
+	BOX_INFO("Running bbstoreaccounts to check and then repair the account"); \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Utbbstoreaccounts " \
+		"-L/FileSystem/Locking=trace check 01234567"); \
+	::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf -Utbbstoreaccounts " \
+		"-L/FileSystem/Locking=trace check 01234567 fix");
 
 // Get ID of an object given a filename
 int32_t getID(const char *name)
@@ -233,14 +236,14 @@ void test_dir_fixing()
 			int64_t SizeInBlocks, int16_t Flags,
 			uint64_t AttributesHash);
 		*/
-		dir.AddEntry(fnames[0], 12, 2 /* id */, 1, 
+		dir.AddEntry(fnames[0], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[1], 12, 2 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 3 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File, 2);
 		dir.AddEntry(fnames[0], 12, 5 /* id */, 1,
-			BackupStoreDirectory::Entry::Flags_File | 
+			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 
 		/*
@@ -445,8 +448,21 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 	check_root_dir_ok(after_entries, after_deps);
 }
 
+bool compare_store_contents_with_expected(int phase)
+{
+	BOX_INFO("Running testbackupstorefix.pl to check contents of store (phase " <<
+		phase << ")");
+	std::ostringstream cmd;
+	cmd << PERL_EXECUTABLE " testfiles/testbackupstorefix.pl ";
+	cmd << ((phase == 6) ? "reroot" : "check") << " " << phase;
+	return ::system(cmd.str().c_str()) == 0;
+}
+
 int test(int argc, const char *argv[])
 {
+	// Enable logging timestamps to help debug race conditions on AppVeyor
+	Console::SetShowTimeMicros(true);
+
 	{
 		MEMLEAKFINDER_NO_LEAKS;
 		fnames[0].SetAsClearFilename("x1");
@@ -463,13 +479,13 @@ int test(int argc, const char *argv[])
 	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
 
 	// Create an account
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS 
+	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
 		" -c testfiles/bbstored.conf "
 		"create 01234567 0 10000B 20000B") == 0);
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Run the perl script to create the initial directories
-	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE 
+	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE
 		" testfiles/testbackupstorefix.pl init") == 0);
 
 	BOX_INFO("  === Test that an entry pointing to a file that doesn't "
@@ -546,8 +562,11 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Test that an entry pointing to a directory whose "
 		"raidfile is corrupted doesn't crash");
 
-	// Start the bbstored server
-	TEST_THAT_OR(StartServer(), return 1);
+	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
+	// locked when we try to check or query it (race conditions):
+	std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+		"-kT -Winfo -tbbstored -L/FileSystem/Locking=trace");
+	TEST_THAT_OR(StartServer(daemon_args), return 1);
 
 	// Instead of starting a client, read the file listing file created by
 	// testbackupstorefix.pl and upload them in the correct order, so that the object
@@ -560,7 +579,7 @@ int test(int argc, const char *argv[])
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
 			discSetNum, false);
 
-		for(getline.GetLine(line, true); line != ""; getline.GetLine(line, true))
+		for(line = getline.GetLine(true); line != ""; line = getline.GetLine(true))
 		{
 			std::string full_path = line;
 			ASSERT(StartsWith("testfiles/TestDir1/", full_path));
@@ -671,7 +690,7 @@ int test(int argc, const char *argv[])
 		char name[256];
 		while(::fgets(line, sizeof(line), f) != 0)
 		{
-			TEST_THAT(::sscanf(line, "%x %s %s", &id, 
+			TEST_THAT(::sscanf(line, "%x %s %s", &id,
 				flags, name) == 3);
 			bool isDir = (::strcmp(flags, "-d---") == 0);
 			//TRACE3("%x,%d,%s\n", id, isDir, name);
@@ -691,7 +710,7 @@ int test(int argc, const char *argv[])
 	}
 	{
 		// Add a spurious file
-		RaidFileWrite random(discSetNum, 
+		RaidFileWrite random(discSetNum,
 			accountRootDir + "randomfile");
 		random.Open();
 		random.Write("test", 4);
@@ -702,11 +721,11 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it was
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl check 0") == 0);
+	TEST_THAT(compare_store_contents_with_expected(0));
+
 	// Check the random file doesn't exist
 	{
-		TEST_THAT(!RaidFileRead::FileExists(discSetNum, 
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
 			accountRootDir + "01/randomfile"));
 	}
 
@@ -714,20 +733,13 @@ int test(int argc, const char *argv[])
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
 	{
-		// Temporarily stop the server, so it doesn't repair the refcount error. Except 
-		// on win32, where hard-killing the server can leave a lockfile in place,
-		// breaking the rest of the test.
-#ifdef WIN32
-		// Wait for the server to finish housekeeping first, by getting a lock on
-		// the account.
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccounts acc(*apAccounts);
-		NamedLock lock;
-		acc.LockAccount(0x1234567, lock);
-#else
-		TEST_THAT(StopServer());
-#endif
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to prevent housekeeping from repairing the damage in the
+		// background. We could just stop the server, but on Windows that can leave the
+		// account half-cleaned and always leaves a PID file lying around, which breaks
+		// the rest of the test, so we do it this way on all platforms instead.
+		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
+		fs.GetLock();
 
 		// Open dir and find entry
 		int64_t delID = getID("Test1/cannes/ict/metegoguered/oats");
@@ -783,9 +795,8 @@ int test(int argc, const char *argv[])
 		// ERROR:   BlocksInCurrentFiles changed from 228 to 226
 		// ERROR:   NumCurrentFiles changed from 114 to 113
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
-#ifdef WIN32
-		lock.ReleaseLock();
-#endif
+		fs.ReleaseLock();
+
 		TEST_EQUAL(5, check_account_for_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
@@ -799,16 +810,8 @@ int test(int argc, const char *argv[])
 			TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
 		}
 
-		// Start the server again, so testbackupstorefix.pl can run bbackupquery which
-		// connects to it. Except on win32, where we didn't stop it earlier.
-#ifndef WIN32
-		TEST_THAT(StartServer());
-#endif
-
 		// Check
-		TEST_THAT(::system(PERL_EXECUTABLE
-			" testfiles/testbackupstorefix.pl check 1") 
-			== 0);
+		TEST_THAT(compare_store_contents_with_expected(1));
 
 		// Check the modified file doesn't exist
 		TEST_THAT(!RaidFileRead::FileExists(discSetNum, fn));
@@ -894,8 +897,8 @@ int test(int argc, const char *argv[])
 	}
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 2") == 0);
+	TEST_THAT(compare_store_contents_with_expected(2));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -954,8 +957,8 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is as it should be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 3") == 0);
+	TEST_THAT(compare_store_contents_with_expected(3));
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -971,22 +974,36 @@ int test(int argc, const char *argv[])
 	RUN_CHECK
 
 	// Check everything is where it is predicted to be
-	TEST_THAT(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl check 4") == 0);
+	TEST_THAT(compare_store_contents_with_expected(4));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Corrupt file and dir");
-	// File
-	CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge",
-		33, "34i729834298349283479233472983sdfhasgs");
-	// Dir
-	CorruptObject("Test1/cannes/imulatrougge/foreomizes",23, 
-		"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+	{
+		// Increase log level for locking errors to help debug random failures on AppVeyor
+		LogLevelOverrideByFileGuard increase_lock_logging("", // rFileName
+			BackupFileSystem::LOCKING.ToString(), Log::TRACE); // NewLevel
+		increase_lock_logging.Install();
+
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to avoid a race condition where bbstored runs housekeeping
+		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
+		// bbstoreaccounts check command to time out waiting for a lock.
+		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
+		fs.GetLock();
+
+		// File
+		CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge", 33,
+			"34i729834298349283479233472983sdfhasgs");
+		// Dir
+		CorruptObject("Test1/cannes/imulatrougge/foreomizes", 23,
+			"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+	}
+
 	// Fix it
 	RUN_CHECK
+
 	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl check 5") == 0);
+	TEST_THAT(compare_store_contents_with_expected(5));
 
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Overwrite root with a file");
@@ -997,22 +1014,16 @@ int test(int argc, const char *argv[])
 		r->CopyStreamTo(w);
 		w.Commit(true /* convert now */);
 	}
+
 	// Fix it
 	RUN_CHECK
-	// Check everything is where it should be
-	TEST_THAT(::system(PERL_EXECUTABLE 
-		" testfiles/testbackupstorefix.pl reroot 6") == 0);
 
+	// Check everything is where it should be
+	TEST_THAT(compare_store_contents_with_expected(6));
 
 	// ---------------------------------------------------------
 	// Stop server
-	TEST_THAT(KillServer(bbstored_pid));
-
-	#ifdef WIN32
-		TEST_THAT(unlink("testfiles/bbstored.pid") == 0);
-	#else
-		TestRemoteProcessMemLeaks("bbstored.memleaks");
-	#endif
+	TEST_THAT(StopServer());
 
 	return 0;
 }

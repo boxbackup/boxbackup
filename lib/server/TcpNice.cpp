@@ -30,6 +30,7 @@
 
 #include "MemLeakFindOn.h"
 
+#ifdef ENABLE_TCP_NICE
 // --------------------------------------------------------------------------
 //
 // Function
@@ -130,15 +131,15 @@ NiceSocketStream::NiceSocketStream(std::auto_ptr<SocketStream> apSocket)
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    NiceSocketStream::Write(const void *pBuffer, int NBytes)
-//		Purpose: Writes bytes to the underlying stream, adjusting window size
-//               using a TcpNice calculator.
+//		Name:    NiceSocketStream::Write(const void *pBuffer,
+//		         int NBytes, int Timeout)
+//		Purpose: Writes bytes to the underlying stream, adjusting
+//		         window size using a TcpNice calculator.
 //		Created: 2012/02/11
 //
 // --------------------------------------------------------------------------
-void NiceSocketStream::Write(const void *pBuffer, int NBytes)
+void NiceSocketStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
-#if HAVE_DECL_SO_SNDBUF && HAVE_DECL_TCP_INFO
 	if(mEnabled && mapTimer.get() && mapTimer->HasExpired())
 	{
 		box_time_t newPeriodStart = GetCurrentBoxTime();
@@ -147,6 +148,7 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 		int rtt = 50; // WAG
 
 #	if HAVE_DECL_SOL_TCP && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
+		// The Linux way
 		struct tcp_info info;
 		socklen_t optlen = sizeof(info);
 		if(getsockopt(socket, SOL_TCP, TCP_INFO, &info, &optlen) == -1)
@@ -164,6 +166,27 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 		{
 			rtt = info.tcpi_rtt;
 		}
+#	elif HAVE_DECL_IPPROTO_TCP && defined HAVE_DECL_TCP_CONNECTION_INFO
+		// The OSX way: https://stackoverflow.com/a/40478874/648162
+		struct tcp_connection_info info;
+		socklen_t optlen = sizeof(info);
+		if(getsockopt(socket, IPPROTO_TCP, TCP_CONNECTION_INFO, &info, &optlen) == -1)
+		{
+			BOX_LOG_SYS_WARNING("getsockopt(" << socket << ", IPPROTO_TCP, "
+				"TCP_CONNECTION_INFO) failed");
+		}
+		else if(optlen < sizeof(info))
+		{
+			BOX_WARNING("getsockopt(" << socket << ", IPPROTO_TCP, "
+				"TCP_CONNECTION_INFO) return structure size " << optlen << ", "
+				"expected " << sizeof(info));
+		}
+		else
+		{
+			rtt = info.tcpi_rttcur;
+		}
+#	else
+#		error "Don't know how to get current TCP RTT"
 #	endif // HAVE_DECL_SOL_TCP && defined HAVE_STRUCT_TCP_INFO_TCPI_RTT
 		
 		int newWindow = mTcpNice.GetNextWindowSize(mBytesWrittenThisPeriod,
@@ -191,9 +214,8 @@ void NiceSocketStream::Write(const void *pBuffer, int NBytes)
 	}
 	
 	mBytesWrittenThisPeriod += NBytes;
-#endif // HAVE_DECL_SO_SNDBUF
 
-	mapSocket->Write(pBuffer, NBytes);
+	mapSocket->Write(pBuffer, NBytes, Timeout);
 }
 
 // --------------------------------------------------------------------------
@@ -213,7 +235,6 @@ void NiceSocketStream::SetEnabled(bool enabled)
 	if(!enabled)
 	{
 		StopTimer();
-#if HAVE_DECL_SO_SNDBUF
 		int socket = mapSocket->GetSocketHandle();
 		int newWindow = 1<<17;
 		if(setsockopt(socket, SOL_SOCKET, SO_SNDBUF, 
@@ -230,6 +251,7 @@ void NiceSocketStream::SetEnabled(bool enabled)
 			BOX_LOG_SYS_WARNING("getsockopt(" << socket << ", SOL_SOCKET, "
 				"SO_SNDBUF, " << newWindow << ") failed");
 		}
-#endif
 	}
 }
+
+#endif // ENABLE_TCP_NICE

@@ -13,11 +13,13 @@
 #include <string.h>
 #include <signal.h>
 
-#include "autogen_BackupProtocol.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"
+#include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -39,6 +41,7 @@
 #include "Socket.h"
 #include "SocketStreamTLS.h"
 #include "StoreStructure.h"
+#include "StoreTestUtils.h" // for run_housekeeping()
 #include "TLSContext.h"
 #include "Test.h"
 
@@ -51,19 +54,20 @@ typedef struct
 	bool IsCompletelyDifferent;
 	bool HasBeenDeleted;
 	int64_t DepNewer, DepOlder;
+	int64_t CurrentSizeInBlocks;
 } file_info;
 
 file_info test_files[] =
 {
-//   ChPnt,	Insert,	Delete, ID, IsCDf,	BeenDel
-	{0, 	0,		0,		0,	false,	false},	// 0 dummy first entry
-	{32000,	2087,	0,		0,	false,	false}, // 1
+//	ChPnt,	Insert,	Delete, ID,	IsCDf,	BeenDel
+	{0, 	0,	0,	0,	false,	false},	// 0 dummy first entry
+	{32000,	2087,	0,	0,	false,	false}, // 1
 	{1000,	1998,	2976,	0,	false,	false}, // 2
-	{27800,	0,		288,	0,	false,	false}, // 3
-	{3208,	1087,	98,		0,	false,	false}, // 4
-	{56000,	23087,	98,		0,	false,	false}, // 5
-	{0,		98765,	9999999,0,	false,	false},	// 6 completely different, make a break in the storage
-	{9899,	9887,	2,		0,	false,	false}, // 7
+	{27800,	0,	288,	0,	false,	false}, // 3
+	{3208,	1087,	98,	0,	false,	false}, // 4 - this entry is deleted from middle of patch chain on r=1
+	{56000,	23087,	98,	0,	false,	false}, // 5
+	{0,	98765,	9999999,0,	false,	false},	// 6 completely different, make a break in the storage
+	{9899,	9887,	2,	0,	false,	false}, // 7
 	{12984,	12345,	1234,	0,	false,	false}, // 8
 	{1209,	29885,	3498,	0,	false,	false}  // 9
 };
@@ -75,6 +79,7 @@ int test_file_remove_order[] = {0, 2, 3, 5, 8, 1, 4, -1};
 #define FIRST_FILE_SIZE	(64*1024+3)
 #define BUFFER_SIZE		(256*1024)
 #define SHORT_TIMEOUT 5000
+#define HOUSEKEEPING_IN_PROCESS
 
 // Chunk of memory to use for copying files, etc
 static void *buffer = 0;
@@ -170,8 +175,6 @@ bool files_identical(const char *file1, const char *file2)
 	
 	return true;
 }
-
-
 
 void create_test_files()
 {
@@ -337,7 +340,16 @@ int test(int argc, const char *argv[])
 	}
 	RaidFileDiscSet rfd(rcontroller.GetDiscSet(discSet));
 
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored.conf", 
+	std::string errs;
+	std::auto_ptr<Configuration> config(
+		Configuration::LoadAndVerify("testfiles/bbstored.conf",
+			&BackupConfigFileVerify, errs));
+	TEST_EQUAL(0, errs.size());
+
+	BackupStoreAccountControl control(*config, 0x01234567);
+	BackupFileSystem& filesystem(control.GetFileSystem());
+
+	int pid = LaunchServer(BBSTORED " -c testfiles/bbstored.conf " + bbstored_args,
 		"testfiles/bbstored.pid");
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)
@@ -451,6 +463,21 @@ int test(int argc, const char *argv[])
 				{
 					TEST_THAT(en->GetDependsNewer() == 0);
 					TEST_THAT(en->GetDependsOlder() == 0);
+					bool found = false;
+
+					for(int tfi = 0; tfi < NUMBER_FILES; tfi++)
+					{
+						if(test_files[tfi].IDOnServer == en->GetObjectID())
+						{
+							found = true;
+							test_files[tfi].CurrentSizeInBlocks =
+								en->GetSizeInBlocks();
+							break;
+						}
+					}
+
+					TEST_LINE(found, "Unexpected file found on server: " <<
+						en->GetObjectID());
 				}
 			}
 
@@ -475,6 +502,19 @@ int test(int argc, const char *argv[])
 			test_files[f].DepOlder = older;
 		}
 
+#ifdef HOUSEKEEPING_IN_PROCESS
+		// Kill store server
+		TEST_THAT(KillServer(pid));
+		TEST_THAT(!ServerIsAlive(pid));
+
+		#ifndef WIN32
+		TestRemoteProcessMemLeaks("bbstored.memleaks");
+		#endif
+#else
+		// We need to leave the bbstored process running, so that we can connect to it
+		// and retrieve directory listings from it.
+#endif // HOUSEKEEPING_IN_PROCESS
+
 		// Check the stuff on the server
 		int deleteIndex = 0;
 		while(true)
@@ -482,23 +522,41 @@ int test(int argc, const char *argv[])
 			// Load up the root directory
 			BackupStoreDirectory dir;
 			{
+				// Take a lock before actually reading files from disk,
+				// to avoid them changing under our feet.
+				filesystem.GetLock();
+
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
 				dir.Dump(0, true);
+
+				// Find the test_files entry for the file that was just deleted:
+				int just_deleted = deleteIndex == 0 ? -1 : test_file_remove_order[deleteIndex - 1];
+				file_info* p_just_deleted;
+				if(just_deleted == 0 || just_deleted == -1)
+				{
+					p_just_deleted = NULL;
+				}
+				else
+				{
+					p_just_deleted = test_files + just_deleted;
+				}
 				
 				// Check that dependency info is correct
-				for(unsigned int f = 0; f < NUMBER_FILES; ++f)
+				for(unsigned int f = 1; f < NUMBER_FILES; ++f)
 				{
 					//TRACE1("t f = %d\n", f);
 					BackupStoreDirectory::Entry *en = dir.FindEntryByID(test_files[f].IDOnServer);
 					if(en == 0)
 					{
-						TEST_THAT(test_files[f].HasBeenDeleted);
+						TEST_LINE(test_files[f].HasBeenDeleted,
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") was unexpectedly deleted by housekeeping");
 						// check that unreferenced
 						// object was removed by
 						// housekeeping
 						std::string filenameOut;
-						int startDisc = 0;
 						StoreStructure::MakeObjectFilename(
 							test_files[f].IDOnServer,
 							storeRootDir, discSet,
@@ -514,25 +572,84 @@ int test(int argc, const char *argv[])
 					}
 					else
 					{
-						TEST_THAT(!test_files[f].HasBeenDeleted);
+						TEST_LINE(!test_files[f].HasBeenDeleted,
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") was unexpectedly not deleted by housekeeping");
 						TEST_THAT(en->GetDependsNewer() == test_files[f].DepNewer);
-						TEST_THAT(en->GetDependsOlder() == test_files[f].DepOlder);
+						TEST_EQUAL_LINE(test_files[f].DepOlder, en->GetDependsOlder(),
+							"Test file " << f << " (id " <<
+							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+							") has different dependencies than "
+							"expected after housekeeping");
 						// Test that size is plausible
 						if(en->GetDependsNewer() == 0)
 						{
 							// Should be a full file
-							TEST_THAT(en->GetSizeInBlocks() > 40);
+							TEST_LINE(en->GetSizeInBlocks() > 40,
+								"Test file " << f << " (id " <<
+								BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+								") was smaller than expected: "
+								"wanted a full file with >40 blocks, "
+								"but found " << en->GetSizeInBlocks());
 						}
 						else
 						{
 							// Should be a patch
-							TEST_THAT(en->GetSizeInBlocks() < 40);
+							TEST_LINE(en->GetSizeInBlocks() < 40,
+								"Test file " << f << " (id " <<
+								BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+								") was larger than expected: "
+								"wanted a patch file with <40 blocks, "
+								"but found " << en->GetSizeInBlocks());
 						}
 					}
+
+					// All the files that we've deleted so far should have had
+					// HasBeenDeleted set to true.
+					if(test_files[f].HasBeenDeleted)
+					{
+						TEST_LINE(en == NULL, "File " << f << " should have been "
+							"deleted by this point")
+					}
+					else if(en == 0)
+					{
+						TEST_FAIL_WITH_MESSAGE("File " << f << " has been unexpectedly "
+							"deleted, cannot check its size");
+					}
+					// If the file that was just deleted was a patch that this file depended on,
+					// then it should have been merged with this file, which should have made this
+					// file larger. But that might not translate to a larger number of blocks.
+					else if(test_files[just_deleted].DepOlder == test_files[f].IDOnServer)
+					{
+						TEST_LINE(en->GetSizeInBlocks() >= test_files[f].CurrentSizeInBlocks,
+							"File " << f << " has been merged with an older patch, "
+							"so it should be larger than its previous size of " <<
+							test_files[f].CurrentSizeInBlocks << " blocks, but it is " <<
+							en->GetSizeInBlocks() << " blocks now");
+					}
+					else
+					{
+						// This file should not have changed in size.
+						TEST_EQUAL_LINE(test_files[f].CurrentSizeInBlocks, en->GetSizeInBlocks(),
+							"File " << f << " unexpectedly changed size");
+					}
+
+					if(en != 0)
+					{
+						// Update test_files to record new size for next pass:
+						test_files[f].CurrentSizeInBlocks = en->GetSizeInBlocks();
+					}
 				}
+
+				filesystem.ReleaseLock();
 			}
 			
-			// Open a connection to the server (need to do this each time, otherwise housekeeping won't delete files)
+#ifdef HOUSEKEEPING_IN_PROCESS
+			BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/", 0, true);
+#else
+			// Open a connection to the server (need to do this each time, otherwise
+			// housekeeping won't run on Windows, and thus won't delete any files).
 			SocketStreamTLS *pConn = new SocketStreamTLS;
 			std::auto_ptr<SocketStream> apConn(pConn);
 			pConn->Open(context, Socket::TypeINET, "localhost",
@@ -543,11 +660,16 @@ int test(int argc, const char *argv[])
 				TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 				protocol.QueryLogin(0x01234567, 0);
 			}
+#endif
 
-			// Pull all the files down, and check that they match the files on disc
+			// Pull all the files down, and check that they (still) match the files
+			// that we uploaded earlier.
 			for(unsigned int f = 0; f < NUMBER_FILES; ++f)
 			{
-				::printf("r=%d, f=%d\n", deleteIndex, f);
+				::printf("r=%d, f=%d, id=%08llx, blocks=%d, deleted=%s\n", deleteIndex, f,
+					(long long)test_files[f].IDOnServer,
+					test_files[f].CurrentSizeInBlocks,
+					test_files[f].HasBeenDeleted ? "true" : "false");
 				
 				// Might have been deleted
 				if(test_files[f].HasBeenDeleted)
@@ -559,22 +681,32 @@ int test(int argc, const char *argv[])
 				char filename[64], filename_fetched[64];
 				::sprintf(filename, "testfiles/%d.test", f);
 				::sprintf(filename_fetched, "testfiles/%d.test.fetched", f);
-				::unlink(filename_fetched);
+				EMU_UNLINK(filename_fetched);
 	
 				// Fetch the file
+				try
 				{
 					std::auto_ptr<BackupProtocolSuccess> getobj(protocol.QueryGetFile(
 						BackupProtocolListDirectory::RootDirectory,
 						test_files[f].IDOnServer));
 					TEST_THAT(getobj->GetObjectID() == test_files[f].IDOnServer);
-					// BLOCK
-					{
-						// Get stream
-						std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
-						// Get and decode
-						BackupStoreFile::DecodeFile(*filestream, filename_fetched, SHORT_TIMEOUT);
-					}
 				}
+				catch(ConnectionException &e)
+				{
+					TEST_FAIL_WITH_MESSAGE("Failed to get test file " << f <<
+						" (id " << BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+						") from server: " << e.what());
+					continue;
+				}
+
+				// BLOCK
+				{
+					// Get stream
+					std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+					// Get and decode
+					BackupStoreFile::DecodeFile(*filestream, filename_fetched, SHORT_TIMEOUT);
+				}
+
 				// Test for identicalness
 				TEST_THAT(files_identical(filename_fetched, filename));
 				
@@ -587,8 +719,12 @@ int test(int argc, const char *argv[])
 				}
 			}
 
-			// Close the connection			
+			// Close the connection
 			protocol.QueryFinished();
+
+			// Take a lock before modifying the directory
+			filesystem.GetLock();
+			filesystem.GetDirectory(BackupProtocolListDirectory::RootDirectory, dir);
 
 			// Mark one of the elements as deleted
 			if(test_file_remove_order[deleteIndex] == -1)
@@ -600,30 +736,45 @@ int test(int argc, const char *argv[])
 			
 			// Modify the entry
 			BackupStoreDirectory::Entry *pentry = dir.FindEntryByID(test_files[todel].IDOnServer);
-			TEST_THAT(pentry != 0);
+			TEST_LINE_OR(pentry != 0, "Cannot delete test file " << todel << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[todel].IDOnServer) << "): not found on server",
+				break);
+
 			pentry->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
-			// Save it back
+			filesystem.PutDirectory(dir);
+
+			// Get the revision number of the root directory, before we release
+			// the lock (and therefore before housekeeping makes any changes).
+			int64_t first_revision = 0;
+			TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
+				&first_revision));
+			filesystem.ReleaseLock();
+
+#ifdef HOUSEKEEPING_IN_PROCESS
+			// Housekeeping wants to open both a temporary and a permanent refcount DB,
+			// and after committing the temporary one, it becomes the permanent one and
+			// not ReadOnly, and the BackupFileSystem does not allow opening another
+			// temporary refcount DB if the permanent one is open for writing (with good
+			// reason), so we need to close it here so that housekeeping can open it
+			// again, read-only, on the second and subsequent passes.
+			if(filesystem.GetCurrentRefCountDatabase() != NULL)
 			{
-				RaidFileWrite writedir(0, "backup/01234567/o01");
-				writedir.Open(true /* overwrite */);
-				dir.WriteToStream(writedir);
-				writedir.Commit(true);
+				filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 			}
 
-			// Get the revision number of the root directory, before housekeeping makes any changes.
-			int64_t first_revision = 0;
-			RaidFileRead::FileExists(0, "backup/01234567/o01", &first_revision);
-
-#ifdef WIN32
+			TEST_EQUAL_LINE(0, run_housekeeping(filesystem),
+				"Housekeeping detected errors in account");
+#else
+#	ifdef WIN32
 			// Cannot signal bbstored to do housekeeping now, and we don't need to, as we will
 			// wait up to 32 seconds and detect automatically when it has finished.
-#else
+#	else
 			// Send the server a restart signal, so it does 
 			// housekeeping immediately, and wait for it to happen
 			// Wait for old connections to terminate
 			::sleep(1);	
 			::kill(pid, SIGHUP);
-#endif
+#	endif // WIN32
 
 			// Wait for changes to be written back to the root directory.
 			for(int secs_remaining = 32; secs_remaining >= 0; secs_remaining--)
@@ -634,19 +785,42 @@ int test(int argc, const char *argv[])
 				::fflush(stdout);
 				
 				// Early end?
-				if(!TestFileExists("testfiles/0_0/backup/01234567/write.lock"))
+				try
 				{
-					int64_t revid = 0;
-					RaidFileRead::FileExists(0, "backup/01234567/o01", &revid);
-					if(revid != first_revision)
+					filesystem.GetLock();
+					int64_t current_revision = 0;
+					TEST_THAT(filesystem.ObjectExists(BackupProtocolListDirectory::RootDirectory,
+						&current_revision));
+					filesystem.ReleaseLock();
+
+					if(current_revision != first_revision)
 					{
+						// Root directory has changed, and housekeeping is
+						// not running right now (as we have a lock), so it
+						// must have run already.
 						break;
+					}
+				}
+				catch(BackupStoreException &e)
+				{
+					if(EXCEPTION_IS_TYPE(e, BackupStoreException,
+						CouldNotLockStoreAccount))
+					{
+						// Housekeeping must still be running. Do nothing,
+						// hopefully after another few seconds it will have
+						// finished.
+					}
+					else
+					{
+						// Unexpected exception
+						throw;
 					}
 				}
 
 				TEST_LINE(secs_remaining != 0, "No changes detected to root directory after 32 seconds");
 			}
 			::printf("\n");
+#endif // HOUSEKEEPING_IN_PROCESS
 			
 			// Flag for test
 			test_files[todel].HasBeenDeleted = true;
@@ -664,7 +838,10 @@ int test(int argc, const char *argv[])
 			}
 			if(z < (int)NUMBER_FILES) test_files[z].DepOlder = test_files[todel].DepOlder;
 		}
-		
+
+#ifdef HOUSEKEEPING_IN_PROCESS
+		// We already killed the bbstored process earlier
+#else
 		// Kill store server
 		TEST_THAT(KillServer(pid));
 		TEST_THAT(!ServerIsAlive(pid));
@@ -672,6 +849,7 @@ int test(int argc, const char *argv[])
 		#ifndef WIN32
 		TestRemoteProcessMemLeaks("bbstored.memleaks");
 		#endif
+#endif // HOUSEKEEPING_IN_PROCESS
 	}
 	
 	::free(buffer);

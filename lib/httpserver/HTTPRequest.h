@@ -14,6 +14,8 @@
 #include <map>
 
 #include "CollectInBufferStream.h"
+#include "HTTPHeaders.h"
+#include "SocketStream.h"
 
 class HTTPResponse;
 class IOStream;
@@ -41,16 +43,49 @@ public:
 		Method_GET = 1,
 		Method_HEAD = 2,
 		Method_POST = 3,
-		Method_PUT = 4
+		Method_PUT = 4,
+		Method_DELETE = 5
 	};
 	
 	HTTPRequest();
 	HTTPRequest(enum Method method, const std::string& rURI);
 	~HTTPRequest();
-private:
-	// no copying
-	HTTPRequest(const HTTPRequest &);
-	HTTPRequest &operator=(const HTTPRequest &);
+
+	HTTPRequest(const HTTPRequest &to_copy)
+	: mMethod(to_copy.mMethod),
+	  mRequestURI(to_copy.mRequestURI),
+	  mQueryString(to_copy.mQueryString),
+	  mHTTPVersion(to_copy.mHTTPVersion),
+	  mQuery(to_copy.mQuery),
+	  // it's not safe to copy this, as it may be consumed or destroyed:
+	  mpCookies(NULL),
+	  mHeaders(to_copy.mHeaders),
+	  mExpectContinue(to_copy.mExpectContinue),
+	  // it's not safe to copy this, as it may be consumed or destroyed:
+	  mpStreamToReadFrom(NULL),
+	  mHttpVerb(to_copy.mHttpVerb)
+	// If you ever add members, be sure to update this list too!
+	{ }
+
+	HTTPRequest &operator=(const HTTPRequest &to_copy)
+	{
+		mMethod = to_copy.mMethod;
+		mRequestURI = to_copy.mRequestURI;
+		mQueryString = to_copy.mQueryString;
+		mHTTPVersion = to_copy.mHTTPVersion;
+		mQuery = to_copy.mQuery;
+		// it's not safe to copy this; as it may be modified or destroyed:
+		mpCookies = NULL;
+		mHeaders = to_copy.mHeaders;
+		mExpectContinue = to_copy.mExpectContinue;
+		// it's not safe to copy this; as it may be consumed or destroyed:
+		mpStreamToReadFrom = NULL;
+		mHttpVerb = to_copy.mHttpVerb;
+		// If you ever add members, be sure to update this list too!
+
+		return *this;
+	}
+
 public:
 	typedef std::multimap<std::string, std::string> Query_t;
 	typedef Query_t::value_type QueryEn_t;
@@ -65,60 +100,68 @@ public:
 	};
 
 	bool Receive(IOStreamGetLine &rGetLine, int Timeout);
-	bool Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
-	void SendWithStream(IOStream &rStreamToSendTo, int Timeout,
+	void SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinue = false);
+	void Send(IOStream &rStream, int Timeout, bool ExpectContinue = false);
+	IOStream::pos_type SendWithStream(SocketStream &rStreamToSendTo, int Timeout,
 		IOStream* pStreamToSend, HTTPResponse& rResponse);
-	void ReadContent(IOStream& rStreamToWriteTo);
+	void ReadContent(IOStream& rStreamToWriteTo, int Timeout);
 
 	typedef std::map<std::string, std::string> CookieJar_t;
 	
-	// --------------------------------------------------------------------------
-	//
-	// Function
-	//		Name:    HTTPResponse::Get*()
-	//		Purpose: Various Get accessors
-	//		Created: 26/3/04
-	//
-	// --------------------------------------------------------------------------
 	enum Method GetMethod() const {return mMethod;}
 	std::string GetMethodName() const;
-	const std::string &GetRequestURI() const {return mRequestURI;}
+	std::string GetRequestURI(bool with_parameters_for_get_request = false) const;
 
-	// Note: the HTTPRequest generates and parses the Host: header
-	// Do not attempt to set one yourself with AddHeader().
-	const std::string &GetHostName() const {return mHostName;}
+	const std::string &GetHostName() const {return mHeaders.GetHostName();}
 	void SetHostName(const std::string& rHostName)
 	{
-		mHostName = rHostName;
+		mHeaders.SetHostName(rHostName);
 	}
-
-	const int GetHostPort() const {return mHostPort;}
+	const int GetHostPort() const {return mHeaders.GetHostPort();}
 	const std::string &GetQueryString() const {return mQueryString;}
 	int GetHTTPVersion() const {return mHTTPVersion;}
 	const Query_t &GetQuery() const {return mQuery;}
-	int GetContentLength() const {return mContentLength;}
-	const std::string &GetContentType() const {return mContentType;}
+	void AddParameter(const std::string& name, const std::string& value)
+	{
+		mQuery.insert(QueryEn_t(name, value));
+	}
+	void SetParameter(const std::string& name, const std::string& value)
+	{
+		mQuery.erase(name);
+		mQuery.insert(QueryEn_t(name, value));
+	}
+	void RemoveParameter(const std::string& name)
+	{
+		mQuery.erase(name);
+	}
+	std::string GetParameterString(const std::string& name,
+		const std::string& default_value)
+	{
+		return GetParameterString(name, default_value, false); // !required
+	}
+	std::string GetParameterString(const std::string& name)
+	{
+		return GetParameterString(name, "", true); // required
+	}
+	const Query_t GetParameters() const
+	{
+		return mQuery;
+	}
+
+	int GetContentLength() const {return mHeaders.GetContentLength();}
+	const std::string &GetContentType() const {return mHeaders.GetContentType();}
 	const CookieJar_t *GetCookies() const {return mpCookies;} // WARNING: May return NULL
 	bool GetCookie(const char *CookieName, std::string &rValueOut) const;
 	const std::string &GetCookie(const char *CookieName) const;
 	bool GetHeader(const std::string& rName, std::string* pValueOut) const
 	{
-		std::string header = ToLowerCase(rName);
-
-		for (std::vector<Header>::const_iterator
-			i  = mExtraHeaders.begin();
-			i != mExtraHeaders.end(); i++)
-		{
-			if (i->first == header)
-			{
-				*pValueOut = i->second;
-				return true;
-			}
-		}
-
-		return false;
+		return mHeaders.GetHeader(rName, pValueOut);
 	}
-	std::vector<Header> GetHeaders() { return mExtraHeaders; }
+	void AddHeader(const std::string& rName, const std::string& rValue)
+	{
+		mHeaders.AddHeader(rName, rValue);
+	}
+	const HTTPHeaders& GetHeaders() const { return mHeaders; }
 
 	// --------------------------------------------------------------------------
 	//
@@ -129,65 +172,61 @@ public:
 	//		Created: 22/12/04
 	//
 	// --------------------------------------------------------------------------
-	bool GetClientKeepAliveRequested() const {return mClientKeepAliveRequested;}
+	bool GetClientKeepAliveRequested() const {return mHeaders.IsKeepAlive();}
 	void SetClientKeepAliveRequested(bool keepAlive)
 	{
-		mClientKeepAliveRequested = keepAlive;
+		mHeaders.SetKeepAlive(keepAlive);
 	}
 
-	void AddHeader(const std::string& rName, const std::string& rValue)
-	{
-		mExtraHeaders.push_back(Header(ToLowerCase(rName), rValue));
-	}
 	bool IsExpectingContinue() const { return mExpectContinue; }
-	const char* GetVerb() const
+
+	// This is not supposed to be an API, but the S3Simulator needs to be able to
+	// associate a data stream with an HTTPRequest when handling it in-process.
+	void SetDataStream(IOStream* pStreamToReadFrom)
 	{
-		if (!mHttpVerb.empty())
-		{
-			return mHttpVerb.c_str();
-		}
-		switch (mMethod)
-		{
-			case Method_UNINITIALISED: return "Uninitialized";
-			case Method_UNKNOWN: return "Unknown";
-			case Method_GET: return "GET";
-			case Method_HEAD: return "HEAD";
-			case Method_POST: return "POST";
-			case Method_PUT: return "PUT";
-		}
-		return "Bad";
+		ASSERT(!mpStreamToReadFrom);
+		mpStreamToReadFrom = pStreamToReadFrom;
 	}
-	
+
 private:
-	void ParseHeaders(IOStreamGetLine &rGetLine, int Timeout);
-	void ParseCookies(const std::string &rHeader, int DataStarts);
+	std::string GetParameterString(const std::string& name,
+		const std::string& default_value, bool required)
+	{
+		Query_t::iterator i = mQuery.find(name);
+		if(i == mQuery.end())
+		{
+			if(required)
+			{
+				THROW_EXCEPTION_MESSAGE(HTTPException, ParameterNotFound,
+					name);
+			}
+			else
+			{
+				return default_value;
+			}
+		}
+		const std::string& value(i->second);
+		i++;
+		if(i != mQuery.end() && i->first == name)
+		{
+			THROW_EXCEPTION_MESSAGE(HTTPException, DuplicateParameter, name);
+		}
+		return value;
+	}
+
+	void ParseCookies(const std::string &rCookieString);
 
 	enum Method mMethod;
 	std::string mRequestURI;
-	std::string mHostName;
-	int mHostPort;
 	std::string mQueryString;
 	int mHTTPVersion;
 	Query_t mQuery;
-	int mContentLength;
-	std::string mContentType;
 	CookieJar_t *mpCookies;
-	bool mClientKeepAliveRequested;
-	std::vector<Header> mExtraHeaders;
+	HTTPHeaders mHeaders;
 	bool mExpectContinue;
 	IOStream* mpStreamToReadFrom;
 	std::string mHttpVerb;
-
-	std::string ToLowerCase(const std::string& rInput) const
-	{
-		std::string output = rInput;
-		for (std::string::iterator c = output.begin();
-			c != output.end(); c++)
-		{
-			*c = tolower(*c);
-		}
-		return output;
-	}
+	// If you ever add members, be sure to update the copy constructor too!
 };
 
 #endif // HTTPREQUEST__H

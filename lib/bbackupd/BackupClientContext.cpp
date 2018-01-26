@@ -73,8 +73,10 @@ BackupClientContext::BackupClientContext
   mKeepAliveTimer(0, "KeepAliveTime"),
   mbIsManaged(false),
   mrProgressNotifier(rProgressNotifier),
-  mTcpNiceMode(TcpNiceMode),
-  mpNice(NULL)
+  mTcpNiceMode(TcpNiceMode)
+#ifdef ENABLE_TCP_NICE
+  , mpNice(NULL)
+#endif
 {
 }
 
@@ -135,6 +137,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 
 		if(mTcpNiceMode)
 		{
+#ifdef ENABLE_TCP_NICE
 			// Pass control of apSocket to NiceSocketStream,
 			// which will take care of destroying it for us.
 			// But we need to hang onto a pointer to the nice
@@ -142,6 +145,9 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 			// This is scary, it could be deallocated under us.
 			mpNice = new NiceSocketStream(apSocket);
 			apSocket.reset(mpNice);
+#else
+			BOX_WARNING("TcpNice option is enabled but not supported on this system");
+#endif
 		}
 
 		// We need to call some methods that aren't defined in
@@ -310,7 +316,7 @@ int BackupClientContext::GetTimeout() const
 	{
 		return pConnection->GetTimeout();
 	}
-	
+
 	return (15*60*1000);
 }
 
@@ -555,7 +561,7 @@ void BackupClientContext::DoKeepAlive()
 	{
 		return;
 	}
-	
+
 	if (mKeepAliveTime == 0)
 	{
 		return;
@@ -565,14 +571,14 @@ void BackupClientContext::DoKeepAlive()
 	{
 		return;
 	}
-	
+
 	BOX_TRACE("KeepAliveTime reached, sending keep-alive message");
 	pConnection->QueryGetIsAlive();
-	
+
 	mKeepAliveTimer.Reset(mKeepAliveTime * MILLI_SEC_IN_SEC);
 }
 
-int BackupClientContext::GetMaximumDiffingTime() 
+int BackupClientContext::GetMaximumDiffingTime()
 {
 	return mMaximumDiffingTime;
 }

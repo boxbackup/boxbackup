@@ -70,19 +70,35 @@ bool kill_running_daemons()
 	TEST_THAT(kill_running_daemons()); \
 	TEARDOWN();
 
+bool check_new_account_info();
+
 bool test_create_account_with_account_control()
 {
 	SETUP_TEST_S3SIMULATOR();
 
 	std::auto_ptr<Configuration> config = load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE,
 		BackupDaemonConfigVerify);
-	S3BackupAccountControl control(*config);
-	control.CreateAccount("test", 1000, 2000);
+	TEST_LINE_OR(config.get(), "Failed to load configuration, aborting", FAIL);
+
+	{
+		S3BackupAccountControl control(*config);
+		control.CreateAccount("test", 1000, 2000);
+		TEST_THAT(check_new_account_info());
+		// Exit scope to release S3BackupFileSystem now, writing the refcount db back to the
+		// store, before stopping the simulator daemon!
+	}
+
+	TEARDOWN_TEST_S3SIMULATOR();
+}
+
+bool check_new_account_info()
+{
+	int old_failure_count_local = num_failures;
 
 	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
 	std::auto_ptr<BackupStoreInfo> info = BackupStoreInfo::Load(fs, fs.GetFileName(),
 		true); // ReadOnly
-	TEST_EQUAL(0, info->GetAccountID());
+	TEST_EQUAL(S3_FAKE_ACCOUNT_ID, info->GetAccountID());
 	TEST_EQUAL(1, info->GetLastObjectIDUsed());
 	TEST_EQUAL(1, info->GetBlocksUsed());
 	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
@@ -101,9 +117,36 @@ bool test_create_account_with_account_control()
 	TEST_EQUAL(0, info->GetClientStoreMarker());
 	TEST_EQUAL("test", info->GetAccountName());
 
-	FileStream root_stream("testfiles/store/subdir/dirs/0x1.dir");
+	FileStream root_stream("testfiles/store/subdir/0x1.dir");
 	BackupStoreDirectory root_dir(root_stream);
 	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
+
+	// Return true if no new failures.
+	return (old_failure_count_local == num_failures);
+}
+
+#define BBSTOREACCOUNTS_COMMAND BBSTOREACCOUNTS " -3 -c " \
+	DEFAULT_BBACKUPD_CONFIG_FILE "  "
+
+bool test_bbstoreaccounts_commands()
+{
+	SETUP_TEST_S3SIMULATOR();
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "create test 1000B 2000B"), 0);
+	TEST_THAT(check_new_account_info());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "name foo"), 0);
+	FileStream fs("testfiles/store/subdir/" S3_INFO_FILE_NAME);
+	std::auto_ptr<BackupStoreInfo> apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(),
+		true); // ReadOnly
+	TEST_EQUAL("foo", apInfo->GetAccountName());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "enabled no"), 0);
+	fs.Seek(0, IOStream::SeekType_Absolute);
+	apInfo = BackupStoreInfo::Load(fs, fs.GetFileName(), true); // ReadOnly
+	TEST_EQUAL(false, apInfo->IsAccountEnabled());
+
+	TEST_RETURN(system(BBSTOREACCOUNTS_COMMAND "info"), 0);
 
 	TEARDOWN_TEST_S3SIMULATOR();
 }
@@ -122,6 +165,7 @@ int test(int argc, const char *argv[])
 #endif
 
 	TEST_THAT(test_create_account_with_account_control());
+	TEST_THAT(test_bbstoreaccounts_commands());
 
 	return finish_test_suite();
 }

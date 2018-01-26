@@ -52,6 +52,7 @@ public:
 	{
 		buffers[(currentBuffer + 1) & 1].Write(pBuffer, NBytes, Timeout);
 	}
+	using IOStream::Write;
 	bool StreamDataLeft()
 	{
 		return buffers[currentBuffer].StreamDataLeft() || buffers[(currentBuffer + 1) % 1].GetSize() > 0;

@@ -58,7 +58,10 @@ CollectInBufferStream::~CollectInBufferStream()
 // --------------------------------------------------------------------------
 int CollectInBufferStream::Read(void *pBuffer, int NBytes, int Timeout)
 {
-	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
+	if(mInWritePhase != false)
+	{
+		THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase);
+	}
 	
 	// Adjust to number of bytes left
 	if(NBytes > (mBytesInBuffer - mReadPosition))
@@ -100,6 +103,7 @@ IOStream::pos_type CollectInBufferStream::BytesLeftToRead()
 // --------------------------------------------------------------------------
 void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 {
+	ASSERT(NBytes >= 0);
 	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Enough space in the buffer
@@ -225,7 +229,10 @@ bool CollectInBufferStream::StreamClosed()
 // --------------------------------------------------------------------------
 void CollectInBufferStream::SetForReading()
 {
-	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
+	if(mInWritePhase != true)
+	{
+		THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase);
+	}
 	
 	// Move to read phase
 	mInWritePhase = false;

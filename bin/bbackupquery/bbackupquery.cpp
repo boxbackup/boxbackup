@@ -189,24 +189,6 @@ int main(int argc, const char *argv[])
 		"bbackupquery")
 	MAINHELPER_START
 
-#ifdef WIN32
-	WSADATA info;
-	
-	// Under Win32 we must initialise the Winsock library
-	// before using it.
-	
-	if (WSAStartup(0x0101, &info) == SOCKET_ERROR) 
-	{
-		// throw error? perhaps give it its own id in the future
-		THROW_EXCEPTION(BackupStoreException, Internal)
-	}
-#endif
-
-	// Really don't want trace statements happening, even in debug mode
-	#ifndef BOX_RELEASE_BUILD
-		BoxDebugTraceOn = false;
-	#endif
-	
 	FILE *logFile = 0;
 
 	// Filename for configuration file?
@@ -313,7 +295,7 @@ int main(int argc, const char *argv[])
 			true)); // open in append mode
 	}
 
-	BOX_NOTICE(BANNER_TEXT("Backup Query Tool"));
+	BOX_NOTICE(BANNER_TEXT("query tool (bbackupquery)"));
 
 #ifdef WIN32
 	if (unicodeConsole)
@@ -355,7 +337,7 @@ int main(int argc, const char *argv[])
 	}
 	// Easier coding
 	const Configuration &conf(*config);
-	
+
 	// Setup and connect
 	// 1. TLS context
 	SSLLib::Initialise();
@@ -485,7 +467,7 @@ int main(int argc, const char *argv[])
 
 			try
 			{
-				cmd_str = apGetLine->GetLine();
+				cmd_str = apGetLine->GetLine(false);
 			}
 			catch(CommonException &e)
 			{
@@ -530,12 +512,6 @@ int main(int argc, const char *argv[])
 	
 	// Let everything be cleaned up on exit.
 	
-#ifdef WIN32
-	// Clean up our sockets
-	// FIXME we should do this, but I get an abort() when I try
-	// WSACleanup();
-#endif
-
 	MAINHELPER_END
 	
 	return returnCode;

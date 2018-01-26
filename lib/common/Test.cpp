@@ -17,14 +17,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef HAVE_DIRENT_H
+#	include <dirent.h> // for opendir(), struct DIR
+#endif
+
 #ifdef HAVE_UNISTD_H
-	#include <unistd.h>
+#	include <unistd.h>
 #endif
 
 #include "BoxTime.h"
 #include "FileStream.h"
 #include "Test.h"
-#include "Utils.h"
+#include "Utils.h" // for ObjectExists_* (object_exists_t)
 
 int num_tests_selected = 0;
 int num_failures = 0;
@@ -35,10 +39,19 @@ std::string first_fail_file;
 std::string current_test_name;
 std::list<std::string> run_only_named_tests;
 std::map<std::string, std::string> s_test_status;
+box_time_t current_test_start;
 
-bool setUp(const char* function_name)
+bool setUp(const std::string& function_name, const std::string& specialisation)
 {
-	current_test_name = function_name;
+	std::ostringstream specialised_name;
+	specialised_name << function_name;
+
+	if(!specialisation.empty())
+	{
+		specialised_name << "(" << specialisation << ")";
+	}
+
+	current_test_name = specialised_name.str();
 
 	if (!run_only_named_tests.empty())
 	{
@@ -48,7 +61,7 @@ bool setUp(const char* function_name)
 			i = run_only_named_tests.begin();
 			i != run_only_named_tests.end(); i++)
 		{
-			if (*i == current_test_name)
+			if (*i == function_name || *i == current_test_name)
 			{
 				run_this_test = true;
 				break;
@@ -62,9 +75,10 @@ bool setUp(const char* function_name)
 		}
 	}
 
-	printf("\n\n== %s ==\n", function_name);
+	printf("\n\n== %s ==\n", current_test_name.c_str());
 	num_tests_selected++;
 	old_failure_count = num_failures;
+	current_test_start = GetCurrentBoxTime();
 
 	if (original_working_dir == "")
 	{
@@ -83,7 +97,8 @@ bool setUp(const char* function_name)
 		}
 	}
 
-#ifdef _MSC_VER
+	// We need to do something more complex than "rm -rf testfiles" to clean up the mess and
+	// prepare for the next test, in a way that works on Windows (without rm -rf) as well.
 	DIR* pDir = opendir("testfiles");
 	if(!pDir)
 	{
@@ -101,18 +116,22 @@ bool setUp(const char* function_name)
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
 			StartsWith("restore", filename) ||
+			filename == "bbackupd-cache" ||
 			filename == "bbackupd-data" ||
+			filename == "store" ||
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
-			EndsWith("testfile", filename))
+			EndsWith("testfile", filename) ||
+			EndsWith(".qdbm", filename))
 		{
-			std::string filepath = std::string("testfiles\\") + filename;
+			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
+				filename;
 
-			int filetype = ObjectExists(filepath);
+			object_exists_t filetype = ObjectExists(filepath);
 			if(filetype == ObjectExists_File)
 			{
-				if(::unlink(filepath.c_str()) != 0)
+				if(EMU_UNLINK(filepath.c_str()) != 0)
 				{
 					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
 						"test fixture file: unlink(\"" << filepath << "\")"));
@@ -120,6 +139,9 @@ bool setUp(const char* function_name)
 			}
 			else if(filetype == ObjectExists_Dir)
 			{
+#ifdef _MSC_VER
+				// More complex command invocation required to properly encode
+				// arguments when non-ASCII characters are involved:
 				std::string cmd = "cmd /c rd /s /q " + filepath;
 				WCHAR* wide_cmd = ConvertUtf8ToWideString(cmd.c_str());
 				if(wide_cmd == NULL)
@@ -181,6 +203,11 @@ bool setUp(const char* function_name)
 
 				CloseHandle(pi.hProcess);
 				CloseHandle(pi.hThread);
+#else // !_MSC_VER
+				// Deleting directories is so much easier on Unix!
+				std::string cmd = "rm -rf '" + filepath + "'";
+				TEST_EQUAL_LINE(0, system(cmd.c_str()), "system() failed: " << cmd);
+#endif
 			}
 			else
 			{
@@ -190,40 +217,38 @@ bool setUp(const char* function_name)
 		}
 	}
 	closedir(pDir);
+
 	FileStream touch("testfiles/accounts.txt", O_WRONLY | O_CREAT | O_TRUNC,
 		S_IRUSR | S_IWUSR);
-#else
-	TEST_THAT_THROWONFAIL(system(
-		"rm -rf testfiles/TestDir* testfiles/0_0 testfiles/0_1 "
-		"testfiles/0_2 testfiles/accounts.txt " // testfiles/test* .tgz!
-		"testfiles/file* testfiles/notifyran testfiles/notifyran.* "
-		"testfiles/notifyscript.tag* "
-		"testfiles/restore* testfiles/bbackupd-data "
-		"testfiles/syncallowscript.control "
-		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
-		) == 0);
-	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
-#endif
+
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_0", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_1", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
 
 	return true;
 }
 
 bool tearDown()
 {
+	box_time_t elapsed_time = GetCurrentBoxTime() - current_test_start;
+	std::ostringstream buf;
+	buf.setf(std::ios_base::fixed);
+	buf.precision(1);
+	buf << " (" << ((float)BoxTimeToMilliSeconds(elapsed_time) / 1000) << " sec)";
+
 	if (num_failures == old_failure_count)
 	{
-		BOX_NOTICE(current_test_name << " passed");
+		BOX_NOTICE(current_test_name << " passed" << buf.str());
 		s_test_status[current_test_name] = "passed";
 		return true;
 	}
 	else
 	{
-		BOX_NOTICE(current_test_name << " failed"); \
+		BOX_NOTICE(current_test_name << " failed" << buf.str()); \
 		s_test_status[current_test_name] = "FAILED";
 		return false;
 	}
@@ -318,46 +343,7 @@ int RunCommand(const std::string& rCommandLine)
 
 bool ServerIsAlive(int pid)
 {
-	#ifdef WIN32
-
-		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION,
-			false, pid);
-		if (hProcess == NULL)
-		{
-			if (GetLastError() != ERROR_INVALID_PARAMETER)
-			{
-				BOX_ERROR("Failed to open process " << pid <<
-					": " <<
-					GetErrorMessage(GetLastError()));
-			}
-			return false;
-		}
-
-		DWORD exitCode;
-		BOOL result = GetExitCodeProcess(hProcess, &exitCode);
-		CloseHandle(hProcess);
-
-		if (result == 0)
-		{
-			BOX_ERROR("Failed to get exit code for process " <<
-				pid << ": " <<
-				GetErrorMessage(GetLastError()))
-			return false;
-		}
-
-		if (exitCode == STILL_ACTIVE)
-		{
-			return true;
-		}
-		
-		return false;
-
-	#else // !WIN32
-
-		if(pid == 0) return false;
-		return ::kill(pid, 0) != -1;
-
-	#endif // WIN32
+	return process_is_running(pid);
 }
 
 int ReadPidFile(const char *pidFile)
@@ -382,11 +368,22 @@ int ReadPidFile(const char *pidFile)
 	return pid;
 }
 
+#ifdef WIN32
+HANDLE sTestChildDaemonJobObject = INVALID_HANDLE_VALUE;
+#endif
+
 int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 {
 	BOX_INFO("Starting server: " << rCommandLine);
 
 #ifdef WIN32
+
+	// Use a Windows "Job Object" as a container for all our child
+	// processes. The test runner will create this job object when
+	// it starts, and close the handle (killing any running daemons)
+	// when it exits. This is the best way to avoid daemons hanging
+	// around and causing subsequent tests to fail, and/or the test
+	// runner to hang waiting for a daemon that will never terminate.
 
 	PROCESS_INFORMATION procInfo;
 
@@ -419,9 +416,17 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 	free(tempCmd);
 
 	TEST_THAT_OR(result != 0,
-		BOX_LOG_WIN_ERROR("Launch failed: " << rCommandLine);
+		BOX_LOG_WIN_ERROR("Failed to CreateProcess: " << rCommandLine);
 		return -1;
 		);
+
+	if(sTestChildDaemonJobObject != INVALID_HANDLE_VALUE)
+	{
+		if(!AssignProcessToJobObject(sTestChildDaemonJobObject, procInfo.hProcess))
+		{
+			BOX_LOG_WIN_WARNING("Failed to add child process to job object");
+		}
+	}
 
 	CloseHandle(procInfo.hProcess);
 	CloseHandle(procInfo.hThread);
@@ -550,7 +555,7 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 		}
 		
 		// Delete it
-		::unlink(filename);
+		EMU_UNLINK(filename);
 	}
 #endif
 }
@@ -638,3 +643,32 @@ std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	return config;
 }
 
+bool test_equal_lists(const std::vector<std::string>& expected_items,
+	const std::vector<std::string>& actual_items)
+{
+	bool all_match = (expected_items.size() == actual_items.size());
+
+	for(size_t i = 0; i < std::max(expected_items.size(), actual_items.size()); i++)
+	{
+		const std::string& expected = (i < expected_items.size()) ? expected_items[i] : "None";
+		const std::string& actual   = (i < actual_items.size())   ? actual_items[i]   : "None";
+		TEST_EQUAL_LINE(expected, actual, "Item " << i);
+		all_match &= (expected == actual);
+	}
+
+	return all_match;
+}
+
+bool test_equal_maps(const str_map_t& expected_attrs, const str_map_t& actual_attrs)
+{
+	str_map_diff_t differences = compare_str_maps(expected_attrs, actual_attrs);
+	for(str_map_diff_t::iterator i = differences.begin(); i != differences.end(); i++)
+	{
+		const std::string& name = i->first;
+		const std::string& expected = i->second.first;
+		const std::string& actual = i->second.second;
+		TEST_EQUAL_LINE(expected, actual, "Wrong value for attribute " << name);
+	}
+
+	return differences.empty();
+}
