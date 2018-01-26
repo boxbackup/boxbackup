@@ -40,6 +40,7 @@
 #include "FileStream.h"
 #include "HousekeepStoreAccount.h"
 #include "MemBlockStream.h"
+#include "NamedLock.h" // for BOX_LOCK_TYPE_F_SETLK
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
@@ -1390,18 +1391,21 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 	return loginConf->GetClientStoreMarker();
 }
 
-bool test_multiple_uploads()
+bool test_multiple_uploads(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-	std::auto_ptr<BackupProtocolCallable> apProtocol =
-		connect_and_login(context);
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
 
-	// TODO FIXME replace protocolReadOnly with apProtocolReadOnly.
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, true); // ReadOnly
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocolReadOnly(
+		new BackupProtocolLocal2(roContext, 0x01234567, true)); // ReadOnly
 
 	// Read the root directory a few times (as it's cached, so make sure it doesn't hurt anything)
 	for(int l = 0; l < 3; ++l)
@@ -1419,14 +1423,14 @@ bool test_multiple_uploads()
 
 	// Read the dir from the readonly connection (make sure it gets in the cache)
 	// Command
-	protocolReadOnly.QueryListDirectory(
+	apProtocolReadOnly->QueryListDirectory(
 		BACKUPSTORE_ROOT_DIRECTORY_ID,
 		BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
 		false /* no attributes */);
 	// Stream
-	BackupStoreDirectory dir(protocolReadOnly.ReceiveStream(),
-		protocolReadOnly.GetTimeout());
+	BackupStoreDirectory dir(apProtocolReadOnly->ReceiveStream(),
+		apProtocolReadOnly->GetTimeout());
 	TEST_THAT(dir.GetNumberOfEntries() == 0);
 
 	// TODO FIXME dedent
@@ -1476,10 +1480,10 @@ bool test_multiple_uploads()
 				expected_num_old_files, 0, 1));
 
 			apProtocol->QueryFinished();
-			protocolReadOnly.QueryFinished();
-			TEST_THAT(run_housekeeping_and_check_account());
-			apProtocol = connect_and_login(context);
-			protocolReadOnly.Reopen();
+			apProtocolReadOnly->QueryFinished();
+			TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+			apProtocol->Reopen();
+			apProtocolReadOnly->Reopen();
 
 			TEST_THAT(check_num_files(fs, expected_num_current_files,
 				expected_num_old_files, 0, 1));
@@ -1500,10 +1504,10 @@ bool test_multiple_uploads()
 		}
 
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Delete one of them (will implicitly delete an old version)
 		{
@@ -1515,10 +1519,10 @@ bool test_multiple_uploads()
 		}
 
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account());
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1552,7 +1556,7 @@ bool test_multiple_uploads()
 
 			// Use the read only connection to verify that the directory is as we expect
 			printf("\n\n==== Reading directory using read-only connection\n");
-			check_dir_after_uploads(protocolReadOnly, attrtest);
+			check_dir_after_uploads(*apProtocolReadOnly, attrtest);
 			printf("done.\n\n");
 			// And on the read/write one
 			check_dir_after_uploads(*apProtocol, attrtest);
@@ -1584,23 +1588,10 @@ bool test_multiple_uploads()
 		// ourselves) and check that it doesn't change the numbers
 		// of files
 		apProtocol->QueryFinished();
-		protocolReadOnly.QueryFinished();
-
-		std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-		BackupStoreAccountDatabase::Entry account =
-			apAccounts->GetEntry(0x1234567);
-		TEST_EQUAL(0, run_housekeeping(account));
-
-		// Also check that bbstoreaccounts doesn't change anything,
-		// using an external process instead of the internal one.
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS
-			" -c testfiles/bbstored.conf check 01234567 fix") == 0,
-			FAIL);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-		apProtocol = connect_and_login(context);
-		protocolReadOnly.Reopen();
+		apProtocolReadOnly->QueryFinished();
+		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		apProtocol->Reopen();
+		apProtocolReadOnly->Reopen();
 
 		TEST_THAT(check_num_files(fs, UPLOAD_NUM - 4, 3, 2, 1));
 
@@ -1631,6 +1622,10 @@ bool test_multiple_uploads()
 				FileStream patch(TEST_FILE_FOR_PATCHING ".patch", O_WRONLY | O_CREAT);
 				patchstream->CopyStreamTo(patch);
 			}
+
+			// Release blockIndexStream to close the RaidFile, so that we can rename over it
+			blockIndexStream.reset();
+
 			// Make sure the stream is a plausible size for a patch containing only one new block
 			TEST_THAT(TestGetFileSize(TEST_FILE_FOR_PATCHING ".patch") < (8*1024));
 
@@ -1667,9 +1662,9 @@ bool test_multiple_uploads()
 	}
 
 	apProtocol->QueryFinished();
-	protocolReadOnly.QueryFinished();
+	apProtocolReadOnly->QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_server_commands(const std::string& specialisation_name,
@@ -2857,9 +2852,9 @@ bool test_login_with_disabled_account()
 	// make sure something is written to it
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences(
+	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
 		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true));
+			apAccounts->GetEntry(0x1234567), true);
 	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
 		apReferences->GetLastObjectIDUsed());
 	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -3760,7 +3755,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 	TEST_THAT(test_server_housekeeping());
-	TEST_THAT(test_multiple_uploads());
+	TEST_THAT(test_multiple_uploads("store", *specialisations["store"]));
 
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
