@@ -490,6 +490,12 @@ int test(int argc, const char *argv[])
 	// so enable it unconditionally:
 	Console::SetShowTime(true);
 
+	// Enable stack trace logging for ServerException(SocketOpenError) to help debug random
+	// test failures:
+	LogLevelOverrideByFileGuard enable_socket_backtraces("SocketStream.cpp", "", Log::TRACE,
+		false); // !OverrideAllButSelected
+	enable_socket_backtraces.Install();
+
 	// Server launching stuff
 	if(argc >= 2)
 	{
@@ -844,7 +850,7 @@ int test(int argc, const char *argv[])
 			BOX_INFO("Try to end protocol (should fail as server is already dead)");
 			{
 				bool didthrow = false;
-				HideExceptionMessageGuard hide;
+				// HideExceptionMessageGuard hide;
 				try
 				{
 					protocol.QueryQuit();
