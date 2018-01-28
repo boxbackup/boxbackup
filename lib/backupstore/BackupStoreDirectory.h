@@ -476,7 +476,7 @@ public:
 	// Don't use these functions in normal code!
 	void TESTONLY_SetObjectID(int64_t ObjectID) {mObjectID = ObjectID;}
 	// Debug and diagnostics
-	void Dump(void *clibFileHandle, bool ToTrace); // first arg is FILE *, but avoid including stdio.h everywhere
+	void Dump(std::ostream& Output, bool ToTrace);
 
 private:
 	int64_t mRevisionID;

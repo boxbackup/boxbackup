@@ -13,6 +13,8 @@
 #include <string.h>
 #include <signal.h>
 
+#include <iostream>
+
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
@@ -259,7 +261,7 @@ void test_depends_in_dirs()
 			TEST_THAT(en->GetDependsNewer() == ((i == 3)?4:0));
 			TEST_THAT(en->GetDependsOlder() == 0);
 		}
-		dir2.Dump(0, true);
+		dir2.Dump(std::cout, true);
 		// Test that numbers go in and out as required
 		for(int i = 2; i <= 5; ++i)
 		{
@@ -278,7 +280,7 @@ void test_depends_in_dirs()
 			BackupStoreDirectory dir3;
 			FileStream in("testfiles/dir.2");
 			dir3.ReadFromStream(in, SHORT_TIMEOUT);
-			dir3.Dump(0, true);
+			dir3.Dump(std::cout, true);
 			for(int i = 2; i <= 5; ++i)
 			{
 				BackupStoreDirectory::Entry *en = dir2.FindEntryByID(i);
@@ -528,7 +530,7 @@ int test(int argc, const char *argv[])
 
 				std::auto_ptr<RaidFileRead> dirStream(RaidFileRead::Open(0, "backup/01234567/o01"));
 				dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
-				dir.Dump(0, true);
+				dir.Dump(std::cout, true);
 
 				// Find the test_files entry for the file that was just deleted:
 				int just_deleted = deleteIndex == 0 ? -1 : test_file_remove_order[deleteIndex - 1];

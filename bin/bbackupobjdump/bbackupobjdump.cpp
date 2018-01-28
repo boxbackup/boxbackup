@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 
 #include "MainHelper.h"
 #include "FileStream.h"
@@ -46,7 +47,7 @@ int main(int argc, const char *argv[])
 	if(file.Read(&signature, sizeof(signature)) != sizeof(signature))
 	{
 		// Too short, can't read signature from it
-		return false;
+		return 0;
 	}
 	// Seek back to beginning
 	file.Seek(0, IOStream::SeekType_Absolute);
@@ -58,14 +59,14 @@ int main(int argc, const char *argv[])
 #ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
 	case OBJECTMAGIC_FILE_MAGIC_VALUE_V0:
 #endif
-		BackupStoreFile::DumpFile(stdout, false, file);
+		BackupStoreFile::DumpFile(std::cout, false, file);
 		break;
 
 	case OBJECTMAGIC_DIR_MAGIC_VALUE:
 		{
 			BackupStoreDirectory dir;
 			dir.ReadFromStream(file, IOStream::TimeOutInfinite);
-			dir.Dump(stdout, false);
+			dir.Dump(std::cout, false);
 			if(dir.CheckAndFix())
 			{
 				::printf("Directory didn't pass checking\n");

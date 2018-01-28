@@ -32,7 +32,7 @@
 //		Created: 3/5/04
 //
 // --------------------------------------------------------------------------
-static void OutputLine(FILE *file, bool ToTrace, const char *format, ...)
+static void OutputLine(std::ostream* pOutput, bool ToTrace, const char *format, ...)
 {
 	char text[512];
 	int r = 0;
@@ -41,10 +41,11 @@ static void OutputLine(FILE *file, bool ToTrace, const char *format, ...)
 	r = vsnprintf(text, sizeof(text), format, ap);
 	va_end(ap);
 
-	if(file != 0)
+	if(pOutput != 0)
 	{
-		::fprintf(file, "%s", text);		
+		(*pOutput) << text << "\n";
 	}
+
 	if(ToTrace)
 	{
 		BOX_TRACE(text);
@@ -61,11 +62,9 @@ static void OutputLine(FILE *file, bool ToTrace, const char *format, ...)
 //		Created: 3/5/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
+void BackupStoreDirectory::Dump(std::ostream& output, bool ToTrace)
 {
-	FILE *file = (FILE*)clibFileHandle;
-
-	OutputLine(file, ToTrace, "Directory object.\nObject ID: %llx\nContainer ID: %llx\nNumber entries: %d\n"\
+	OutputLine(&output, ToTrace, "Directory object.\nObject ID: %llx\nContainer ID: %llx\nNumber entries: %d\n"\
 		"Attributes mod time: %llx\nAttributes size: %d\n", mObjectID, mContainerID, mEntries.size(),
 		mAttributesModTime, mAttributes.GetSize());
 
@@ -74,7 +73,9 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 	int nameNumI = 0;
 
 	// Dump items
-	OutputLine(file, ToTrace, "Items:\nID     Size AttrHash         AtSz NSz NIdx Flags\n");
+	OutputLine(&output, ToTrace, "Items:");
+	OutputLine(&output, ToTrace, "ID     Size AttrHash         AtSz NSz NIdx Flags");
+	OutputLine(&output, ToTrace, "====== ==== ================ ==== === ==== =====");
 	for(std::vector<Entry*>::const_iterator i(mEntries.begin()); i != mEntries.end(); ++i)
 	{
 		// Choose file name index number for this file
@@ -114,11 +115,11 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 		// Output item
 		int16_t f = (*i)->GetFlags();
 #ifdef WIN32
-		OutputLine(file, ToTrace, 
-			"%06I64x %4I64d %016I64x %4d %3d %4d%s%s%s%s%s%s\n",
+		OutputLine(&output, ToTrace,
+			"%06I64x %4I64d %016I64x %4d %3d %4d%s%s%s%s%s%s",
 #else
-		OutputLine(file, ToTrace, 
-			"%06llx %4lld %016llx %4d %3d %4d%s%s%s%s%s%s\n",
+		OutputLine(&output, ToTrace,
+			"%06llx %4lld %016llx %4d %3d %4d%s%s%s%s%s%s",
 #endif
 			(*i)->GetObjectID(),
 			(*i)->GetSizeInBlocks(),
@@ -144,10 +145,8 @@ void BackupStoreDirectory::Dump(void *clibFileHandle, bool ToTrace)
 //		Created: 4/5/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFile)
+void BackupStoreFile::DumpFile(std::ostream& output, bool ToTrace, IOStream &rFile)
 {
-	FILE *file = (FILE*)clibFileHandle;
-
 	// Read header
 	file_StreamFormat hdr;
 	if(!rFile.ReadFullBuffer(&hdr, sizeof(hdr),
@@ -161,24 +160,23 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 	if(hdr.mMagicValue != (int32_t)htonl(OBJECTMAGIC_FILE_MAGIC_VALUE_V1)
 		&& hdr.mMagicValue != (int32_t)htonl(OBJECTMAGIC_FILE_MAGIC_VALUE_V0))
 	{
-		OutputLine(file, ToTrace, "File header doesn't have the correct magic, aborting dump\n");
+		OutputLine(&output, ToTrace, "File header doesn't have the correct magic, aborting dump");
 		return;
 	}
 
-	OutputLine(file, ToTrace, "File object.\nContainer ID: %llx\nModification time: %llx\n"\
-		"Max block clear size: %d\nOptions: %08x\nNum blocks: %d\n", box_ntoh64(hdr.mContainerID),
+	OutputLine(&output, ToTrace, "File object.\nContainer ID: %llx\nModification time: %llx\n"\
+		"Max block clear size: %d\nOptions: %08x\nNum blocks: %d", box_ntoh64(hdr.mContainerID),
 			box_ntoh64(hdr.mModificationTime), ntohl(hdr.mMaxBlockClearSize), ntohl(hdr.mOptions),
 			box_ntoh64(hdr.mNumBlocks));
 
 	// Read the next two objects
 	BackupStoreFilename fn;
 	fn.ReadFromStream(rFile, IOStream::TimeOutInfinite);
-	OutputLine(file, ToTrace, "Filename size: %d\n",
-		fn.GetEncodedFilename().size());
+	OutputLine(&output, ToTrace, "Filename size: %d", fn.GetEncodedFilename().size());
 	
 	BackupClientFileAttributes attr;
 	attr.ReadFromStream(rFile, IOStream::TimeOutInfinite);
-	OutputLine(file, ToTrace, "Attributes size: %d\n", attr.GetSize());
+	OutputLine(&output, ToTrace, "Attributes size: %d", attr.GetSize());
 	
 	// Dump the blocks
 	rFile.Seek(0, IOStream::SeekType_Absolute);
@@ -190,38 +188,45 @@ void BackupStoreFile::DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFi
 	if(bhdr.mMagicValue != (int32_t)htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V1)
 		&& bhdr.mMagicValue != (int32_t)htonl(OBJECTMAGIC_FILE_BLOCKS_MAGIC_VALUE_V0))
 	{
-		OutputLine(file, ToTrace, "WARNING: Block header doesn't have the correct magic\n");
+		OutputLine(&output, ToTrace, "WARNING: Block header doesn't have the correct magic");
 	}
 	// number of blocks
 	int64_t nblocks = box_ntoh64(bhdr.mNumBlocks);
-	OutputLine(file, ToTrace, "Other file ID (for block refs): %llx\nNum blocks (in blk hdr): %lld\n",
+	OutputLine(&output, ToTrace, "Other file ID (for block refs): %llx\nNum blocks (in blk hdr): %lld",
 		box_ntoh64(bhdr.mOtherFileID), nblocks);
 
 	// Dump info about each block
-	OutputLine(file, ToTrace, "======== ===== ==========\n   Index Where  EncSz/Idx\n");
+	OutputLine(&output, ToTrace, "Index    Where EncSz/Idx");
+	OutputLine(&output, ToTrace, "======== ===== ==========");
 	int64_t nnew = 0, nold = 0;
 	for(int64_t b = 0; b < nblocks; ++b)
 	{
 		file_BlockIndexEntry en;
 		if(!rFile.ReadFullBuffer(&en, sizeof(en), 0))
 		{
-			OutputLine(file, ToTrace, "Didn't manage to read block %lld from file\n", b);
+			OutputLine(&output, ToTrace, "Didn't manage to read block %lld from file\n", b);
 			continue;
 		}
 		int64_t s = box_ntoh64(en.mEncodedSize);
 		if(s > 0)
 		{
 			nnew++;
-			BOX_TRACE(std::setw(8) << b << " this  s=" <<
-				std::setw(8) << s);
+			output << b << " this  s=" << std::setw(8) << s;
+			if(ToTrace)
+			{
+				BOX_TRACE(std::setw(8) << b << " this  s=" << std::setw(8) << s);
+			}
 		}
 		else
 		{
 			nold++;
-			BOX_TRACE(std::setw(8) << b << " other i=" <<
-				std::setw(8) << 0 - s);
+			output << std::setw(8) << b << " other i=" << std::setw(8) << 0 - s;
+			if(ToTrace)
+			{
+				BOX_TRACE(std::setw(8) << b << " other i=" << std::setw(8) << 0 - s);
+			}
 		}
 	}
-	BOX_TRACE("======== ===== ==========");
+	OutputLine(&output, ToTrace, "======== ===== ==========");
 }
 

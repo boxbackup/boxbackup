@@ -317,7 +317,7 @@ public:
 #endif
 
 	// For decoding encoded files
-	static void DumpFile(void *clibFileHandle, bool ToTrace, IOStream &rFile);
+	static void DumpFile(std::ostream& Output, bool ToTrace, IOStream &rFile);
 };
 
 #include "MemLeakFindOff.h"
