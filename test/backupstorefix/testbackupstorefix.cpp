@@ -197,9 +197,9 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 		}
 		TEST_EQUAL_LINE(ck->id, en->GetObjectID(), "Wrong object ID "
 			"for " << BOX_FORMAT_OBJECTID(ck->id));
-		TEST_EQUAL_LINE(ck->depNewer, en->GetDependsNewer(),
+		TEST_EQUAL_LINE(ck->depNewer, en->GetDependsOnObject(),
 			"Wrong Newer dependency for " << BOX_FORMAT_OBJECTID(ck->id));
-		TEST_EQUAL_LINE(ck->depOlder, en->GetDependsOlder(),
+		TEST_EQUAL_LINE(ck->depOlder, en->GetRequiredByObject(),
 			"Wrong Older dependency for " << BOX_FORMAT_OBJECTID(ck->id));
 		++ck;
 	}
@@ -216,7 +216,7 @@ void test_dir_fixing()
 		BackupStoreDirectory::Entry* e = dir.AddEntry(fnames[0], 12,
 			2 /* id */, 1, BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
-		e->SetDependsNewer(3);
+		e->SetDependsOnObject(3);
 
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
@@ -295,23 +295,23 @@ void test_dir_fixing()
 			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e2 != 0);
-		e2->SetDependsNewer(3);
+		e2->SetDependsOnObject(3);
 		BackupStoreDirectory::Entry *e3 = dir.AddEntry(fnames[0], 12,
 			3 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e3 != 0);
-		e3->SetDependsNewer(4); e3->SetDependsOlder(2);
+		e3->SetDependsOnObject(4); e3->SetRequiredByObject(2);
 		BackupStoreDirectory::Entry *e4 = dir.AddEntry(fnames[0], 12,
 			4 /* id */, 1,
 			BackupStoreDirectory::Entry::Flags_File |
 			BackupStoreDirectory::Entry::Flags_OldVersion, 2);
 		TEST_THAT(e4 != 0);
-		e4->SetDependsNewer(5); e4->SetDependsOlder(3);
+		e4->SetDependsOnObject(5); e4->SetRequiredByObject(3);
 		BackupStoreDirectory::Entry *e5 = dir.AddEntry(fnames[0], 12,
 			5 /* id */, 1, BackupStoreDirectory::Entry::Flags_File, 2);
 		TEST_THAT(e5 != 0);
-		e5->SetDependsOlder(4);
+		e5->SetRequiredByObject(4);
 
 		// This should all be nice and valid
 		TEST_THAT(dir.CheckAndFix() == false);
@@ -319,13 +319,13 @@ void test_dir_fixing()
 		check_dir_dep(dir, c1);
 
 		// Check that dependency forwards are restored
-		e4->SetDependsOlder(34343);
+		e4->SetRequiredByObject(34343);
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
 		check_dir_dep(dir, c1);
 
 		// Check that a spurious depends older ref is undone
-		e2->SetDependsOlder(1);
+		e2->SetRequiredByObject(1);
 		TEST_THAT(dir.CheckAndFix() == true);
 		TEST_THAT(dir.CheckAndFix() == false);
 		check_dir_dep(dir, c1);

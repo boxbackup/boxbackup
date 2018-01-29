@@ -3521,8 +3521,8 @@ bool test_read_write_attr_streamformat()
 	// 85 bytes to here
 
 	// Then an en_StreamFormatDepends for dependency info.
-	darc.Write((uint64_t)0x0000000000000005); // mDependsNewer
-	darc.Write((uint64_t)0x0000000000000006); // mDependsOlder
+	darc.Write((uint64_t)0x0000000000000005); // mDependsOnObject
+	darc.Write((uint64_t)0x0000000000000006); // mRequiredByObject
 	// 101 bytes to here
 
 	// Make sure none of the fields was expanded in transit by Archive.
@@ -3543,8 +3543,8 @@ bool test_read_write_attr_streamformat()
 	TEST_EQUAL(0x0000000000000002, pen->GetObjectID());
 	TEST_EQUAL(0x0000000000000003, pen->GetSizeInBlocks());
 	TEST_EQUAL(0x0000000000000004, pen->GetAttributesHash());
-	TEST_EQUAL(0x0000000000000005, pen->GetDependsNewer());
-	TEST_EQUAL(0x0000000000000006, pen->GetDependsOlder());
+	TEST_EQUAL(0x0000000000000005, pen->GetDependsOnObject());
+	TEST_EQUAL(0x0000000000000006, pen->GetRequiredByObject());
 	TEST_EQUAL(0x3141, pen->GetFlags());
 
 	CollectInBufferStream buf2;

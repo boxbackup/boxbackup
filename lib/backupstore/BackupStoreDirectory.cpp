@@ -49,8 +49,8 @@ typedef struct
 
 typedef struct
 {
-	int64_t mDependsNewer;
-	int64_t mDependsOlder;
+	int64_t mDependsOnObject;
+	int64_t mRequiredByObject;
 } en_StreamFormatDepends;
 
 // Use default packing
@@ -426,8 +426,8 @@ BackupStoreDirectory::Entry::Entry()
   mAttributesHash(0),
   mMinMarkNumber(0),
   mMarkNumber(0),
-  mDependsNewer(0),
-  mDependsOlder(0)
+  mDependsOnObject(0),
+  mRequiredByObject(0)
 {
 }
 
@@ -465,8 +465,8 @@ BackupStoreDirectory::Entry::Entry(const Entry &rToCopy)
   mAttributes(rToCopy.mAttributes),
   mMinMarkNumber(rToCopy.mMinMarkNumber),
   mMarkNumber(rToCopy.mMarkNumber),
-  mDependsNewer(rToCopy.mDependsNewer),
-  mDependsOlder(rToCopy.mDependsOlder)
+  mDependsOnObject(rToCopy.mDependsOnObject),
+  mRequiredByObject(rToCopy.mRequiredByObject)
 {
 }
 
@@ -492,8 +492,8 @@ BackupStoreDirectory::Entry::Entry(const BackupStoreFilename &rName, box_time_t 
   mAttributesHash(AttributesHash),
   mMinMarkNumber(0),
   mMarkNumber(0),
-  mDependsNewer(0),
-  mDependsOlder(0)
+  mDependsOnObject(0),
+  mRequiredByObject(0)
 {
 }
 
@@ -586,8 +586,8 @@ void BackupStoreDirectory::Entry::ReadFromStreamDependencyInfo(IOStream &rStream
 	}
 
 	// Store the data
-	mDependsNewer = box_ntoh64(depends.mDependsNewer);
-	mDependsOlder = box_ntoh64(depends.mDependsOlder);
+	mDependsOnObject = box_ntoh64(depends.mDependsOnObject);
+	mRequiredByObject = box_ntoh64(depends.mRequiredByObject);
 }
 
 
@@ -604,8 +604,8 @@ void BackupStoreDirectory::Entry::WriteToStreamDependencyInfo(IOStream &rStream)
 	ASSERT(!mInvalidated); // Compiled out of release builds
 	// Build structure
 	en_StreamFormatDepends depends;
-	depends.mDependsNewer = box_hton64(mDependsNewer);
-	depends.mDependsOlder = box_hton64(mDependsOlder);
+	depends.mDependsOnObject = box_hton64(mDependsOnObject);
+	depends.mRequiredByObject = box_hton64(mRequiredByObject);
 	// Write
 	rStream.Write(&depends, sizeof(depends));
 }

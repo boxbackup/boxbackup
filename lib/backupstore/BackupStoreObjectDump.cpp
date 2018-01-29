@@ -95,20 +95,20 @@ void BackupStoreDirectory::Dump(std::ostream& output, bool ToTrace)
 		char depends[128];
 		depends[0] = '\0';
 		int depends_l = 0;
-		if((*i)->GetDependsNewer() != 0)
+		if((*i)->GetDependsOnObject() != 0)
 		{
 #ifdef _MSC_VER
-			depends_l += ::sprintf(depends + depends_l, " depNew(%I64x)", (*i)->GetDependsNewer());
+			depends_l += ::sprintf(depends + depends_l, " depOn(%I64x)", (*i)->GetDependsOnObject());
 #else
-			depends_l += ::sprintf(depends + depends_l, " depNew(%llx)", (long long)((*i)->GetDependsNewer()));
+			depends_l += ::sprintf(depends + depends_l, " depOn(%llx)", (long long)((*i)->GetDependsOnObject()));
 #endif
 		}
-		if((*i)->GetDependsOlder() != 0)
+		if((*i)->GetRequiredByObject() != 0)
 		{
 #ifdef _MSC_VER
-			depends_l += ::sprintf(depends + depends_l, " depOld(%I64x)", (*i)->GetDependsOlder());
+			depends_l += ::sprintf(depends + depends_l, " reqBy(%I64x)", (*i)->GetRequiredByObject());
 #else
-			depends_l += ::sprintf(depends + depends_l, " depOld(%llx)", (long long)((*i)->GetDependsOlder()));
+			depends_l += ::sprintf(depends + depends_l, " reqBy(%llx)", (long long)((*i)->GetRequiredByObject()));
 #endif
 		}
 

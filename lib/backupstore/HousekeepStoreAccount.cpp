@@ -344,13 +344,13 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				&& (en->IsDeleted() || en->IsOld()))
 			{
 				if(!mrFileSystem.CanMergePatches() &&
-					en->GetDependsNewer() != 0)
+					en->GetDependsOnObject() != 0)
 				{
 					BOX_ERROR("Cannot delete file " <<
 						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 						" flagged as RemoveASAP because "
 						"another file depends on it (" <<
-						BOX_FORMAT_OBJECTID(en->GetDependsNewer()) <<
+						BOX_FORMAT_OBJECTID(en->GetDependsOnObject()) <<
 						" and the filesystem does not "
 						"support merging patches");
 					continue;
@@ -419,12 +419,12 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			if(en->IsOld() || en->IsDeleted())
 			{
 				if(!mrFileSystem.CanMergePatches() &&
-					en->GetDependsNewer() != 0)
+					en->GetDependsOnObject() != 0)
 				{
 					BOX_TRACE("Cannot remove old/deleted file " <<
 						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 						" now, because another file depends on it (" <<
-						BOX_FORMAT_OBJECTID(en->GetDependsNewer()) <<
+						BOX_FORMAT_OBJECTID(en->GetDependsOnObject()) <<
 						" and the filesystem does not support merging "
 						"patches");
 					continue;
@@ -739,43 +739,43 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		// If the entry is involved in a chain of patches, it needs to be handled a bit
 		// more carefully.
 
-		if(pentry->GetDependsNewer() != 0 && pentry->GetDependsOlder() == 0)
+		if(pentry->GetDependsOnObject() != 0 && pentry->GetRequiredByObject() == 0)
 		{
 			// This entry is a patch from a newer entry. Just need to update the info on that entry.
-			BackupStoreDirectory::Entry *pnewer = rDirectory.FindEntryByID(pentry->GetDependsNewer());
-			if(pnewer == 0 || pnewer->GetDependsOlder() != ObjectID)
+			BackupStoreDirectory::Entry *pnewer = rDirectory.FindEntryByID(pentry->GetDependsOnObject());
+			if(pnewer == 0 || pnewer->GetRequiredByObject() != ObjectID)
 			{
 				THROW_EXCEPTION(BackupStoreException, PatchChainInfoBadInDirectory);
 			}
 			// Change the info in the newer entry so that this no longer points to this entry
-			pnewer->SetDependsOlder(0);
+			pnewer->SetRequiredByObject(0);
 		}
-		else if(pentry->GetDependsOlder() != 0)
+		else if(pentry->GetRequiredByObject() != 0)
 		{
 			// We should have checked whether the BackupFileSystem can merge patches
 			// before this point:
 			ASSERT(mrFileSystem.CanMergePatches());
 
-			BackupStoreDirectory::Entry *polder = rDirectory.FindEntryByID(pentry->GetDependsOlder());
-			if(pentry->GetDependsNewer() == 0)
+			BackupStoreDirectory::Entry *polder = rDirectory.FindEntryByID(pentry->GetRequiredByObject());
+			if(pentry->GetDependsOnObject() == 0)
 			{
 				// There exists an older version which depends on this
 				// one. Need to combine the two over that one.
 
 				// Adjust the other entry in the directory
-				if(polder == 0 || polder->GetDependsNewer() != ObjectID)
+				if(polder == 0 || polder->GetDependsOnObject() != ObjectID)
 				{
 					THROW_EXCEPTION(BackupStoreException,
 						PatchChainInfoBadInDirectory);
 				}
 				// Change the info in the older entry so that this no
 				// longer points to this entry.
-				polder->SetDependsNewer(0);
+				polder->SetDependsOnObject(0);
 
 				// Actually combine the patch and file, but don't commit
 				// the resulting file yet.
 				apAdjustedEntry = mrFileSystem.CombineFile(
-					pentry->GetDependsOlder(), ObjectID);
+					pentry->GetRequiredByObject(), ObjectID);
 			}
 			else
 			{
@@ -784,23 +784,23 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 
 				// First, adjust the directory entries
 				BackupStoreDirectory::Entry *pnewer =
-					rDirectory.FindEntryByID(pentry->GetDependsNewer());
+					rDirectory.FindEntryByID(pentry->GetDependsOnObject());
 				if(pnewer == 0 ||
-					pnewer->GetDependsOlder() != ObjectID ||
+					pnewer->GetRequiredByObject() != ObjectID ||
 					polder == 0 ||
-					polder->GetDependsNewer() != ObjectID)
+					polder->GetDependsOnObject() != ObjectID)
 				{
 					THROW_EXCEPTION(BackupStoreException,
 						PatchChainInfoBadInDirectory);
 				}
 				// Remove the middle entry from the linked list by simply using the values from this entry
-				pnewer->SetDependsOlder(pentry->GetDependsOlder());
-				polder->SetDependsNewer(pentry->GetDependsNewer());
+				pnewer->SetRequiredByObject(pentry->GetRequiredByObject());
+				polder->SetDependsOnObject(pentry->GetDependsOnObject());
 
 				// Actually combine the patch and file, but don't commit
 				// the resulting file yet.
 				apAdjustedEntry = mrFileSystem.CombineDiffs(
-					pentry->GetDependsOlder(), ObjectID);
+					pentry->GetRequiredByObject(), ObjectID);
 			}
 
 			// COMMON CODE to both cases. The file will be committed later,

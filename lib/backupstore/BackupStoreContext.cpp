@@ -676,8 +676,8 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		// Adjust dependency info of file?
 		if(DiffFromFileID && poldEntry && !apTransaction->IsNewFileIndependent())
 		{
-			poldEntry->SetDependsNewer(id);
-			pnewEntry->SetDependsOlder(DiffFromFileID);
+			poldEntry->SetDependsOnObject(id);
+			pnewEntry->SetRequiredByObject(DiffFromFileID);
 		}
 
 		// Save the directory back (or actually just mark it dirty)
@@ -1546,7 +1546,7 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 	std::auto_ptr<IOStream> stream;
 
 	// Does this depend on anything?
-	if(pfileEntry->GetDependsNewer() != 0)
+	if(pfileEntry->GetDependsOnObject() != 0)
 	{
 		// File exists, but is a patch from a new version. Generate the older version.
 		std::vector<int64_t> patchChain;
@@ -1570,7 +1570,7 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 					BOX_FORMAT_OBJECTID(id) <<
 					" which does not exist in dir");
 			}
-			id = en->GetDependsNewer();
+			id = en->GetDependsOnObject();
 		}
 		while(en != 0 && id != 0);
 

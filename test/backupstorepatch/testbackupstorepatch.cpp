@@ -238,7 +238,7 @@ void test_depends_in_dirs()
 		// Add some dependency info to one of them
 		BackupStoreDirectory::Entry *en = dir.FindEntryByID(3);
 		TEST_THAT(en != 0);
-		en->SetDependsNewer(4);
+		en->SetDependsOnObject(4);
 		// Save again
 		{
 			FileStream out("testfiles/dir.1", O_WRONLY | O_CREAT);
@@ -258,8 +258,8 @@ void test_depends_in_dirs()
 		{
 			BackupStoreDirectory::Entry *en = dir2.FindEntryByID(i);
 			TEST_THAT(en != 0);
-			TEST_THAT(en->GetDependsNewer() == ((i == 3)?4:0));
-			TEST_THAT(en->GetDependsOlder() == 0);
+			TEST_THAT(en->GetDependsOnObject() == ((i == 3)?4:0));
+			TEST_THAT(en->GetRequiredByObject() == 0);
 		}
 		dir2.Dump(std::cout, true);
 		// Test that numbers go in and out as required
@@ -267,8 +267,8 @@ void test_depends_in_dirs()
 		{
 			BackupStoreDirectory::Entry *en = dir2.FindEntryByID(i);
 			TEST_THAT(en != 0);
-			en->SetDependsNewer(i + 1);
-			en->SetDependsOlder(i - 1);
+			en->SetDependsOnObject(i + 1);
+			en->SetRequiredByObject(i - 1);
 		}
 		// Save
 		{
@@ -285,8 +285,8 @@ void test_depends_in_dirs()
 			{
 				BackupStoreDirectory::Entry *en = dir2.FindEntryByID(i);
 				TEST_THAT(en != 0);
-				TEST_THAT(en->GetDependsNewer() == (i + 1));
-				TEST_THAT(en->GetDependsOlder() == (i - 1));
+				TEST_THAT(en->GetDependsOnObject() == (i + 1));
+				TEST_THAT(en->GetRequiredByObject() == (i - 1));
 			}
 		}
 	}
@@ -463,8 +463,8 @@ int test(int argc, const char *argv[])
 				BackupStoreDirectory::Entry *en = 0;
 				while((en = i.Next()) != 0)
 				{
-					TEST_THAT(en->GetDependsNewer() == 0);
-					TEST_THAT(en->GetDependsOlder() == 0);
+					TEST_THAT(en->GetDependsOnObject() == 0);
+					TEST_THAT(en->GetRequiredByObject() == 0);
 					bool found = false;
 
 					for(int tfi = 0; tfi < NUMBER_FILES; tfi++)
@@ -578,14 +578,14 @@ int test(int argc, const char *argv[])
 							"Test file " << f << " (id " <<
 							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
 							") was unexpectedly not deleted by housekeeping");
-						TEST_THAT(en->GetDependsNewer() == test_files[f].DepNewer);
-						TEST_EQUAL_LINE(test_files[f].DepOlder, en->GetDependsOlder(),
+						TEST_THAT(en->GetDependsOnObject() == test_files[f].DepNewer);
+						TEST_EQUAL_LINE(test_files[f].DepOlder, en->GetRequiredByObject(),
 							"Test file " << f << " (id " <<
 							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
 							") has different dependencies than "
 							"expected after housekeeping");
 						// Test that size is plausible
-						if(en->GetDependsNewer() == 0)
+						if(en->GetDependsOnObject() == 0)
 						{
 							// Should be a full file
 							TEST_LINE(en->GetSizeInBlocks() > 40,

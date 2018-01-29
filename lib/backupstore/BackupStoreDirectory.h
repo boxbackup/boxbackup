@@ -237,33 +237,33 @@ public:
 
 		// Get dependency info
 		// new version this depends on
-		int64_t GetDependsNewer() const
+		int64_t GetDependsOnObject() const
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
-			return mDependsNewer;
+			return mDependsOnObject;
 		}
-		void SetDependsNewer(int64_t ObjectID)
+		void SetDependsOnObject(int64_t ObjectID)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
-			mDependsNewer = ObjectID;
+			mDependsOnObject = ObjectID;
 		}
 		// older version which depends on this
-		int64_t GetDependsOlder() const
+		int64_t GetRequiredByObject() const
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
-			return mDependsOlder;
+			return mRequiredByObject;
 		}
-		void SetDependsOlder(int64_t ObjectID)
+		void SetRequiredByObject(int64_t ObjectID)
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
-			mDependsOlder = ObjectID;
+			mRequiredByObject = ObjectID;
 		}
 
 		// Dependency info saving
 		bool HasDependencies()
 		{
 			ASSERT(!mInvalidated); // Compiled out of release builds
-			return mDependsNewer != 0 || mDependsOlder != 0;
+			return mDependsOnObject != 0 || mRequiredByObject != 0;
 		}
 		void ReadFromStreamDependencyInfo(IOStream &rStream, int Timeout);
 		void WriteToStreamDependencyInfo(IOStream &rStream) const;
@@ -279,8 +279,8 @@ public:
 		uint32_t mMinMarkNumber;
 		uint32_t mMarkNumber;
 
-		uint64_t mDependsNewer;	// new version this depends on
-		uint64_t mDependsOlder;	// older version which depends on this
+		uint64_t mDependsOnObject;	// new version this depends on
+		uint64_t mRequiredByObject;	// older version which depends on this
 	};
 
 #ifndef BOX_RELEASE_BUILD

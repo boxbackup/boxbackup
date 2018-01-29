@@ -649,7 +649,7 @@ bool BackupStoreDirectory::CheckAndFix()
 		std::vector<Entry*>::iterator i(mEntries.begin());
 		for(; i != mEntries.end(); ++i)
 		{
-			int64_t dependsNewer = (*i)->GetDependsNewer();
+			int64_t dependsNewer = (*i)->GetDependsOnObject();
 			if(dependsNewer != 0)
 			{
 				BackupStoreDirectory::Entry *newerEn = FindEntryByID(dependsNewer);
@@ -676,16 +676,16 @@ bool BackupStoreDirectory::CheckAndFix()
 				else
 				{
 					// Check that newerEn has it marked
-					if(newerEn->GetDependsOlder() != (*i)->GetObjectID())
+					if(newerEn->GetRequiredByObject() != (*i)->GetObjectID())
 					{
 						// Wrong entry
 						BOX_TRACE("Entry id " <<
 							FMT_OID(dependsNewer) <<
-							", correcting DependsOlder to " <<
+							", correcting RequiredByObject to " <<
 							FMT_i <<
 							", was " <<
-							FMT_OID(newerEn->GetDependsOlder()));
-						newerEn->SetDependsOlder((*i)->GetObjectID());
+							FMT_OID(newerEn->GetRequiredByObject()));
+						newerEn->SetRequiredByObject((*i)->GetObjectID());
 						// Mark as changed
 						changed = true;
 					}
@@ -700,7 +700,7 @@ bool BackupStoreDirectory::CheckAndFix()
 		std::vector<Entry*>::iterator i(mEntries.begin());
 		for(; i != mEntries.end(); ++i)
 		{
-			int64_t dependsOlder = (*i)->GetDependsOlder();
+			int64_t dependsOlder = (*i)->GetRequiredByObject();
 			if(dependsOlder != 0 && FindEntryByID(dependsOlder) == 0)
 			{
 				// Has an older version marked, but this doesn't exist. Remove this mark
@@ -710,7 +710,7 @@ bool BackupStoreDirectory::CheckAndFix()
 					"which doesn't exist, dependency "
 					"info cleared");
 
-				(*i)->SetDependsOlder(0);
+				(*i)->SetRequiredByObject(0);
 
 				// Mark as changed
 				changed = true;
