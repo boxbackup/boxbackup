@@ -53,6 +53,7 @@ public:
 		virtual ~Transaction() { }
 		virtual void Commit() = 0;
 		virtual int64_t GetNumBlocks() = 0;
+		virtual bool IsOldFileIndependent() = 0;
 		virtual bool IsNewFileIndependent() = 0;
 		virtual int64_t GetChangeInBlocksUsedByOldFile() { return 0; }
 	};
@@ -114,7 +115,7 @@ public:
 	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true) = 0;
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID) = 0;
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
-		std::vector<int64_t>& rPatchChain) = 0;
+		std::vector<int64_t>& rPatchChain);
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
 	virtual void DeleteObjectUnknown(int64_t ObjectID) = 0;
@@ -179,6 +180,7 @@ protected:
 	// AfterDiscard() destroys the temporary database object and therefore invalidates
 	// any held references to it!
 	virtual void RefCountDatabaseAfterDiscard(BackupStoreRefCountDatabase& refcount_db);
+	virtual std::auto_ptr<IOStream> GetTemporaryFileStream(int64_t id) = 0;
 };
 
 class RaidBackupFileSystem : public BackupFileSystem
@@ -251,8 +253,6 @@ public:
 		// For RaidBackupFileSystem, GetObject() is equivalent to GetFile().
 		return GetObject(ObjectID);
 	}
-	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
-		std::vector<int64_t>& rPatchChain);
 	virtual void DeleteFile(int64_t ObjectID)
 	{
 		// RaidFile doesn't care what type of object it is
@@ -280,6 +280,7 @@ protected:
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
+	virtual std::auto_ptr<IOStream> GetTemporaryFileStream(int64_t id);
 
 private:
 	void CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName,
@@ -350,11 +351,6 @@ public:
 		return PutFileComplete(ObjectID, rPatchData, refcount);
 	}
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
-	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
-		std::vector<int64_t>& rPatchChain)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
 	virtual void DeleteFile(int64_t ObjectID);
 	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
@@ -418,6 +414,7 @@ public:
 protected:
 	virtual void TryGetLock();
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
+	virtual std::auto_ptr<IOStream> GetTemporaryFileStream(int64_t id);
 
 private:
 	// GetObjectURL() returns the complete URL for an object at the given

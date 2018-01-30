@@ -34,13 +34,13 @@
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreInfo.h"
+#include "BackupStoreObjectMagic.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "BufferedStream.h"
 #include "BufferedWriteStream.h"
 #include "ByteCountingStream.h"
 #include "CollectInBufferStream.h"
 #include "Configuration.h"
-#include "BackupStoreObjectMagic.h"
 #include "HTTPResponse.h"
 #include "IOStream.h"
 #include "InvisibleTempFileStream.h"
@@ -162,6 +162,53 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 
 	mapBackupStoreInfo = GetBackupStoreInfoInternal(ReadOnly);
 	return *mapBackupStoreInfo;
+}
+
+
+std::auto_ptr<IOStream> BackupFileSystem::GetFilePatch(int64_t ObjectID,
+	std::vector<int64_t>& rPatchChain)
+{
+	// File exists, but is a patch from a new version. Generate the older version.
+	// The last entry in the chain is the full file, the others are patches back from it.
+	// Open the last one, which is the current full file.
+	std::auto_ptr<IOStream> from(GetFile(rPatchChain[rPatchChain.size() - 1]));
+
+	// Then, for each patch in the chain, do a combine
+	for(int p = ((int)rPatchChain.size()) - 2; p >= 0; --p)
+	{
+		// ID of patch
+		int64_t patchID = rPatchChain[p];
+
+		// Open it a couple of times. TODO FIXME: this could be very inefficient.
+		std::auto_ptr<IOStream> diff(GetFile(patchID));
+		std::auto_ptr<IOStream> diff2(GetFile(patchID));
+
+		// Open the temporary file
+		std::auto_ptr<IOStream> combined = GetTemporaryFileStream(p);
+
+		// Do the combining
+		BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
+
+		// Move to the beginning of the combined file
+		combined->Seek(0, IOStream::SeekType_Absolute);
+
+		// Then shuffle round for the next go
+		if(from.get())
+		{
+			from->Close();
+		}
+
+		from = combined;
+	}
+
+	std::auto_ptr<IOStream> stream(
+		BackupStoreFile::ReorderFileToStreamOrder(from.get(),
+			true)); // take ownership
+
+	// Release from file to avoid double deletion
+	from.release();
+
+	return stream;
 }
 
 
@@ -536,9 +583,9 @@ public:
 	}
 	RaidFileWrite& GetRaidFile() { return mStoreFile; }
 
-	// It doesn't matter what we return here, because this should never be called
-	// for a PutFileCompleteTransaction (the API is intended for
-	// PutFilePatchTransaction instead):
+	// It doesn't matter what we return here, because this should never be called for a
+	// PutFileCompleteTransaction (the API is intended for PutFilePatchTransaction instead):
+	virtual bool IsOldFileIndependent() { return false; }
 	virtual bool IsNewFileIndependent() { return false; }
 
 	int64_t mNumBlocks;
@@ -645,10 +692,19 @@ public:
 	{
 		mReversedDiffIsCompletelyDifferent = IsCompletelyDifferent;
 	}
-	virtual bool IsNewFileIndependent()
+
+	// Because RaidBackupFileSystem converts uploaded patches to complete files, and the old
+	// file to a reverse diff, the new file is always independent, but the old file may not be
+	// (unless the reversed diff is too different to be stored as a diff).
+	virtual bool IsOldFileIndependent()
 	{
 		return mReversedDiffIsCompletelyDifferent;
 	}
+	virtual bool IsNewFileIndependent()
+	{
+		return true;
+	}
+
 	void SetBlocksUsedByNewFile(int64_t BlocksUsedByNewFile)
 	{
 		mBlocksUsedByNewFile = BlocksUsedByNewFile;
@@ -787,60 +843,22 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetObject(int64_t ObjectID, bool r
 }
 
 
-std::auto_ptr<IOStream> RaidBackupFileSystem::GetFilePatch(int64_t ObjectID,
-	std::vector<int64_t>& rPatchChain)
+std::auto_ptr<IOStream> RaidBackupFileSystem::GetTemporaryFileStream(int64_t id)
 {
-	// File exists, but is a patch from a new version. Generate the older version.
-	// The last entry in the chain is the full file, the others are patches back from it.
-	// Open the last one, which is the current full file.
-	std::auto_ptr<IOStream> from(GetFile(rPatchChain[rPatchChain.size() - 1]));
+	// Choose a temporary filename for the result of the combination
+	std::ostringstream fs;
+	fs << mAccountRootDir << ".recombinetemp." << id;
+	std::string tempFn =
+		RaidFileController::DiscSetPathToFileSystemPath(mStoreDiscSet,
+			fs.str(), id + 16);
 
-	// Then, for each patch in the chain, do a combine
-	for(int p = ((int)rPatchChain.size()) - 2; p >= 0; --p)
-	{
-		// ID of patch
-		int64_t patchID = rPatchChain[p];
+	// Open the temporary file
+	std::auto_ptr<IOStream> temp_file(
+		new InvisibleTempFileStream(tempFn,
+			O_RDWR | O_CREAT | O_EXCL | O_BINARY | O_TRUNC,
+			FileStream::EXCLUSIVE));
 
-		// Open it a couple of times. TODO FIXME: this could be very inefficient.
-		std::auto_ptr<IOStream> diff(GetFile(patchID));
-		std::auto_ptr<IOStream> diff2(GetFile(patchID));
-
-		// Choose a temporary filename for the result of the combination
-		std::ostringstream fs;
-		fs << mAccountRootDir << ".recombinetemp." << p;
-		std::string tempFn =
-			RaidFileController::DiscSetPathToFileSystemPath(mStoreDiscSet,
-				fs.str(), p + 16);
-
-		// Open the temporary file
-		std::auto_ptr<IOStream> combined(
-			new InvisibleTempFileStream(
-				tempFn, O_RDWR | O_CREAT | O_EXCL |
-				O_BINARY | O_TRUNC));
-
-		// Do the combining
-		BackupStoreFile::CombineFile(*diff, *diff2, *from, *combined);
-
-		// Move to the beginning of the combined file
-		combined->Seek(0, IOStream::SeekType_Absolute);
-
-		// Then shuffle round for the next go
-		if(from.get())
-		{
-			from->Close();
-		}
-
-		from = combined;
-	}
-
-	std::auto_ptr<IOStream> stream(
-		BackupStoreFile::ReorderFileToStreamOrder(from.get(),
-			true)); // take ownership
-
-	// Release from file to avoid double deletion
-	from.release();
-
-	return stream;
+	return temp_file;
 }
 
 
@@ -1689,6 +1707,18 @@ void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 }
 
 
+std::auto_ptr<IOStream> S3BackupFileSystem::GetTemporaryFileStream(int64_t id)
+{
+	std::ostringstream fs;
+	fs << "boxbackup.recombinetemp." << id << ".XXXXXX";
+
+	// Open the temporary file
+	return static_cast<std::auto_ptr<IOStream> >(
+		FileStream::CreateTemporaryFile(fs.str(), "", // temp_dir
+			O_BINARY, true)); // delete_asap
+}
+
+
 void S3BackupFileSystem::DeleteDirectory(int64_t ObjectID)
 {
 	std::string uri = GetDirectoryURI(ObjectID);
@@ -1740,9 +1770,16 @@ public:
 	virtual void Commit();
 	virtual int64_t GetNumBlocks() { return mNumBlocks; }
 
-	// It doesn't matter what we return here, because this should never be called
-	// for a PutFileCompleteTransaction (the API is intended for
-	// PutFilePatchTransaction instead):
+	// Because S3BackupFileSystem does not convert uploaded patches to complete files, but
+	// stores them as patches and doesn't modify the diff-from file, that file remains
+	// independent of the newly uploaded one, always. But if a patch was uploaded then it
+	// does depend on the diff-from file, and always will.
+	virtual bool IsOldFileIndependent() { return true; }
+
+	// IsNewFileIndependent() returning false is strictly speaking incorrect for a complete
+	// file upload (since it is independent) but it doesn't matter because it should never be
+	// called (the API is intended for PutFilePatchTransaction instead). However we use the same
+	// code for S3 patch uploads, so we return the correct value (false) for use in those cases.
 	virtual bool IsNewFileIndependent() { return false; }
 };
 

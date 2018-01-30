@@ -899,7 +899,16 @@ void BackupStoreFile::DecodedStream::Setup(const BackupClientFileAttributes *pAl
 		{
 			// Get the clear and encoded size
 			int32_t encodedSize = box_ntoh64(entry[e].mEncodedSize);
-			ASSERT(encodedSize > 0);
+
+			// This function can only be used on a reconstructed object stream, not a
+			// patch, so is most likely only useful on the client side. If encodedSize
+			// is less than 0, that means that this entry includes a block from another
+			// file (the one that it depends on), and so it is not a reconstructed
+			// stream!
+			if(encodedSize <= 0)
+			{
+				THROW_EXCEPTION(BackupStoreException, ExpectedReconstructedStream);
+			}
 
 			// Larger?
 			if(encodedSize > maxEncodedDataSize) maxEncodedDataSize = encodedSize;

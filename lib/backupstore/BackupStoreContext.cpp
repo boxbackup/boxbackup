@@ -674,10 +674,20 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 			BackupStoreDirectory::Entry::Flags_File, AttributesHash);
 
 		// Adjust dependency info of file?
-		if(DiffFromFileID && poldEntry && !apTransaction->IsNewFileIndependent())
+		if(DiffFromFileID && poldEntry)
 		{
-			poldEntry->SetDependsOnObject(id);
-			pnewEntry->SetRequiredByObject(DiffFromFileID);
+			if(!apTransaction->IsOldFileIndependent())
+			{
+				// Diff-from file was transformed into a reverse patch
+				poldEntry->SetDependsOnObject(id);
+				pnewEntry->SetRequiredByObject(DiffFromFileID);
+			}
+			else if(!apTransaction->IsNewFileIndependent())
+			{
+				// Uploaded patch was saved as a patch
+				pnewEntry->SetDependsOnObject(DiffFromFileID);
+				poldEntry->SetRequiredByObject(id);
+			}
 		}
 
 		// Save the directory back (or actually just mark it dirty)
@@ -1548,7 +1558,11 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 	// Does this depend on anything?
 	if(pfileEntry->GetDependsOnObject() != 0)
 	{
-		// File exists, but is a patch from a new version. Generate the older version.
+		// File exists, but is a patch from another version. Reconstruct the complete
+		// object. (With backupstore storage, uploading a patch reconstructs and writes
+		// the complete object, and rewrites the old version as a patch, but with S3 stores
+		// that logic cannot be implemented in S3, so the new version is simply stored as a
+		// patch instead).
 		std::vector<int64_t> patchChain;
 		int64_t id = ObjectID;
 		BackupStoreDirectory::Entry *en = 0;
