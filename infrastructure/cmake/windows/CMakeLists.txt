@@ -46,17 +46,16 @@ ExternalProject_Add(zlib
 if(WIN32)
 	if(PLATFORM STREQUAL "x64")
 		set(openssl_config debug-VC-WIN64A)
-		set(batch_config ms\\do_win64a.bat)
 	else()
 		set(openssl_config debug-VC-WIN32)
-		set(batch_config ms\\do_ms.bat)
 	endif()
 	ExternalProject_Add(openssl
 		DEPENDS zlib
 		URL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 		URL_HASH ${OPENSSL_HASH}
 		DOWNLOAD_NO_PROGRESS 1
-		CONFIGURE_COMMAND perl Configure ${openssl_config} no-asm no-shared
+		CONFIGURE_COMMAND
+			perl Configure ${openssl_config} no-asm no-shared
 			--prefix=${install_dir}
 			--openssldir=etc
 		# Run tests before install, but don't make the main target depend on them, so that
@@ -64,10 +63,14 @@ if(WIN32)
 		TEST_BEFORE_INSTALL 1
 		TEST_EXCLUDE_FROM_MAIN 1
 		BUILD_IN_SOURCE 1
-		BUILD_COMMAND   nmake /s
+		# Recursive build loses the /s option, so override the MAKE macro to reinstate it
+		# <https://github.com/openssl/openssl/issues/5277>:
+		BUILD_COMMAND   nmake /s "MAKE=nmake /s"
 		TEST_COMMAND    nmake /s test
-		INSTALL_COMMAND nmake /s install
-		STEP_TARGETS test
+		# The only way to silence all the "Copying..." messages appears to be redirecting
+		# to /dev/null:
+		INSTALL_COMMAND cmd /c "nmake /s install >nul"
+		STEP_TARGETS build test
 	)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	ExternalProject_Add(openssl
