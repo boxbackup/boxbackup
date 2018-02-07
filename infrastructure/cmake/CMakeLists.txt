@@ -776,9 +776,9 @@ replace_file_if_different(
 # Tell QDBM not to build itself as a DLL, because we want to link statically to it.
 target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
 
-# Silence some less-useful warnings
+# Silence some less-useful warnings, and promote more useful ones to errors:
 if(MSVC)
-	add_definitions(/wd4291 /wd4710 /wd4820 /wd4996)
+	add_definitions(/wd4291 /wd4710 /wd4820 /wd4996 /we4150)
 	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
 endif(MSVC)
 

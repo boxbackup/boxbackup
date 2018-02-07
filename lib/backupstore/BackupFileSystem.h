@@ -14,6 +14,7 @@
 #include <string>
 
 #include "autogen_BackupStoreException.h"
+#include "BackupStoreInfo.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "HTTPResponse.h"
 #include "NamedLock.h"
@@ -22,7 +23,6 @@
 #include "Utils.h" // for ObjectExists_*
 
 class BackupStoreDirectory;
-class BackupStoreInfo;
 class Configuration;
 class IOStream;
 
