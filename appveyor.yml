@@ -46,7 +46,7 @@ install:
   # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
   # If you are doing this on a fresh box for development, you would probably want to
   # install Chocolatey and then run:
-  # cinst -y cmake.portable strawberryperl git vim visualstudio2012wdx
+  # cinst -y cmake.portable strawberryperl git vim-tux.portable visualstudio2012wdx
   # We install cmake.portable instead of cmake, to get it on the path again
   # <http://disq.us/p/xdknrt>.
 
