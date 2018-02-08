@@ -779,7 +779,7 @@ target_compile_definitions(qdbm PUBLIC -DQDBM_STATIC)
 # Silence some less-useful warnings, and promote more useful ones to errors:
 if(MSVC)
 	add_definitions(/wd4291 /wd4710 /wd4820 /wd4996 /we4150)
-	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006)
+	set_property(TARGET qdbm PROPERTY CMAKE_STATIC_LINKER_FLAGS /IGNORE:LNK4006 /IGNORE:LNK4221)
 endif(MSVC)
 
 # Define the location of the Perl executable, needed by testbackupstorefix
