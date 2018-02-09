@@ -100,6 +100,9 @@ ExternalProject_Add(pcre
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 	-DPCRE_SUPPORT_LIBREADLINE=OFF
 	-DPCRE_SUPPORT_LIBBZ2=OFF
+	-DPCRE_BUILD_PCRECPP=OFF
+	-DPCRE_BUILD_PCREGREP=OFF
+	-DPCRE_BUILD_TESTS=OFF
 	# We need to build both versions, debug and release, because cmake requires both to be
 	# present to generate its multi-configuration project files for Visual Studio/MSBuild.
 	INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
