@@ -376,6 +376,12 @@ std::string GetTempDirPath()
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
 			"Failed to get temporary directory path");
 	}
+	if(buffer[len - 1] == DIRECTORY_SEPARATOR_ASCHAR)
+	{
+		// Ensure that the returned string does not end with a backslash, so that we can append
+		// one without creating a syntax error
+		buffer[len - 1] = 0;
+	}
 	return std::string(buffer);
 #else
 	const char* result = getenv("TMPDIR");
@@ -392,7 +398,7 @@ std::string GetTempDirPath()
 		BOX_WARNING("TMPDIR/TEMP/TMP not set, falling back to /tmp");
 		result = "/tmp";
 	}
-	return std::string(result);
+	return RemoveSuffix(DIRECTORY_SEPARATOR, std::string(result), result); // default_value
 #endif
 }
 
