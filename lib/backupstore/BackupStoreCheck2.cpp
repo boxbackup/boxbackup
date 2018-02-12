@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <string>
+
 #include "autogen_BackupStoreException.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreCheck.h"
@@ -22,6 +24,7 @@
 #include "BackupStoreInfo.h"
 #include "BackupStoreObjectMagic.h"
 #include "BackupStoreRefCountDatabase.h"
+#include "Exception.h"
 #include "MemBlockStream.h"
 
 #include "MemLeakFindOn.h"

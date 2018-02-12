@@ -10,8 +10,6 @@
 #include "Box.h"
 
 #define TLS_CLASS_IMPLEMENTATION_CPP
-#include <openssl/ssl.h>
-#include <openssl/bio.h>
 #include <errno.h>
 #include <fcntl.h>
 
@@ -19,10 +17,14 @@
 #include <poll.h>
 #endif
 
+#include <openssl/ssl.h>
+#include <openssl/bio.h>
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
 #include "BoxTime.h"
 #include "CryptoUtils.h"
+#include "Exception.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
 #include "TLSContext.h"

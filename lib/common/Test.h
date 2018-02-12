@@ -16,6 +16,7 @@
 #include <cstring>
 #include <list>
 #include <map>
+#include <string>
 
 #include "Configuration.h"
 

@@ -28,8 +28,8 @@
 	#include <sys/file.h>
 #endif
 
+#include "Exception.h"
 #include "FileStream.h"
-#include "CommonException.h"
 #include "Logging.h"
 
 #include "MemLeakFindOn.h"

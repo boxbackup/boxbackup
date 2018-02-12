@@ -20,6 +20,8 @@
 	#include <unistd.h>
 #endif
 
+#include <string>
+
 #if HAVE_DECL_O_EXLOCK
 #	define BOX_LOCK_TYPE_O_EXLOCK
 #elif defined BOX_OPEN_LOCK

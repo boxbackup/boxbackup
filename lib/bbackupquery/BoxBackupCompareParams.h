@@ -17,6 +17,8 @@
 #include "ExcludeList.h"
 #include "BackupClientMakeExcludeList.h"
 
+class BoxException;
+
 // --------------------------------------------------------------------------
 //
 // Class

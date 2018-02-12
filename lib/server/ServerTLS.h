@@ -10,6 +10,8 @@
 #ifndef SERVERTLS__H
 #define SERVERTLS__H
 
+#include <string>
+
 #include "ServerStream.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"

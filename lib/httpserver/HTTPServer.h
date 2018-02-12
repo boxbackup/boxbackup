@@ -10,6 +10,8 @@
 #ifndef HTTPSERVER__H
 #define HTTPSERVER__H
 
+#include <string>
+
 #include "ServerStream.h"
 #include "SocketStream.h"
 

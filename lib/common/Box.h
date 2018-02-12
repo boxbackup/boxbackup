@@ -23,59 +23,9 @@
 // malloc-ed blocks (at least, ones used by the STL)
 //#define MEMLEAKFINDER_FULL_MALLOC_MONITORING
 
-// Show backtraces on exceptions in release builds until further notice
-// (they are only logged at TRACE level anyway)
-#if defined WIN32 || defined HAVE_EXECINFO_H
-	#define SHOW_BACKTRACE_ON_EXCEPTION
+#if !defined BOX_RELEASE_BUILD && !defined PLATFORM_DISABLE_MEM_LEAK_TESTING
+	#define BOX_MEMORY_LEAK_TESTING
 #endif
-
-#ifdef SHOW_BACKTRACE_ON_EXCEPTION
-	#include "Utils.h"
-	#define OPTIONAL_DO_BACKTRACE DumpStackBacktrace(__FILE__);
-#else
-	#define OPTIONAL_DO_BACKTRACE
-#endif
-
-#include "CommonException.h"
-#include "Logging.h"
-
-#ifndef BOX_RELEASE_BUILD
-	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
-	#define ASSERT(cond) \
-	{ \
-		if(!(cond)) \
-		{ \
-			BoxDebugAssertFailed(#cond, __FILE__, __LINE__); \
-			THROW_EXCEPTION_MESSAGE(CommonException, \
-				AssertFailed, #cond); \
-		} \
-	}
-
-	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
-		#define BOX_MEMORY_LEAK_TESTING
-	#endif
-	
-	// Exception names
-	#define EXCEPTION_CODENAMES_EXTENDED
-#else
-	#define ASSERT(cond)
-
-	// Box Backup builds release get extra information for exception logging
-	#define EXCEPTION_CODENAMES_EXTENDED
-	#define EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
-#endif
-
-#if defined DEBUG_LEAKS
-	#ifdef PLATFORM_DISABLE_MEM_LEAK_TESTING
-		#error Compiling with DEBUG_LEAKS enabled, but not supported on this platform
-	#else
-		#define BOX_MEMORY_LEAK_TESTING
-	#endif
-#elif defined BOX_RELEASE_BUILD
-	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
-		#define BOX_MEMORY_LEAK_TESTING
-	#endif
-#endif // DEBUG_LEAKS || BOX_RELEASE_BUILD
 
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Memory leak testing
@@ -94,37 +44,6 @@
 	#define MEMLEAKFINDER_START
 	#define MEMLEAKFINDER_STOP
 #endif
-
-#define THROW_EXCEPTION(type, subtype) \
-	{ \
-		if((!HideExceptionMessageGuard::ExceptionsHidden() \
-			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype))) \
-		{ \
-			OPTIONAL_DO_BACKTRACE \
-			BOX_WARNING("Exception thrown: " \
-				#type "(" #subtype ") " \
-				"at " __FILE__ "(" << __LINE__ << ")") \
-		} \
-		throw type(type::subtype); \
-	}
-
-#define THROW_EXCEPTION_MESSAGE(type, subtype, message) \
-	{ \
-		std::ostringstream _box_throw_line; \
-		_box_throw_line << message; \
-		if((!HideExceptionMessageGuard::ExceptionsHidden() \
-			&& !HideSpecificExceptionGuard::IsHidden( \
-				type::ExceptionType, type::subtype))) \
-		{ \
-			OPTIONAL_DO_BACKTRACE \
-			BOX_WARNING("Exception thrown: " \
-				#type "(" #subtype ") (" << \
-				_box_throw_line.str() << \
-				") at " __FILE__ ":" << __LINE__) \
-		} \
-		throw type(type::subtype, _box_throw_line.str()); \
-	}
 
 // extra macros for converting to network byte order
 #ifdef HAVE_NETINET_IN_H

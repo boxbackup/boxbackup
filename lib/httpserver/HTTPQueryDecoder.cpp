@@ -12,6 +12,7 @@
 #include <cctype> // for std::isalnum
 #include <cstdlib>
 #include <ostream>
+#include <string>
 
 #include "HTTPQueryDecoder.h"
 

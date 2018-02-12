@@ -28,8 +28,10 @@
 #include <cstdio>
 #include <cstring>
 #include <iomanip>
+#include <string>
 
 #include "BoxTime.h"
+#include "Exception.h"
 #include "Logging.h"
 
 bool Logging::sLogToSyslog  = false;

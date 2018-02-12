@@ -9,18 +9,20 @@
 
 #include "Box.h"
 
+#ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
+	#include <stdio.h>
+#endif
+
+#include <string.h>
+
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
 
 #include <sys/stat.h>
-#include <string.h>
-#include <new>
-#include <string.h>
 
-#ifndef BOX_DISABLE_BACKWARDS_COMPATIBILITY_BACKUPSTOREFILE
-	#include <stdio.h>
-#endif
+#include <new>
+#include <string>
 
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreConstants.h"
@@ -37,6 +39,7 @@
 #include "CipherContext.h"
 #include "CollectInBufferStream.h"
 #include "Compress.h"
+#include "Exception.h"
 #include "FileModificationTime.h"
 #include "FileStream.h"
 #include "Guards.h"

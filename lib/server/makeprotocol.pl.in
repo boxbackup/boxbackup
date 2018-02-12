@@ -178,8 +178,9 @@ print H <<__E;
 #endif
 
 #include "autogen_ConnectionException.h"
-#include "Protocol.h"
+#include "Exception.h"
 #include "Message.h"
+#include "Protocol.h"
 #include "SocketStream.h"
 
 __E

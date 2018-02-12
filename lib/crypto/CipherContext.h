@@ -11,10 +11,15 @@
 #define CIPHERCONTEXT__H
 
 #ifdef BOX_LIB_CRYPTO_OPENSSL_HEADERS_INCLUDED_FALSE
-	always include CipherContext.h first in any .cpp file
+#error	"always include CipherContext.h before any other crypto headers"
 #endif
+
 #define BOX_LIB_CRYPTO_OPENSSL_HEADERS_INCLUDED_TRUE
+
+#include <string>
+
 #include <openssl/evp.h>
+
 class CipherDescription;
 
 #define CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH		32

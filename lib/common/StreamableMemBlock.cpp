@@ -10,10 +10,12 @@
 
 #include "Box.h"
 
-#include <new>
-#include <cstdlib>
 #include <string.h>
 
+#include <new>
+#include <cstdlib>
+
+#include "Exception.h"
 #include "StreamableMemBlock.h"
 #include "IOStream.h"
 

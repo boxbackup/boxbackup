@@ -13,6 +13,9 @@
 #include <openssl/md5.h>
 #include <string>
 
+#include "Exception.h"
+#include "IOStream.h"
+
 // --------------------------------------------------------------------------
 //
 // Function

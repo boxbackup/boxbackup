@@ -13,6 +13,7 @@
 #include <zlib.h>
 
 #include "CompressException.h"
+#include "Exception.h"
 
 // --------------------------------------------------------------------------
 //

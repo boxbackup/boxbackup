@@ -14,6 +14,7 @@
 #endif
 
 #include <sys/types.h>
+
 #ifndef WIN32
 #include <sys/socket.h>
 #include <netdb.h>
@@ -26,6 +27,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Exception.h"
 #include "Socket.h"
 
 #include "MemLeakFindOn.h"

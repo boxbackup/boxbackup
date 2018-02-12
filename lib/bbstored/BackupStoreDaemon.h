@@ -10,6 +10,8 @@
 #ifndef BACKUPSTOREDAEMON__H
 #define BACKUPSTOREDAEMON__H
 
+#include <string>
+
 #include "ServerTLS.h"
 #include "BoxPortsAndFiles.h"
 #include "BackupConstants.h"

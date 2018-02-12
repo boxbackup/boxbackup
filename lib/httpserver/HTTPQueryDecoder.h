@@ -10,6 +10,8 @@
 #ifndef HTTPQUERYDECODER__H
 #define HTTPQUERYDECODER__H
 
+#include <string>
+
 #include "HTTPRequest.h"
 
 // --------------------------------------------------------------------------

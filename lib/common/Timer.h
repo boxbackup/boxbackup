@@ -15,6 +15,7 @@
 	#include <sys/time.h>
 #endif
 
+#include <string>
 #include <vector>
 
 #include "BoxTime.h"

@@ -9,17 +9,20 @@
 
 #include "Box.h"
 
-#include <stdio.h>
 #include <stdarg.h>
-#include <map>
+#include <stdio.h>
 
+#include <map>
+#include <string>
+
+#include "autogen_BackupStoreException.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreFile.h"
 #include "BackupStoreFileWire.h"
-#include "autogen_BackupStoreException.h"
 #include "BackupStoreFilename.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreObjectMagic.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

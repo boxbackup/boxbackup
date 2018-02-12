@@ -58,6 +58,8 @@ print H <<__E;
 #ifndef $guardname
 #define $guardname
 
+#include <string>
+
 #include "BoxException.h"
 
 // --------------------------------------------------------------------------

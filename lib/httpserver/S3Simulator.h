@@ -10,6 +10,9 @@
 #ifndef S3SIMULATOR__H
 #define S3SIMULATOR__H
 
+#include <string>
+#include <vector>
+
 #include <boost/foreach.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>

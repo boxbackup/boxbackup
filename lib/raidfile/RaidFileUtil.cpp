@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <string>
+
 #include "RaidFileUtil.h"
 #include "FileModificationTime.h"
 #include "RaidFileRead.h" // for type definition

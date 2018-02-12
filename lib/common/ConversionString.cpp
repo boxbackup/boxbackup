@@ -9,13 +9,16 @@
 
 #include "Box.h"
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
-#include <errno.h>
 
-#include "Conversion.h"
+#include <string>
+
 #include "autogen_ConversionException.h"
+#include "Conversion.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

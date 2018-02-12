@@ -11,6 +11,7 @@
 #define BACKUPSTOREACCOUNTDATABASE__H
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "BoxTime.h"

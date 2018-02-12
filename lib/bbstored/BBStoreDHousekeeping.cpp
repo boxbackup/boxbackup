@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 
+#include <string>
+
 #include "BackupStoreDaemon.h"
 #include "BackupStoreAccountDatabase.h"
 #include "BackupStoreAccounts.h"

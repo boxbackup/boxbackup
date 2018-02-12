@@ -35,7 +35,9 @@
 #include <cstdlib> // for std::atexit
 #include <map>
 #include <set>
+#include <string>
 
+#include "Exception.h"
 #include "MemLeakFinder.h"
 #include "Utils.h"
 

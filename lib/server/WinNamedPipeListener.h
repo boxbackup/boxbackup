@@ -11,6 +11,8 @@
 #ifndef WINNAMEDPIPELISTENER__H
 #define WINNAMEDPIPELISTENER__H
 
+#include <string>
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
 #include "OverlappedIO.h"

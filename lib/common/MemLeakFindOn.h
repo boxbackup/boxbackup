@@ -11,16 +11,18 @@
 
 #ifdef BOX_MEMORY_LEAK_TESTING
 
-#define new DEBUG_NEW
+#	include "MemLeakFinder.h"
 
-#ifndef MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
-	#define malloc(X)	memleakfinder_malloc(X, __FILE__, __LINE__)
-	#define calloc(X, Y)	memleakfinder_calloc(X, Y, __FILE__, __LINE__)
-	#define realloc		memleakfinder_realloc
-	#define free		memleakfinder_free
-	#define MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
-#endif
+#	define new DEBUG_NEW
 
-#define MEMLEAKFINDER_ENABLED
+#	ifndef MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
+#		define malloc(X)	memleakfinder_malloc(X, __FILE__, __LINE__)
+#		define calloc(X, Y)	memleakfinder_calloc(X, Y, __FILE__, __LINE__)
+#		define realloc		memleakfinder_realloc
+#		define free		memleakfinder_free
+#		define MEMLEAKFINDER_MALLOC_MONITORING_DEFINED
+#	endif
+
+#	define MEMLEAKFINDER_ENABLED
 
 #endif

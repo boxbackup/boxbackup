@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "BackupStoreFilenameClear.h"
+#include "Exception.h"
 #include "StreamableMemBlock.h"
 #include "BoxTime.h"
 

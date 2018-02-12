@@ -10,7 +10,9 @@
 
 #include "Box.h"
 
-#include "CommonException.h"
+#include <string>
+
+#include "Exception.h"
 #include "NamedLock.h"
 #include "Utils.h"
 

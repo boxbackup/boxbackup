@@ -17,8 +17,10 @@
 	#include <unistd.h>
 #endif
 
+#include <string>
+
+#include "Exception.h"
 #include "UnixUser.h"
-#include "CommonException.h"
 
 #include "MemLeakFindOn.h"
 

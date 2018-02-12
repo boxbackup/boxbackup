@@ -10,6 +10,8 @@
 #ifndef IOSTREAM__H
 #define IOSTREAM__H
 
+#include <string>
+
 // --------------------------------------------------------------------------
 //
 // Class

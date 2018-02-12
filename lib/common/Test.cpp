@@ -25,7 +25,10 @@
 #	include <unistd.h>
 #endif
 
+#include <string>
+
 #include "BoxTime.h"
+#include "Exception.h"
 #include "FileStream.h"
 #include "Test.h"
 #include "Utils.h" // for ObjectExists_* (object_exists_t)

@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "IOStream.h"

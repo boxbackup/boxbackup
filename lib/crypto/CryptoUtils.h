@@ -10,6 +10,8 @@
 #ifndef CRYPTOUTILS__H
 #define CRYPTOUTILS__H
 
+#include <string>
+
 // --------------------------------------------------------------------------
 //
 // Namespace

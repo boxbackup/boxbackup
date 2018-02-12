@@ -22,8 +22,9 @@
 #include <sys/stat.h>
 
 #include <new>
+#include <string>
 
-#include "CommonException.h"
+#include "Exception.h"
 #include "Logging.h"
 
 #include "MemLeakFindOn.h"

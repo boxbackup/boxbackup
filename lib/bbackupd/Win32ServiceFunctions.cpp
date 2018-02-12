@@ -21,6 +21,10 @@
 	#include <process.h>
 #endif
 
+#include <string>
+
+#include "Exception.h"
+
 extern void TerminateService(void);
 extern unsigned int WINAPI RunService(LPVOID lpParameter);
 

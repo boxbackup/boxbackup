@@ -9,23 +9,29 @@
 
 #include "Box.h"
 
-#include "intercept.h"
-
-#ifdef HAVE_SYS_SYSCALL_H
-	#include <sys/syscall.h>
-#endif
-#include <sys/types.h>
-
-#ifdef HAVE_SYS_UIO_H
-	#include <sys/uio.h>
+#ifdef HAVE_DLFCN_H
+#	include <dlfcn.h>
 #endif
 
 #include <errno.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
-#ifdef HAVE_DLFCN_H
-#include <dlfcn.h>
+#ifdef HAVE_SYS_SYSCALL_H
+#	include <sys/syscall.h>
 #endif
+
+#include <sys/types.h>
+
+#ifdef HAVE_SYS_UIO_H
+#	include <sys/uio.h>
+#endif
+
+#include <string>
+
+#include "Exception.h"
+#include "intercept.h"
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 
@@ -62,9 +68,6 @@
 		#define syscall __syscall
 	#endif
 #endif
-
-#include <string.h>
-#include <stdio.h>
 
 #include "MemLeakFindOn.h"
 

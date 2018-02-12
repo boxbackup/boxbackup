@@ -10,11 +10,12 @@
 #include "Box.h"
 
 #include <stdlib.h>
+
 #include <memory>
 
-#include "CompressStream.h"
-#include "Compress.h"
 #include "autogen_CompressException.h"
+#include "Compress.h"
+#include "CompressStream.h"
 
 #include "MemLeakFindOn.h"
 

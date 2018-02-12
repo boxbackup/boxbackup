@@ -17,6 +17,8 @@
 	#include <sys/wait.h>
 #endif
 
+#include <string>
+
 #include "autogen_ServerException.h"
 #include "Daemon.h"
 #include "SocketListen.h"

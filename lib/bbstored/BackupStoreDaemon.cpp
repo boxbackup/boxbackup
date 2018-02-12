@@ -9,13 +9,15 @@
 
 #include "Box.h"
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef HAVE_SYSLOG_H
 	#include <syslog.h>
 #endif
+
+#include <string>
 
 #include "BackupStoreContext.h"
 #include "BackupStoreDaemon.h"

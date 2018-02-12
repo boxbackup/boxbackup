@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #include <algorithm>
+#include <string>
 
 #include "BackupClientDeleteList.h"
 #include "BackupClientContext.h"

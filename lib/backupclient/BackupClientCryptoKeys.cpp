@@ -11,6 +11,8 @@
 
 #include <string.h>
 
+#include <string>
+
 #include "BackupClientCryptoKeys.h"
 #include "FileStream.h"
 #include "BackupStoreFilenameClear.h"

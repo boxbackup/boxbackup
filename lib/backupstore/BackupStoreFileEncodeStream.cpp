@@ -11,6 +11,8 @@
 
 #include <string.h>
 
+#include <string>
+
 #include "BackgroundTask.h"
 #include "BackupClientFileAttributes.h"
 #include "BackupStoreConstants.h"
@@ -21,13 +23,12 @@
 #include "BackupStoreFileWire.h"
 #include "BackupStoreObjectMagic.h"
 #include "BoxTime.h"
+#include "Exception.h"
 #include "FileStream.h"
 #include "Random.h"
 #include "RollingChecksum.h"
 
 #include "MemLeakFindOn.h"
-
-#include <cstring>
 
 using namespace BackupStoreFileCryptVar;
 

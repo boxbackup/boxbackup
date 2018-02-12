@@ -13,6 +13,8 @@
 // Only available in new versions of openssl
 #ifndef HAVE_OLD_SSL
 
+#include <string>
+
 #include "CipherDescription.h"
 
 // --------------------------------------------------------------------------

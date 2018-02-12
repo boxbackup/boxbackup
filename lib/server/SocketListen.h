@@ -31,6 +31,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Exception.h"
 #include "Socket.h"
 
 #include "MemLeakFindOn.h"

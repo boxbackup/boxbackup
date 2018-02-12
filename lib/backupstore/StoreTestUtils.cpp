@@ -10,6 +10,7 @@
 #include "Box.h"
 
 #include <cstdio>
+#include <string>
 #include <vector>
 
 #include "autogen_BackupProtocol.h"

@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include "IOStream.h"
+
 #ifdef BOX_RELEASE_BUILD
 	#define GETLINE_BUFFER_SIZE		1024
 #elif defined WIN32

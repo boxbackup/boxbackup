@@ -9,13 +9,14 @@
 
 #include "Box.h"
 
+#include <errno.h>
+#include <string.h>
+
 #ifdef HAVE_UNISTD_H
 	#include <unistd.h>
 #endif
 
-#include <errno.h>
-#include <string.h>
-
+#include "Exception.h"
 #include "WaitForEvent.h"
 
 #include "MemLeakFindOn.h"

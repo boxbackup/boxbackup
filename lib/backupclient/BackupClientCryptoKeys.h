@@ -10,6 +10,7 @@
 #ifndef BACKUPCLIENTCRYTOKEYS__H
 #define BACKUPCLIENTCRYTOKEYS__H
 
+#include <string>
 
 // All keys are the maximum size that Blowfish supports. Since only the
 // setup time is affected by key length (encryption same speed whatever)

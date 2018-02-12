@@ -13,6 +13,7 @@
 #include <sys/types.h>
 
 #include <map>
+#include <string>
 #include <utility>
 
 // avoid having to include the DB files when not necessary

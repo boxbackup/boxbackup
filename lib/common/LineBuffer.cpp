@@ -15,8 +15,8 @@
 	#include <unistd.h>
 #endif
 
-#include "autogen_CommonException.h"
 #include "BoxTime.h"
+#include "Exception.h"
 #include "LineBuffer.h"
 
 #include "MemLeakFindOn.h"

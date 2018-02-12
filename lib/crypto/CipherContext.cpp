@@ -10,10 +10,12 @@
 #include "Box.h"
 
 #define BOX_LIB_CRYPTO_OPENSSL_HEADERS_INCLUDED_TRUE
+
 #include "CipherContext.h"
 #include "CipherDescription.h"
 #include "CipherException.h"
 #include "CryptoUtils.h"
+#include "Exception.h"
 #include "Random.h"
 
 #include "MemLeakFindOn.h"

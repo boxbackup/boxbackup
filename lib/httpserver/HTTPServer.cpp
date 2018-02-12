@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 
+#include <string>
+
 #include "HTTPServer.h"
 #include "HTTPRequest.h"
 #include "HTTPResponse.h"

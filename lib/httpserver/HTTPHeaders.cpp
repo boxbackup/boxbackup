@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 
+#include "Exception.h"
 #include "HTTPHeaders.h"
 #include "IOStreamGetLine.h"
 

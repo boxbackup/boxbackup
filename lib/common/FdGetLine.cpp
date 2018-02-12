@@ -15,8 +15,8 @@
 	#include <unistd.h>
 #endif
 
+#include "Exception.h"
 #include "FdGetLine.h"
-#include "CommonException.h"
 
 #include "MemLeakFindOn.h"
 

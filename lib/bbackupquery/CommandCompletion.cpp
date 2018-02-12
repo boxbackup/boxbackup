@@ -28,6 +28,7 @@
 #endif
 
 #include <cstring>
+#include <string>
 
 #include "BackupQueries.h"
 #include "Configuration.h"

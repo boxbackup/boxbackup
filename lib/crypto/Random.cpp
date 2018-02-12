@@ -9,11 +9,13 @@
 
 #include "Box.h"
 
-#include <openssl/rand.h>
 #include <stdio.h>
 
-#include "Random.h"
+#include <openssl/rand.h>
+
 #include "CipherException.h"
+#include "Exception.h"
+#include "Random.h"
 
 #include "MemLeakFindOn.h"
 

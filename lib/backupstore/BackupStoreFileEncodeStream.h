@@ -10,6 +10,7 @@
 #ifndef BACKUPSTOREFILEENCODESTREAM__H
 #define BACKUPSTOREFILEENCODESTREAM__H
 
+#include <string>
 #include <vector>
 
 #include "IOStream.h"

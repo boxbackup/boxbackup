@@ -10,9 +10,11 @@
 #ifndef BACKUPPROTOCOL__H
 #define BACKUPPROTOCOL__H
 
-#include <autogen_BackupProtocol.h>
-#include <BackupStoreConstants.h>
-#include <BackupStoreContext.h>
+#include <string>
+
+#include "autogen_BackupProtocol.h"
+#include "BackupStoreConstants.h"
+#include "BackupStoreContext.h"
 
 // --------------------------------------------------------------------------
 //

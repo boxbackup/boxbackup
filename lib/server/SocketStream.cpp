@@ -9,14 +9,8 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <errno.h>
 #include <string.h>
-
-#include <sys/types.h>
 
 #ifdef WIN32
 	#include <ws2tcpip.h> // for InetNtop
@@ -29,6 +23,10 @@
 	#include <ucred.h>
 #endif
 
+#ifdef HAVE_UNISTD_H
+	#include <unistd.h>
+#endif
+
 #ifdef HAVE_BSD_UNISTD_H
 	#include <bsd/unistd.h>
 #endif
@@ -37,14 +35,18 @@
 	#include <sys/param.h>
 #endif
 
+#include <sys/types.h>
+
 #ifdef HAVE_SYS_UCRED_H
 	#include <sys/ucred.h>
 #endif
 
+#include <string>
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Exception.h"
 #include "SocketStream.h"
-#include "CommonException.h"
 #include "Socket.h"
 #include "Utils.h"
 

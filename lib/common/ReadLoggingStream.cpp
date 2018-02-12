@@ -12,7 +12,7 @@
 #include <string.h>
 
 #include "ReadLoggingStream.h"
-#include "CommonException.h"
+#include "Exception.h"
 #include "Logging.h"
 
 #include "MemLeakFindOn.h"

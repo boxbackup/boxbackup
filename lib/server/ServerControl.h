@@ -1,11 +1,13 @@
 #ifndef SERVER_CONTROL_H
 #define SERVER_CONTROL_H
 
+#include <string>
+
 #include "Test.h"
 
 bool HUPServer(int pid);
 bool KillServer(int pid, bool WaitForProcess = false);
-bool KillServer(std::string pid_file, bool WaitForProcess = false);
+bool KillServer(const std::string& pid_file, bool WaitForProcess = false);
 int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file);
 bool StopDaemon(int current_pid, const std::string& pid_file,
 	const std::string& memleaks_file, bool wait_for_process);

@@ -9,17 +9,18 @@
 
 #include "Box.h"
 
-#include <openssl/evp.h>
-
 #ifdef HAVE_OLD_SSL
 	#include <string.h>
 	#include <strings.h>
 #endif
 
+#include <openssl/evp.h>
+
 #define BOX_LIB_CRYPTO_OPENSSL_HEADERS_INCLUDED_TRUE
 
 #include "CipherBlowfish.h"
 #include "CipherException.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

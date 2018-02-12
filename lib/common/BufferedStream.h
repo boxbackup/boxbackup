@@ -10,6 +10,8 @@
 #ifndef BUFFEREDSTREAM__H
 #define BUFFEREDSTREAM__H
 
+#include <string>
+
 #include "IOStream.h"
 
 class BufferedStream : public IOStream

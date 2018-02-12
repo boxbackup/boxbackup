@@ -11,6 +11,8 @@
 #define LOCALPROCESSSTREAM__H
 
 #include <memory>
+#include <string>
+
 #include "IOStream.h"
 
 std::auto_ptr<IOStream> LocalProcessStream(const std::string& rCommandLine,

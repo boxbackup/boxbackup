@@ -11,9 +11,10 @@
 
 #include <stdio.h>
 
+#include "Configuration.h"
+#include "Exception.h"
 #include "RaidFileController.h"
 #include "RaidFileException.h"
-#include "Configuration.h"
 
 #include "MemLeakFindOn.h"
 

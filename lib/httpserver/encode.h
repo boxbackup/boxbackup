@@ -10,6 +10,7 @@ For details, see http://sourceforge.net/projects/libb64
 #define BASE64_ENCODE_H
 
 #include <iostream>
+#include <string>
 
 namespace base64
 {

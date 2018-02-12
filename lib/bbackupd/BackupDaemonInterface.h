@@ -17,6 +17,7 @@
 class Archive;
 class BackupClientContext;
 class BackupDaemon;
+class BoxException;
 
 // --------------------------------------------------------------------------
 //

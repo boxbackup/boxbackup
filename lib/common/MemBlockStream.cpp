@@ -11,6 +11,8 @@
 
 #include <string.h>
 
+#include <string>
+
 #include "MemBlockStream.h"
 #include "CommonException.h"
 #include "StreamableMemBlock.h"

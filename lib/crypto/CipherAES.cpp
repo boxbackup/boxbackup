@@ -18,6 +18,7 @@
 
 #include "CipherAES.h"
 #include "CipherException.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

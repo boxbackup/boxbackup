@@ -11,6 +11,7 @@
 #define PROTOCOLOBJECT__H
 
 #include <memory>
+#include <string>
 
 class Protocol;
 class ProtocolContext;

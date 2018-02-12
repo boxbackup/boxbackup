@@ -10,6 +10,8 @@
 #ifndef UNIXUSER__H
 #define UNIXUSER__H
 
+#include <string>
+
 class UnixUser
 {
 public:

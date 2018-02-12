@@ -10,6 +10,8 @@
 #ifndef MEMBLOCKSTREAM__H
 #define MEMBLOCKSTREAM__H
 
+#include <string>
+
 #include "CollectInBufferStream.h"
 #include "IOStream.h"
 

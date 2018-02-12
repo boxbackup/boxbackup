@@ -10,6 +10,8 @@
 #ifndef BOXTIME__H
 #define BOXTIME__H
 
+#include <string>
+
 // Time is presented as a signed 64 bit integer, in microseconds
 typedef int64_t box_time_t;
 

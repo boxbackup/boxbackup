@@ -19,8 +19,11 @@
 #endif
 
 #include <signal.h>
-#include <cstring>
 
+#include <cstring>
+#include <string>
+
+#include "Exception.h"
 #include "Timer.h"
 #include "Logging.h"
 

@@ -11,6 +11,8 @@
 #ifndef INVISIBLETEMPFILESTREAM__H
 #define INVISIBLETEMPFILESTREAM__H
 
+#include <string>
+
 #include "FileStream.h"
 
 class InvisibleTempFileStream : public FileStream

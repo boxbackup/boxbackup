@@ -14,7 +14,7 @@
 #	include <dbghelp.h>
 #endif
 
-#include "autogen_CommonException.h"
+#include "Exception.h"
 #include "Logging.h"
 
 // Windows requires winsock to be initialised before use, unlike every other platform.

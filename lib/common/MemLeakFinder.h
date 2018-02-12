@@ -15,6 +15,8 @@
 	#include <cstdlib>
 #endif
 
+#include <string>
+
 // global enable flag
 extern bool memleakfinder_global_enable;
 

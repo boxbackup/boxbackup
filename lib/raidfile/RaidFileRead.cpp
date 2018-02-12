@@ -33,6 +33,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <string>
 
 #include "RaidFileRead.h"
 #include "RaidFileException.h"

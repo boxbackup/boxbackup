@@ -10,6 +10,8 @@
 #ifndef BACKUPSTOREFILENAMECLEAR__H
 #define BACKUPSTOREFILENAMECLEAR__H
 
+#include <string>
+
 #include "BackupStoreFilename.h"
 
 class CipherContext;

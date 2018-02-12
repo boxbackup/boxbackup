@@ -8,10 +8,14 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
+
+#include <string>
+
 #include "BackupStoreFilenameClear.h"
 #include "BackupStoreException.h"
 #include "CipherContext.h"
 #include "CipherBlowfish.h"
+#include "Exception.h"
 #include "Guards.h"
 #include "Logging.h"
 

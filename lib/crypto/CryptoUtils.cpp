@@ -14,6 +14,7 @@
 #include <openssl/err.h>
 
 #include "CryptoUtils.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

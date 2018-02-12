@@ -19,12 +19,12 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Exception.h"
+#include "PartialReadStream.h"
 #include "Protocol.h"
+#include "ProtocolUncertainStream.h"
 #include "ProtocolWire.h"
 #include "SocketStream.h"
-#include "PartialReadStream.h"
-#include "ProtocolUncertainStream.h"
-#include "Logging.h"
 
 #include "MemLeakFindOn.h"
 

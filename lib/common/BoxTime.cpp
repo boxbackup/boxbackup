@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "BoxTime.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

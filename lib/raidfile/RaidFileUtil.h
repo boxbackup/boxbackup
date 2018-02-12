@@ -10,6 +10,9 @@
 #ifndef RAIDFILEUTIL__H
 #define RAIDFILEUTIL__H
 
+#include <string>
+
+#include "Exception.h"
 #include "RaidFileController.h"
 #include "RaidFileException.h"
 

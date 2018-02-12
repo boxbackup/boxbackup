@@ -10,6 +10,8 @@
 #ifndef STORETESTUTILS__H
 #define STORETESTUTILS__H
 
+#include <string>
+
 #include "Test.h"
 
 class BackupAccountControl;

@@ -11,7 +11,9 @@
 #define WINNAMEDPIPESTREAM__H
 
 #include <list>
+#include <string>
 
+#include "Exception.h"
 #include "IOStream.h"
 
 // --------------------------------------------------------------------------

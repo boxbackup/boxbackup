@@ -12,7 +12,7 @@
 
 #include <cstdlib>
 #include <memory>
-#include <cstdlib>
+#include <string>
 
 #include "autogen_BackupProtocol.h"
 #include "BackupClientFileAttributes.h"

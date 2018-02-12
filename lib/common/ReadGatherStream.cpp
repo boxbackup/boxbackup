@@ -9,8 +9,8 @@
 
 #include "Box.h"
 
+#include "Exception.h"
 #include "ReadGatherStream.h"
-#include "CommonException.h"
 
 #include "MemLeakFindOn.h"
 

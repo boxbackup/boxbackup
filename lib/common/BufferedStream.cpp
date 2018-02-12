@@ -8,10 +8,11 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
-#include "BufferedStream.h"
-#include "CommonException.h"
 
 #include <string.h>
+
+#include "BufferedStream.h"
+#include "Exception.h"
 
 #include "MemLeakFindOn.h"
 

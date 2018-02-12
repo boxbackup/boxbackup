@@ -10,6 +10,8 @@
 #ifndef BACKUPCLIENTRESTORE_H
 #define BACKUPCLIENTRESTORE_H
 
+#include <string>
+
 class BackupProtocolCallable;
 
 enum

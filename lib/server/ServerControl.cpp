@@ -1,6 +1,11 @@
 #include "Box.h"
 
 #include <errno.h>
+
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
+#endif
+
 #include <stdio.h>
 
 #ifdef HAVE_SYS_TYPES_H
@@ -11,9 +16,7 @@
 	#include <sys/wait.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
-	#include <signal.h>
-#endif
+#include <string>
 
 #include "BoxTime.h"
 #include "IOStreamGetLine.h"
@@ -268,7 +271,7 @@ bool KillServer(int pid, bool WaitForProcess)
 	return !ServerIsAlive(pid);
 }
 
-bool KillServer(std::string pid_file, bool WaitForProcess)
+bool KillServer(const std::string& pid_file, bool WaitForProcess)
 {
 	FileStream fs(pid_file);
 	IOStreamGetLine getline(fs);

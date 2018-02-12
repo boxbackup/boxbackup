@@ -16,6 +16,8 @@
 #include <string>
 #include <memory>
 
+#include "Logging.h" // for Log::Category
+
 // For defining tests
 enum
 {

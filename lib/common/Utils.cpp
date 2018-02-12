@@ -39,7 +39,7 @@
 #	include "BoxVersion.h"
 #endif
 
-#include "CommonException.h"
+#include "Exception.h"
 #include "Logging.h"
 #include "Utils.h"
 

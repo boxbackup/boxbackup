@@ -10,6 +10,8 @@
 #ifndef NAMEDLOCK__H
 #define NAMEDLOCK__H
 
+#include <string>
+
 // --------------------------------------------------------------------------
 //
 // Class

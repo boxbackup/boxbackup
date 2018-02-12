@@ -11,14 +11,15 @@
 
 #include <string.h>
 
-#include <new>
-#include <map>
-
 #ifdef HAVE_TIME_H
 	#include <time.h>
 #elif defined HAVE_SYS_TIME_H
 	#include <sys/time.h>
 #endif
+
+#include <map>
+#include <new>
+#include <string>
 
 #include "BackupStoreConstants.h"
 #include "BackupStoreException.h"
@@ -27,7 +28,7 @@
 #include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFileWire.h"
 #include "BackupStoreObjectMagic.h"
-#include "CommonException.h"
+#include "Exception.h"
 #include "FileStream.h"
 #include "MD5Digest.h"
 #include "RollingChecksum.h"

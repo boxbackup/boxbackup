@@ -8,8 +8,10 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Exception.h"
 #include "ProtocolUncertainStream.h"
 #include "Protocol.h"
 

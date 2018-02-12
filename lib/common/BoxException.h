@@ -2,7 +2,7 @@
 //
 // File
 //		Name:    BoxException.h
-//		Purpose: Exception
+//		Purpose: BoxException class definition
 //		Created: 2003/07/10
 //
 // --------------------------------------------------------------------------
@@ -12,6 +12,9 @@
 
 #include <exception>
 #include <string>
+
+#define EXCEPTION_IS_TYPE(exception_obj, type, subtype) \
+	exception_obj.IsType(type::ExceptionType, type::subtype)
 
 // --------------------------------------------------------------------------
 //
@@ -37,9 +40,6 @@ public:
 
 private:
 };
-
-#define EXCEPTION_IS_TYPE(exception_obj, type, subtype) \
-	exception_obj.IsType(type::ExceptionType, type::subtype)
 
 #endif // BOXEXCEPTION__H
 

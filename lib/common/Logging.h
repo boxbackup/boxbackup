@@ -17,6 +17,7 @@
 #include <cstring>
 #include <iomanip>
 #include <list>
+#include <string>
 #include <sstream>
 #include <vector>
 

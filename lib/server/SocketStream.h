@@ -10,11 +10,12 @@
 #ifndef SOCKETSTREAM__H
 #define SOCKETSTREAM__H
 
-#include <climits>
-
 #ifdef HAVE_SYS_POLL_H
 #	include <sys/poll.h>
 #endif
+
+#include <climits>
+#include <string>
 
 #include "BoxTime.h"
 #include "IOStream.h"

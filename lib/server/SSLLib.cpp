@@ -10,17 +10,19 @@
 #include "Box.h"
 
 #define TLS_CLASS_IMPLEMENTATION_CPP
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <openssl/rand.h>
 
 #ifdef WIN32
 	#include <wincrypt.h>
 #endif
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
 #include "CryptoUtils.h"
+#include "Exception.h"
 #include "SSLLib.h"
 
 #include "MemLeakFindOn.h"
