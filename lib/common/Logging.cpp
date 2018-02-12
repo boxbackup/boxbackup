@@ -44,10 +44,13 @@ std::vector<Logger*> Logging::sLoggers;
 std::string Logging::sContext;
 Console*    Logging::spConsole = NULL;
 Syslog*     Logging::spSyslog  = NULL;
+// initialise before sGlobalLogging, which adds Console and Syslog loggers and thus checks
+// sLogLevelOverrideByFileGuards:
+std::vector<LogLevelOverrideByFileGuard> Logging::sLogLevelOverrideByFileGuards;
 Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
+Log::Level  Logging::sLowestCommonLevel = Log::EVERYTHING;
 const Log::Category Logging::UNCATEGORISED("Uncategorised");
-std::vector<LogLevelOverrideByFileGuard> Logging::sLogLevelOverrideByFileGuards;
 
 HideSpecificExceptionGuard::SuppressedExceptions_t
 	HideSpecificExceptionGuard::sSuppressedExceptions;
@@ -124,6 +127,7 @@ void Logging::Add(Logger* pNewLogger)
 	}
 	
 	sLoggers.insert(sLoggers.begin(), pNewLogger);
+	UpdateLowestCommonLevel();
 }
 
 void Logging::Remove(Logger* pOldLogger)
@@ -137,12 +141,45 @@ void Logging::Remove(Logger* pOldLogger)
 			return;
 		}
 	}
+	UpdateLowestCommonLevel();
 }
 
-void Logging::Log(Log::Level level, const std::string& file, int line,
+void Logging::UpdateLowestCommonLevel()
+{
+	sLowestCommonLevel = Log::NOTHING;
+
+	for (std::vector<Logger*>::iterator i = sLoggers.begin();
+		i != sLoggers.end(); i++)
+	{
+		Log::Level new_level = (*i)->GetLowestLevel();
+		// Higher levels -> more logging
+		if(sLowestCommonLevel < new_level)
+		{
+			sLowestCommonLevel = new_level;
+		}
+	}
+
+	for (std::vector<LogLevelOverrideByFileGuard>::const_iterator
+		i = sLogLevelOverrideByFileGuards.begin();
+		i != sLogLevelOverrideByFileGuards.end(); i++)
+	{
+		Log::Level new_level = i->GetNewLevel();
+		if(sLowestCommonLevel < new_level)
+		{
+			sLowestCommonLevel = new_level;
+		}
+	}
+}
+
+bool Logging::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
+	if(level > Logging::GetLowestCommonLevel())
+	{
+		return false;
+	}
+
 	std::string newMessage;
 	
 	if (sContextSet)
@@ -159,9 +196,11 @@ void Logging::Log(Log::Level level, const std::string& file, int line,
 			newMessage);
 		if (!result)
 		{
-			return;
+			return false;
 		}
 	}
+
+	return true; // message was not suppressed
 }
 
 void Logging::LogToSyslog(Log::Level level, const std::string& rFile, int line,
@@ -249,6 +288,12 @@ Logger::~Logger()
 bool Logger::IsEnabled(Log::Level level)
 {
 	return (int)mCurrentLevel >= (int)level;
+}
+
+void Logger::Filter(Log::Level level)
+{
+	mCurrentLevel = level;
+	Logging::UpdateLowestCommonLevel();
 }
 
 bool Console::sShowTime = false;

@@ -25,26 +25,38 @@
 
 #define BOX_LOG(level, stuff) \
 { \
-	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
-		Logging::UNCATEGORISED, _box_log_line.str()); \
+	if(level <= Logging::GetLowestCommonLevel()) \
+	{ \
+		std::ostringstream _box_log_line; \
+		_box_log_line << stuff; \
+		Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
+			Logging::UNCATEGORISED, _box_log_line.str()); \
+	} \
 }
+
+// Higher levels -> more logging. So only build the log message if the level if the level is
+// lower or equal to the level that any logger is interested in.
 
 #define BOX_LOG_CATEGORY(level, category, stuff) \
 { \
-	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
-	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
-		category, _box_log_line.str()); \
+	if(level <= Logging::GetLowestCommonLevel()) \
+	{ \
+		std::ostringstream _box_log_line; \
+		_box_log_line << stuff; \
+		Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, \
+			category, _box_log_line.str()); \
+	} \
 }
 
 #define BOX_SYSLOG(level, stuff) \
 { \
-	std::ostringstream _box_log_line; \
-	_box_log_line << stuff; \
-	Logging::LogToSyslog(level, __FILE__, __LINE__, __FUNCTION__, \
-		Logging::UNCATEGORISED, _box_log_line.str()); \
+	if(level <= Logging::GetLowestCommonLevel()) \
+	{ \
+		std::ostringstream _box_log_line; \
+		_box_log_line << stuff; \
+		Logging::LogToSyslog(level, __FILE__, __LINE__, __FUNCTION__, \
+			Logging::UNCATEGORISED, _box_log_line.str()); \
+	} \
 }
 
 #define BOX_FATAL(stuff)   BOX_LOG(Log::FATAL,   stuff)
@@ -238,13 +250,16 @@ class Logger
 		const std::string& function, const Log::Category& category,
 		const std::string& message) = 0;
 	
-	void Filter(Log::Level level)
-	{
-		mCurrentLevel = level;
-	}
+	void Filter(Log::Level level);
 
 	virtual const char* GetType() = 0;
 	Log::Level GetLevel() { return mCurrentLevel; }
+
+	// mCurrentLevel is the default for GetLowestLevel(). Subclasses can override it if they
+	// need to, for example if the user can configure them in ways that would increase
+	// sensitivity to certain messages that isn't reflected in mCurrentLevel:
+	virtual Log::Level GetLowestLevel() { return mCurrentLevel; }
+
 	bool IsEnabled(Log::Level level);
 
 	virtual void SetProgramName(const std::string& rProgramName) = 0;
@@ -449,7 +464,7 @@ class LogLevelOverrideByFileGuard
 	bool IsOverridden(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
-	Log::Level GetNewLevel() { return mNewLevel; }
+	Log::Level GetNewLevel() const { return mNewLevel; }
 	bool operator==(const LogLevelOverrideByFileGuard& rOther)
 	{
 		return (mFileNames == rOther.mFileNames) &&
@@ -482,6 +497,11 @@ class Logging
 	static Logging    sGlobalLogging;
 	static std::string sProgramName;
 	static std::vector<LogLevelOverrideByFileGuard> sLogLevelOverrideByFileGuards;
+
+	// Caches the lowest common level (no higher than needed by any Logger or
+	// LogLevelOverrideByFileGuard), since it could be expensive to recompute:
+	static Log::Level sLowestCommonLevel;
+
 	friend class LogLevelOverrideByFileGuard;
 
 	public:
@@ -496,7 +516,7 @@ class Logging
 	static bool ShouldLog(Log::Level default_level, Log::Level message_level,
 		const std::string& file, int line, const std::string& function,
 		const Log::Category& category, const std::string& message);
-	static void Log(Log::Level level, const std::string& file, int line,
+	static bool Log(Log::Level level, const std::string& file, int line,
 		const std::string& function, const Log::Category& category,
 		const std::string& message);
 	static void LogToSyslog(Log::Level level, const std::string& rFile, int line,
@@ -510,6 +530,13 @@ class Logging
 	static void SetFacility(int facility);
 	static Console& GetConsole() { return *spConsole; }
 	static Syslog&  GetSyslog()  { return *spSyslog; }
+
+	// Returns the lowest level which needs to be enabled because at least one Logger (or
+	// LogLevelOverrideByFileGuard) wants to see messages of that level:
+	static Log::Level GetLowestCommonLevel() { return sLowestCommonLevel; }
+
+	// Updates the cached lowest common level:
+	static void UpdateLowestCommonLevel();
 
 	class ShowTagOnConsole
 	{

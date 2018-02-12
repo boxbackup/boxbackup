@@ -1117,6 +1117,61 @@ bool test_remove_prefix_suffix()
 	TEARDOWN();
 }
 
+// Test that logging works properly
+bool test_logging()
+{
+	SETUP();
+
+#define TMP_LOG(level, message) \
+	Logging::Log(level, __FILE__, __LINE__, __FUNCTION__, Logging::UNCATEGORISED, message)
+
+	{
+		Logger::LevelGuard console_trace(Logging::GetConsole(), Log::TRACE);
+		TEST_THAT(TMP_LOG(Log::TRACE,  "trace level"));
+		TEST_THAT(TMP_LOG(Log::INFO,   "info level"));
+		TEST_THAT(TMP_LOG(Log::NOTICE, "notice level"));
+
+		Capture capture;
+		capture.Filter(Logging::GetConsole().GetLevel());
+		BOX_TRACE("trace level");
+		BOX_INFO("info level");
+		BOX_NOTICE("notice level");
+		TEST_EQUAL(3, capture.GetMessages().size());
+	}
+
+	{
+		Logger::LevelGuard console_trace(Logging::GetConsole(), Log::INFO);
+		TEST_THAT(!TMP_LOG(Log::TRACE,  "trace level"));
+		TEST_THAT( TMP_LOG(Log::INFO,   "info level"));
+		TEST_THAT( TMP_LOG(Log::NOTICE, "notice level"));
+
+		Capture capture;
+		capture.Filter(Logging::GetConsole().GetLevel());
+		BOX_TRACE("trace level");
+		BOX_INFO("info level");
+		BOX_NOTICE("notice level");
+		TEST_EQUAL(2, capture.GetMessages().size());
+	}
+
+	{
+		Logger::LevelGuard console_trace(Logging::GetConsole(), Log::NOTICE);
+		TEST_THAT(!TMP_LOG(Log::TRACE,  "trace level"));
+		TEST_THAT(!TMP_LOG(Log::INFO,   "info level"));
+		TEST_THAT( TMP_LOG(Log::NOTICE, "notice level"));
+
+		Capture capture;
+		capture.Filter(Logging::GetConsole().GetLevel());
+		BOX_TRACE("trace level");
+		BOX_INFO("info level");
+		BOX_NOTICE("notice level");
+		TEST_EQUAL(1, capture.GetMessages().size());
+	}
+
+#undef TMP_LOG
+
+	TEARDOWN();
+}
+
 int test(int argc, const char *argv[])
 {
 	if(argc == 2 && strcmp(argv[1], "lockwait") == 0)
@@ -1142,6 +1197,7 @@ int test(int argc, const char *argv[])
 	test_archive();
 	test_box_strtoui64();
 	test_remove_prefix_suffix();
+	test_logging();
 
 	return finish_test_suite();
 }
