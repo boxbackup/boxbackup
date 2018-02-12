@@ -1,14 +1,14 @@
 // --------------------------------------------------------------------------
 //
 // File
-//		Name:    GetLine.h
+//		Name:    LineBuffer.h
 //		Purpose: Common base class for line based file descriptor reading
 //		Created: 2011/04/22
 //
 // --------------------------------------------------------------------------
 
-#ifndef GETLINE__H
-#define GETLINE__H
+#ifndef LINEBUFFER__H
+#define LINEBUFFER__H
 
 #include <string>
 
@@ -64,5 +64,5 @@ protected:
 	bool mEOF;
 };
 
-#endif // GETLINE__H
+#endif // LINEBUFFER__H
 
