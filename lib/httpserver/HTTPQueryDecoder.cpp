@@ -173,17 +173,45 @@ void HTTPQueryDecoder::Finish()
 std::string HTTPQueryDecoder::URLEncode(const std::string& value)
 {
 	std::ostringstream out;
-	for(std::string::const_iterator i = value.begin(); i != value.end(); i++)
+	for(std::string::const_iterator i = value.begin(); i != value.end();)
 	{
 		// Do not URL encode any of the unreserved characters that RFC 3986
 		// defines: A-Z, a-z, 0-9, hyphen ( - ), underscore ( _ ), period ( . ),
 		// and tilde ( ~ ).
-		if(std::isalnum(*i) || *i == '-' || *i == '_' || *i == '.' || *i == '~')
+
+		// To avoid appending one character at a time to the output buffer, we scan for the
+		// first character requiring encoding, and append all (possibly zero) characters
+		// before that point directly.
+
+		// Because the conditions to break out of each loop are opposite, one or other of
+		// these loops will make progress (increment i by at least one) unless we are at
+		// end of string, which also terminates the outer loop, so it is guaranteed to
+		// terminate eventually.
+		std::string::size_type append_start = (i - value.begin());
+		for(;i != value.end(); i++)
 		{
-			out << *i;
+			if(!(std::isalnum(*i) || *i == '-' || *i == '_' || *i == '.' || *i == '~'))
+			{
+				break;
+			}
 		}
-		else
+
+		// Short circuit: if the entire value is URL-safe, just return it now.
+		std::string::size_type append_end = (i - value.begin());
+		if(append_start == 0 && append_end == value.size())
 		{
+			return value;
+		}
+
+		out << value.substr(append_start, append_end - append_start);
+
+		for(;i != value.end(); i++)
+		{
+			if(std::isalnum(*i) || *i == '-' || *i == '_' || *i == '.' || *i == '~')
+			{
+				break;
+			}
+
 			// Percent encode all other characters with %XY, where X and Y are
 			// hex characters 0-9 and uppercase A-F.
 			out << "%" <<
