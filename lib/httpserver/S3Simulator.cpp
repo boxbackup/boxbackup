@@ -873,62 +873,65 @@ void ProcessConditionalRequest(const std::string& domain, HTTPRequest& rRequest,
 		std::string param_name = i->first;
 		std::string param_value = i->second;
 		std::string param_number_type = RemovePrefix("Attribute.",
-			param_name, false); // !force
+			param_name, ""); // default_value
 		std::string expected_number_type = RemovePrefix("Expected.",
-			param_name, false); // !force
-		if(!param_number_type.empty())
+			param_name, ""); // default_value
+		if(!param_number_type.empty()) // prefix removed, i.e. started with Attribute.
 		{
 			std::string param_index_name = RemoveSuffix(".Name",
-				param_number_type, false); // !force
+				param_number_type, ""); // default_value
 			std::string param_index_value = RemoveSuffix(".Value",
-				param_number_type, false); // !force
+				param_number_type, ""); // default_value
 			std::string param_index_replace = RemoveSuffix(".Replace",
-				param_number_type, false); // !force
+				param_number_type, ""); // default_value
 			if(!param_index_name.empty())
 			{
+				// suffix removed, i.e. ended with .Name
 				param_index_to_name[param_index_name] =
 					param_value;
 			}
 			else if(!param_index_value.empty())
 			{
+				// suffix removed, i.e. ended with .Value
 				param_index_to_value[param_index_value] =
 					param_value;
 			}
 			// Replace mode makes no sense when deleting matching attributes
 			else if(!param_index_replace.empty() && !delete_attributes)
 			{
+				// suffix removed, i.e. ended with .Replace
 				param_index_to_replace[param_index_replace] =
 					(param_value == "true");
 			}
 			else
 			{
-				THROW_EXCEPTION_MESSAGE(HTTPException,
-					S3SimulatorError, "PutAttributes: "
-					"Unparsed Attribute parameter: " <<
+				THROW_EXCEPTION_MESSAGE(HTTPException, S3SimulatorError,
+					"PutAttributes: Unparsed Attribute parameter: " <<
 					param_name);
 			}
 		}
 		else if(!expected_number_type.empty())
 		{
 			std::string expected_index_name = RemoveSuffix(".Name",
-				expected_number_type, false); // !force
+				expected_number_type, ""); // default_value
 			std::string expected_index_value = RemoveSuffix(".Value",
-				expected_number_type, false); // !force
+				expected_number_type, ""); // default_value
 			if(!expected_index_name.empty())
 			{
+				// suffix removed, i.e. ended with .Name
 				expected_index_to_name[expected_index_name] =
 					param_value;
 			}
 			else if(!expected_index_value.empty())
 			{
+				// suffix removed, i.e. ended with .Value
 				expected_index_to_value[expected_index_value] =
 					param_value;
 			}
 			else
 			{
-				THROW_EXCEPTION_MESSAGE(HTTPException,
-					S3SimulatorError, "PutAttributes: "
-					"Unparsed Expected parameter: " <<
+				THROW_EXCEPTION_MESSAGE(HTTPException, S3SimulatorError,
+					"PutAttributes: Unparsed Expected parameter: " <<
 					param_name);
 			}
 		}

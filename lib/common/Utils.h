@@ -20,9 +20,9 @@ void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOu
 bool StartsWith(const std::string& prefix, const std::string& haystack);
 bool EndsWith(const std::string& prefix, const std::string& haystack);
 std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
-	bool force = true);
+	const char* default_value = NULL);
 std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
-	bool force = true);
+	const char* default_value = NULL);
 
 void DumpStackBacktrace(const std::string& filename);
 void DumpStackBacktrace(const std::string& filename, size_t size, void * const * array);

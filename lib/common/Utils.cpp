@@ -115,13 +115,13 @@ bool EndsWith(const std::string& suffix, const std::string& haystack)
 }
 
 std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
-	bool force)
+	const char* default_value)
 {
 	if(StartsWith(prefix, haystack))
 	{
 		return haystack.substr(prefix.size());
 	}
-	else if(force)
+	else if(default_value == NULL)
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
 			"String '" << haystack << "' was expected to start with prefix "
@@ -129,18 +129,18 @@ std::string RemovePrefix(const std::string& prefix, const std::string& haystack,
 	}
 	else
 	{
-		return "";
+		return default_value;
 	}
 }
 
 std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
-	bool force)
+	const char* default_value)
 {
 	if(EndsWith(suffix, haystack))
 	{
 		return haystack.substr(0, haystack.size() - suffix.size());
 	}
-	else if(force)
+	else if(default_value == NULL)
 	{
 		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
 			"String '" << haystack << "' was expected to end with suffix "
@@ -148,7 +148,7 @@ std::string RemoveSuffix(const std::string& suffix, const std::string& haystack,
 	}
 	else
 	{
-		return "";
+		return default_value;
 	}
 }
 

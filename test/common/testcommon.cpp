@@ -1077,38 +1077,42 @@ bool test_remove_prefix_suffix()
 {
 	SETUP();
 
-	TEST_EQUAL("food", RemovePrefix("", "food", false)); // !force
-	TEST_EQUAL("food", RemoveSuffix("", "food", false)); // !force
-	TEST_EQUAL("", RemovePrefix("d", "food", false)); // !force
-	TEST_EQUAL("", RemoveSuffix("f", "food", false)); // !force
-	TEST_EQUAL("", RemovePrefix("dz", "food", false)); // !force
-	TEST_EQUAL("", RemoveSuffix("fz", "food", false)); // !force
-	TEST_EQUAL("ood", RemovePrefix("f", "food", false)); // !force
-	TEST_EQUAL("foo", RemoveSuffix("d", "food", false)); // !force
-	TEST_EQUAL("od", RemovePrefix("fo", "food", false)); // !force
-	TEST_EQUAL("fo", RemoveSuffix("od", "food", false)); // !force
-	TEST_EQUAL("", RemovePrefix("food", "food", false)); // !force
-	TEST_EQUAL("", RemoveSuffix("food", "food", false)); // !force
-	TEST_EQUAL("", RemovePrefix("foodz", "food", false)); // !force
-	TEST_EQUAL("", RemoveSuffix("foodz", "food", false)); // !force
-	TEST_EQUAL("", RemoveSuffix("zfood", "food", false)); // !force
+	// default_value != NULL, i.e. no exception:
+	TEST_EQUAL("food", RemovePrefix("", "food", ""));
+	TEST_EQUAL("food", RemovePrefix("", "food", "bard"));
+	TEST_EQUAL("food", RemoveSuffix("", "food", ""));
+	TEST_EQUAL("bard", RemovePrefix("d", "food", "bard")); // returns default_value
+	TEST_EQUAL("", RemovePrefix("d", "food", ""));
+	TEST_EQUAL("", RemoveSuffix("f", "food", ""));
+	TEST_EQUAL("", RemovePrefix("dz", "food", ""));
+	TEST_EQUAL("", RemoveSuffix("fz", "food", ""));
+	TEST_EQUAL("", RemovePrefix("fz", "food", ""));
+	TEST_EQUAL("ood", RemovePrefix("f", "food", ""));
+	TEST_EQUAL("ood", RemovePrefix("f", "food", "bard")); // !default_value
+	TEST_EQUAL("foo", RemoveSuffix("d", "food", ""));
+	TEST_EQUAL("od", RemovePrefix("fo", "food", ""));
+	TEST_EQUAL("fo", RemoveSuffix("od", "food", ""));
+	TEST_EQUAL("", RemovePrefix("food", "food", ""));
+	TEST_EQUAL("", RemoveSuffix("food", "food", ""));
+	TEST_EQUAL("", RemovePrefix("foodz", "food", ""));
+	TEST_EQUAL("bard", RemovePrefix("foodz", "food", "bard"));
+	TEST_EQUAL("", RemoveSuffix("foodz", "food", ""));
+	TEST_EQUAL("", RemoveSuffix("zfood", "food", ""));
+	TEST_EQUAL("bard", RemoveSuffix("zfood", "food", "bard"));
 
-	TEST_EQUAL("food", RemovePrefix("", "food", true)); // force
-	TEST_EQUAL("food", RemoveSuffix("", "food", true)); // force
-	TEST_CHECK_THROWS(RemovePrefix("d", "food", true), CommonException, Internal); // force
-	TEST_CHECK_THROWS(RemoveSuffix("f", "food", true), CommonException, Internal); // force
-	TEST_CHECK_THROWS(RemovePrefix("dz", "food", true), CommonException, Internal); // force
-	TEST_CHECK_THROWS(RemoveSuffix("fz", "food", true), CommonException, Internal); // force
-	TEST_EQUAL("ood", RemovePrefix("f", "food", true)); // force
-	TEST_EQUAL("foo", RemoveSuffix("d", "food", true)); // force
-	TEST_EQUAL("od", RemovePrefix("fo", "food", true)); // force
-	TEST_EQUAL("fo", RemoveSuffix("od", "food", true)); // force
-	TEST_CHECK_THROWS(RemovePrefix("foodz", "food", true), CommonException, Internal); // force
-	TEST_CHECK_THROWS(RemoveSuffix("foodz", "food", true), CommonException, Internal); // force
-	TEST_CHECK_THROWS(RemoveSuffix("zfood", "food", true), CommonException, Internal); // force
-
-	// Test that force defaults to true:
+	TEST_EQUAL("food", RemovePrefix("", "food"));
+	TEST_EQUAL("food", RemoveSuffix("", "food"));
 	TEST_CHECK_THROWS(RemovePrefix("d", "food"), CommonException, Internal);
+	TEST_CHECK_THROWS(RemoveSuffix("f", "food"), CommonException, Internal);
+	TEST_CHECK_THROWS(RemovePrefix("dz", "food"), CommonException, Internal);
+	TEST_CHECK_THROWS(RemoveSuffix("fz", "food"), CommonException, Internal);
+	TEST_EQUAL("ood", RemovePrefix("f", "food"));
+	TEST_EQUAL("foo", RemoveSuffix("d", "food"));
+	TEST_EQUAL("od", RemovePrefix("fo", "food"));
+	TEST_EQUAL("fo", RemoveSuffix("od", "food"));
+	TEST_CHECK_THROWS(RemovePrefix("foodz", "food"), CommonException, Internal);
+	TEST_CHECK_THROWS(RemoveSuffix("foodz", "food"), CommonException, Internal);
+	TEST_CHECK_THROWS(RemoveSuffix("zfood", "food"), CommonException, Internal);
 
 	TEARDOWN();
 }
