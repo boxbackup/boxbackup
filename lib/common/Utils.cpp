@@ -161,9 +161,9 @@ const Log::Category BACKTRACE("Backtrace");
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
-	char buffer[1024];
 
 #if defined WIN32
+	char buffer[1024];
 	if(UnDecorateSymbolName(mangled_name.c_str(), buffer, sizeof(buffer),
 		UNDNAME_COMPLETE))
 	{
@@ -175,41 +175,34 @@ static std::string demangle(const std::string& mangled_name)
 	}
 #elif defined HAVE_CXXABI_H
 	int status;
-	size_t length = sizeof(buffer);
 
-	char* result = abi::__cxa_demangle(mangled_name.c_str(),
-		buffer, &length, &status);
+	char* result = abi::__cxa_demangle(mangled_name.c_str(), NULL, NULL, &status);
+	if(result != NULL)
+	{
+		demangled_name = result;
+		free(result);
+	}
 
 	if (status == 0)
 	{
-		demangled_name = result;
+		return demangled_name;
 	}
 	else if (status == -1)
 	{
-		BOX_WARNING("Demangle failed with "
-			"memory allocation error: " <<
-			mangled_name);
+		BOX_WARNING("Demangle failed with memory allocation error: " << mangled_name);
 	}
 	else if (status == -2)
 	{
 		// Probably non-C++ name, don't demangle
-		/*
-		BOX_WARNING("Demangle failed with "
-			"with invalid name: " <<
-			mangled_name);
-		*/
 	}
 	else if (status == -3)
 	{
-		BOX_WARNING("Demangle failed with "
-			"with invalid argument: " <<
-			mangled_name);
+		BOX_WARNING("Demangle failed with with invalid argument: " << mangled_name);
 	}
 	else
 	{
-		BOX_WARNING("Demangle failed with "
-			"with unknown error " << status <<
-			": " << mangled_name);
+		BOX_WARNING("Demangle failed with with unknown error " << status << ": " <<
+			mangled_name);
 	}
 #endif // HAVE_CXXABI_H
 
