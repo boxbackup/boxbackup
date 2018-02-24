@@ -390,23 +390,23 @@ lseek(int fildes, off_t offset, int whence)
 {
 	// random magic for lseek syscall, see /usr/src/lib/libc/sys/lseek.c
 	CHECK_FOR_FAKE_ERROR_COND(fildes, 0, SYS_lseek, -1);
+
 #ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_lseek(fildes, offset, whence);
+#elif defined HAVE_LSEEK_DUMMY_PARAM
+	off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, (int32_t)offset,
+		whence);
+#elif defined HAVE_LSEEK_64_BIT
+	off_t r = syscall(SYS_lseek, fildes, (int64_t)offset, whence);
 #else
-	#ifdef HAVE_LSEEK_DUMMY_PARAM
-		off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
-	#elif defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 32
-		// Don't bother trying to call SYS__llseek on 32 bit since it is
-		// fiddly and not needed for the tests
-		off_t r = syscall(SYS_lseek, fildes, (uint32_t)offset, whence);
-	#else
-		off_t r = syscall(SYS_lseek, fildes, offset, whence);
-	#endif
+	off_t r = syscall(SYS_lseek, fildes, (int32_t)offset, whence);
 #endif
+
 	if(r != -1)
 	{
 		intercept_filepos = r;
 	}
+
 	return r;
 }
 
