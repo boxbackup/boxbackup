@@ -23,17 +23,6 @@
 #define MAX_VERIFICATION_DEPTH		2
 #define CIPHER_LIST					"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
 
-// Macros to allow compatibility with OpenSSL 1.0 and 1.1 APIs. See
-// https://github.com/charybdis-ircd/charybdis/blob/release/3.5/libratbox/src/openssl_ratbox.h
-// for the gory details.
-#if defined(LIBRESSL_VERSION_NUMBER) || (OPENSSL_VERSION_NUMBER >= 0x10100000L) // OpenSSL >= 1.1
-#	define BOX_TLS_SERVER_METHOD TLS_server_method
-#	define BOX_TLS_CLIENT_METHOD TLS_client_method
-#else // OpenSSL < 1.1
-#	define BOX_TLS_SERVER_METHOD TLSv1_server_method
-#	define BOX_TLS_CLIENT_METHOD TLSv1_client_method
-#endif
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -78,7 +67,7 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 		::SSL_CTX_free(mpContext);
 	}
 
-	mpContext = ::SSL_CTX_new(AsServer ? BOX_TLS_SERVER_METHOD() : BOX_TLS_CLIENT_METHOD());
+	mpContext = ::SSL_CTX_new(AsServer?TLSv1_server_method():TLSv1_client_method());
 	if(mpContext == NULL)
 	{
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)

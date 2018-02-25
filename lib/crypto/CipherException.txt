@@ -16,4 +16,3 @@ PseudoRandNotAvailable				12
 EVPSetPaddingFailure				13
 RandomInitFailed					14	Failed to read from random device
 LengthRequestedTooLongForRandomHex	15
-AlreadyInTransform			16	Tried to initialise crypto when already in a transform
