@@ -15,9 +15,9 @@ set(ZLIB_VERSION    1.2.11)
 set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1)
 
 # Version of OpenSSL to download, build, and compile Box Backup against:
-set(OPENSSL_VERSION 1.0.2j)
+set(OPENSSL_VERSION 1.1.0g)
 # Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download:
-set(OPENSSL_HASH SHA256=e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431)
+set(OPENSSL_HASH SHA256=de4d501267da39310905cb6dc8c6121f7a2cad45a7707f76df828fe1b85073af)
 
 # Version of PCRE to download, build, and compile Box Backup against:
 set(PCRE_VERSION    8.39)
@@ -49,15 +49,21 @@ if(WIN32)
 		URL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 		URL_HASH ${OPENSSL_HASH}
 		DOWNLOAD_NO_PROGRESS 1
-		CONFIGURE_COMMAND perl Configure debug-VC-WIN32 no-asm --prefix=${install_dir}
-		COMMAND cmd /c ms\\do_ms.bat
+		CONFIGURE_COMMAND perl Configure debug-VC-WIN32 no-asm no-shared
+			--prefix=${install_dir}
+			--openssldir=etc
+		# Run tests before install, but don't make the main target depend on them, so that
+		# we don't have to run them whenever we build manually on Windows.
+		TEST_BEFORE_INSTALL 1
+		TEST_EXCLUDE_FROM_MAIN 1
 		# You would expect us to use nt.mak to compile a static library here, but mk1mf.pl uses the /MT[d]
 		# CRT in that case, which is incompatible with our dynamic runtime, /MD[d]. It seems that the libs
 		# built by ntdll.mak, which are compiled with /MD[d], are full libraries and not import libs,
 		# so we can link statically against them and still get a dynamic runtime.
 		BUILD_IN_SOURCE 1
-		BUILD_COMMAND   nmake /s /f ms\\nt.mak
-		INSTALL_COMMAND nmake /s /f ms\\nt.mak install
+		BUILD_COMMAND   nmake /s
+		TEST_COMMAND    nmake /s test
+		INSTALL_COMMAND nmake /s install
 	)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	ExternalProject_Add(openssl

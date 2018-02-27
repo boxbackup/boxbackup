@@ -338,7 +338,7 @@ int test(int argc, const char *argv[])
 	// Check rolling checksums
 	uint8_t *checkdata_blk = (uint8_t *)malloc(CHECKSUM_DATA_SIZE);
 	uint8_t *checkdata = checkdata_blk;
-	RAND_pseudo_bytes(checkdata, CHECKSUM_DATA_SIZE);
+	RAND_bytes(checkdata, CHECKSUM_DATA_SIZE);
 	for(int size = CHECKSUM_BLOCK_SIZE_BASE; size <= CHECKSUM_BLOCK_SIZE_LAST; ++size)
 	{
 		// Test skip-roll code
