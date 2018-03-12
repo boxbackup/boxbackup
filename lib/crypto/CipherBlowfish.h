@@ -41,7 +41,7 @@ public:
 	virtual std::string GetCipherName() const
 	{
 		std::ostringstream out;
-		out << "AES";
+		out << "Blowfish";
 		out << mKeyLength;
 		return out.str();
 	}

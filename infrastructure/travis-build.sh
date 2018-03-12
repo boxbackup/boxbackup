@@ -4,11 +4,15 @@ set -e
 set -x
 
 if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-	brew update
+	# No need to "brew update" first: https://docs.travis-ci.com/user/reference/osx/#Homebrew
+	# brew update
+
 	# Travis appears to have Boost and OpenSSL installed already:
 	# brew install boost ccache openssl
-	ls /usr/local /usr/local/opt /usr/local/opt/openssl
-	brew install ccache
+	ls /usr/local /usr/local/opt /usr/local/opt/openssl /usr/local/opt/openssl@1.1
+
+	# Use OSX builds to test OpenSSL 1.1 compatibility as well:
+	brew install ccache openssl@1.1
 fi
 
 ccache -s
@@ -20,7 +24,9 @@ if [ "$BUILD" = 'cmake' ]; then
 	fi
 
 	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-		EXTRA_ARGS="-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DBOOST_ROOT=/usr/local/opt/boost"
+		EXTRA_ARGS="
+			-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1
+			-DBOOST_ROOT=/usr/local/opt/boost"
 	fi
 
 	cd `dirname $0`
@@ -33,7 +39,10 @@ if [ "$BUILD" = 'cmake' ]; then
 	[ "$TEST" = "n" ] || ctest -C $TEST_TARGET -V
 else
 	if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-		EXTRA_ARGS="--with-ssl-lib=/usr/local/opt/openssl/lib --with-ssl-headers=/usr/local/opt/openssl/include --with-boost=/usr/local/opt/boost"
+		EXTRA_ARGS="
+			--with-ssl-lib=/usr/local/opt/openssl@1.1/lib
+			--with-ssl-headers=/usr/local/opt/openssl@1.1/include
+			--with-boost=/usr/local/opt/boost"
 	fi
 
 	cd `dirname $0`/..

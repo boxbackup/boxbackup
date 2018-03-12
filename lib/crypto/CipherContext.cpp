@@ -125,7 +125,6 @@ void CipherContext::Init(CipherContext::CipherFunction Function, const CipherDes
 			"Failed to initialise " << rDescription.GetFullName()
 			<< ": " << LogError("initialising cipher"));
 	}
-	UsePadding(mPaddingOn);
 	
 	try
 	{
@@ -179,7 +178,6 @@ void CipherContext::Reset()
 	}
 #endif
 	mWithinTransform = false;
-	mIV.clear();
 }
 
 
@@ -203,8 +201,7 @@ void CipherContext::Begin()
 		THROW_EXCEPTION(CipherException, AlreadyInTransform);
 	}
 
-	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL,
-		(const unsigned char *)(mIV.size() > 0 ? mIV.c_str() : NULL),
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL, NULL,
 		-1) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
@@ -391,14 +388,12 @@ void CipherContext::OldOpenSSLFinal(unsigned char *Buffer, int &rOutLengthOut)
 		}
 	}
 	// Reinitialise the cipher for the next time around
-	if(EVP_CipherInit_ex(&ctx, mpDescription->GetCipher(), NULL, NULL,
-		(const unsigned char *)(mIV.size() > 0 ? mIV.c_str() : NULL),
+	if(EVP_CipherInit_ex(&ctx, mpDescription->GetCipher(), NULL, NULL, NULL,
 		(mFunction == Encrypt) ? 1 : 0) != 1)
 	{
 		THROW_EXCEPTION(CipherException, EVPInitFailure)
 	}
 	mpDescription->SetupParameters(&ctx);
-	UsePadding(mPaddingOn);
 
 	// Update length for caller
 	rOutLengthOut = outLength;
@@ -458,6 +453,18 @@ int CipherContext::MaxOutSizeForInBufferSize(int InLength)
 // --------------------------------------------------------------------------
 int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *pInBuffer, int InLength)
 {
+	if(!mInitialised)
+	{
+		THROW_EXCEPTION(CipherException, NotInitialised)
+	}
+
+	// Warn if in a transformation
+	if(mWithinTransform)
+	{
+		BOX_WARNING("CipherContext::TransformBlock called when "
+			"context flagged as within a transform");
+	}
+
 	// Check output buffer size
 	if(OutLength < (InLength + EVP_CIPHER_CTX_block_size(BOX_OPENSSL_CTX(ctx))))
 	{
@@ -472,7 +479,11 @@ int CipherContext::TransformBlock(void *pOutBuffer, int OutLength, const void *p
 		}
 	}
 
-	Begin();
+	// Initialise the cipher context again
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL, NULL, -1) != 1)
+	{
+		THROW_EXCEPTION(CipherException, EVPInitFailure)
+	}
 	
 	// Do the entire block
 	int output_space_used = OutLength;
@@ -545,11 +556,8 @@ void CipherContext::SetIV(const void *pIV)
 			"flagged as within a transform");
 	}
 
-	mIV = std::string((const char *)pIV, GetIVLength());
-
 	// Set IV
-	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL,
-		(const unsigned char *)mIV.c_str(), -1) != 1)
+	if(EVP_CipherInit_ex(BOX_OPENSSL_CTX(ctx), NULL, NULL, NULL, (unsigned char *)pIV, -1) != 1)
 	{
 		THROW_EXCEPTION_MESSAGE(CipherException, EVPInitFailure,
 			"Failed to set IV for " << mCipherName << ": " << LogError(GetFunction()));
@@ -589,20 +597,19 @@ const void *CipherContext::SetRandomIV(int &rLengthOut)
 	}
 
 	// Get length of IV
-	uint8_t generated_iv[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
 	unsigned int ivLen = EVP_CIPHER_CTX_iv_length(BOX_OPENSSL_CTX(ctx));
-	if(ivLen > sizeof(generated_iv))
+	if(ivLen > sizeof(mGeneratedIV))
 	{
 		THROW_EXCEPTION(CipherException, IVSizeImplementationLimitExceeded)
 	}
 	
 	// Generate some random data
-	Random::Generate(generated_iv, ivLen);
-	SetIV(generated_iv);
+	Random::Generate(mGeneratedIV, ivLen);
+	SetIV(mGeneratedIV);
 
 	// Return the IV and it's length
 	rLengthOut = ivLen;
-	return mIV.c_str();
+	return mGeneratedIV;
 }
 
 

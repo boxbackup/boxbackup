@@ -274,81 +274,95 @@ bool test_filename_encoding()
 	SETUP_TEST_BACKUPSTORE();
 
 	// test some basics -- encoding and decoding filenames
+
+	// Make some filenames in various ways
+	BackupStoreFilenameClear fn1;
+	fn1.SetClearFilename(std::string("filenameXYZ"));
+	BackupStoreFilenameClear fn2(std::string("filenameXYZ"));
+	BackupStoreFilenameClear fn3(fn1);
+	TEST_THAT(fn1 == fn2);
+	TEST_THAT(fn1 == fn3);
+
+	// Check that it's been encrypted
+	std::string name(fn2.GetEncodedFilename());
+	TEST_THAT(name.find("name") == name.npos);
+
+	// Bung it in a stream, get it out in a Clear filename
 	{
-		// Make some filenames in various ways
-		BackupStoreFilenameClear fn1;
-		fn1.SetClearFilename(std::string("filenameXYZ"));
-		BackupStoreFilenameClear fn2(std::string("filenameXYZ"));
-		BackupStoreFilenameClear fn3(fn1);
-		TEST_THAT(fn1 == fn2);
-		TEST_THAT(fn1 == fn3);
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn4;
+		fn4.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn4.GetClearFilename() == "filenameXYZ");
+		TEST_THAT(fn4 == fn1);
+	}
 
-		// Check that it's been encrypted
-		std::string name(fn2.GetEncodedFilename());
-		TEST_THAT(name.find("name") == name.npos);
+	// Bung it in a stream, get it out in a server non-Clear filename (two of them into the same var)
+	{
+		BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		fno.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilename fn5;
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5 == fn1);
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5 == fno);
+	}
 
-		// Bung it in a stream, get it out in a Clear filename
+	// Same again with clear strings
+	{
+		BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		fno.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn5;
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5.GetClearFilename() == "filenameXYZ");
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5.GetClearFilename() == "pinglet dksfnsf jksjdf ");
+	}
+
+	// Test a very big filename
+	{
+		const char *fnr = "01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789";
+		BackupStoreFilenameClear fnLong(fnr);
+		CollectInBufferStream stream;
+		fnLong.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn9;
+		fn9.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn9.GetClearFilename() == fnr);
+		TEST_THAT(fn9 == fnLong);
+	}
+
+	// Test a filename which went wrong once
+	{
+		BackupStoreFilenameClear dodgy("content-negotiation.html");
+	}
+
+	// Test that we can decrypt filenames in a previously-encrypted directory, to detect
+	// regressions of the encryption setup:
+	{
+		FileStream dir_file("testfiles/encrypted.dir");
+		BackupStoreDirectory dir(dir_file);
+		TEST_EQUAL(2, dir.GetNumberOfEntries());
+		BackupStoreDirectory::Entry* en = dir.FindEntryByID(0x2);
+		TEST_THAT(en != NULL);
+		if(en)
 		{
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn4;
-			fn4.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn4.GetClearFilename() == "filenameXYZ");
-			TEST_THAT(fn4 == fn1);
-		}
-
-		// Bung it in a stream, get it out in a server non-Clear filename (two of them into the same var)
-		{
-			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			fno.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilename fn5;
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5 == fn1);
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5 == fno);
-		}
-
-		// Same again with clear strings
-		{
-			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			fno.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn5;
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5.GetClearFilename() == "filenameXYZ");
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5.GetClearFilename() == "pinglet dksfnsf jksjdf ");
-		}
-
-		// Test a very big filename
-		{
-			const char *fnr = "01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789";
-			BackupStoreFilenameClear fnLong(fnr);
-			CollectInBufferStream stream;
-			fnLong.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn9;
-			fn9.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn9.GetClearFilename() == fnr);
-			TEST_THAT(fn9 == fnLong);
-		}
-
-		// Test a filename which went wrong once
-		{
-			BackupStoreFilenameClear dodgy("content-negotiation.html");
+			BackupStoreFilenameClear clear(en->GetName());
+			TEST_EQUAL("lovely_directory", clear.GetClearFilename());
 		}
 	}
 

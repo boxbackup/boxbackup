@@ -94,10 +94,10 @@ private:
 	bool mInitialised;
 	bool mWithinTransform;
 	bool mPaddingOn;
+	uint8_t mGeneratedIV[CIPHERCONTEXT_MAX_GENERATED_IV_LENGTH];
 	CipherFunction mFunction;
 	std::string mCipherName;
 	const CipherDescription *mpDescription;
-	std::string mIV;
 };
 
 
