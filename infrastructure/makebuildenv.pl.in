@@ -628,7 +628,7 @@ __E
 		{
 			writetestfile("$mod/t-gdb",
 				"echo 'No debugger was detected by configure script'\n".
-				"exit 2");
+				"exit 2", $mod);
 		}
 	}
 	
