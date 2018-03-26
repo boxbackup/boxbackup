@@ -18,7 +18,7 @@ configuration:
 environment:
   VisualStudioVersion: 11.0
   Generator_Base: Visual Studio 11 2012
-  OPENSSL_VERSION: 1.0.2f
+  OPENSSL_VERSION: 1.1.0f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
@@ -39,6 +39,12 @@ init:
 
 # scripts that run after cloning repository (before the build step, not after!)
 install:
+  # work around sourceforge brokenness by temporarily download some files ourselves:
+  - ps: New-Item -ItemType Directory -Force -Path $env:TEMP\chocolatey\nsis.portable\3.02.0.20160720
+  - ps: invoke-webrequest -uri https://10gbps-io.dl.sourceforge.net/project/nsis/NSIS%203%20Pre-release/3.0rc2/nsis-3.0rc2.zip -outfile $env:TEMP\chocolatey\nsis.portable\3.02.0.20160720\download
+  - ps: New-Item -ItemType Directory -Force -Path ..\cmake\Download\boost
+  - ps: invoke-webrequest -uri http://download.openpkg.org/components/cache/boost/boost_1_62_0.tar.bz2 -outfile ..\cmake\Download\boost\boost_1_62_0.tar.bz2
+
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
@@ -106,5 +112,7 @@ deploy:
     on:
       branch:
         - master
-        - s3_support_merge
         - mark_master_builds_as_full_releases
+
+cache:
+  - '%TEMP%\chocolatey'

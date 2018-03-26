@@ -110,6 +110,11 @@ public:
 		return (type)mpBlock;
 	}
 	
+	int GetSize() const
+	{
+		return mBlockSize;
+	}
+
 	void Resize(int NewSize)
 	{
 		void *ptrn = ::realloc(mpBlock, NewSize);

@@ -50,7 +50,7 @@ void Random::Initialise()
 // --------------------------------------------------------------------------
 void Random::Generate(void *pOutput, int Length)
 {
-	if(RAND_pseudo_bytes((uint8_t*)pOutput, Length) == -1)
+	if(RAND_bytes((uint8_t*)pOutput, Length) == -1)
 	{
 		THROW_EXCEPTION(CipherException, PseudoRandNotAvailable)
 	}

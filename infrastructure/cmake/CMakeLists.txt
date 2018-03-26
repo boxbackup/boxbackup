@@ -363,6 +363,7 @@ target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUI
 
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
+include(CheckCXXSourceRuns)
 include(CheckFunctionExists)
 include(CheckIncludeFiles)
 include(CheckLibraryExists)
@@ -407,7 +408,26 @@ else()
 endif()
 
 # Link to OpenSSL
-find_package(OpenSSL REQUIRED)
+# Workaround for incorrect library suffixes searched by FindOpenSSL:
+# https://gitlab.kitware.com/cmake/cmake/issues/17604
+if(WIN32 AND MSVC)
+	find_package(OpenSSL)
+	set(OPENSSL_SSL_LIBRARY ${SSL_EAY_RELEASE})
+	set(OPENSSL_CRYPTO_LIBRARY ${LIB_EAY_RELEASE})
+	set(OPENSSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY} crypt32)
+	find_package_handle_standard_args(OpenSSL
+	REQUIRED_VARS
+		OPENSSL_SSL_LIBRARY
+		OPENSSL_CRYPTO_LIBRARY
+		OPENSSL_INCLUDE_DIR
+	VERSION_VAR
+		OPENSSL_VERSION
+	FAIL_MESSAGE
+		"Could NOT find OpenSSL, try to set the path to OpenSSL root folder in the system variable OPENSSL_ROOT_DIR"
+	)
+else()
+	find_package(OpenSSL REQUIRED)
+endif()
 include_directories(${OPENSSL_INCLUDE_DIR})
 target_link_libraries(lib_crypto PUBLIC ${OPENSSL_LIBRARIES})
 
@@ -463,7 +483,7 @@ move_file_if_exists(
 	"${boxconfig_cmake_h_dir}/BoxConfig.cmake.h.bak")
 
 foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m4)
-	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *AC[_A-Z]+\\(.*\\)$")
+	file(STRINGS "${base_dir}/infrastructure/m4/${m4_filename}" m4_functions REGEX "^ *(AC|AX|BOX)_[A-Z_]+\\(.*\\)$")
 	foreach(m4_function ${m4_functions})
 		if(DEBUG)
 			message(STATUS "Processing m4_function: ${m4_function}")
@@ -545,6 +565,22 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 				}
 				]=] "HAVE_${platform_var_name}")
 			file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_${platform_var_name}\n")
+		elseif(m4_function MATCHES "^ *BOX_CHECK_CXX_FLAG\\((-[A-Za-z_,=-]+)\\)")
+			if(DEBUG)
+				message(STATUS "Processing BOX_CHECK_CXX_FLAG: ${CMAKE_MATCH_1}")
+			endif()
+
+			if(NOT CMAKE_MATCH_1 STREQUAL "-Wall")
+				set(flag "${CMAKE_MATCH_1}")
+				string(TOLOWER "have_flag_${flag}" have_flag_var_name)
+				string(REGEX REPLACE "[^a-z_]" "_" have_flag_var_name ${have_flag_var_name})
+				string(REGEX REPLACE "__+" "_" have_flag_var_name ${have_flag_var_name})
+
+				CHECK_CXX_COMPILER_FLAG(${flag} ${have_flag_var_name})
+				if(${have_flag_var_name})
+					add_definitions("${flag}")
+				endif()
+			endif()
 		endif()
 	endforeach()
 
@@ -596,6 +632,7 @@ CHECK_CXX_SOURCE_COMPILES([=[
 	}
 	]=] "HAVE_STRUCT_STATFS_F_MNTONNAME")
 file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_STRUCT_STATFS_F_MNTONNAME\n")
+
 CHECK_CXX_SOURCE_COMPILES([=[
 	#include "BoxConfig.cmake.h"
 	#ifdef HAVE_SYS_PARAM_H
@@ -609,6 +646,7 @@ CHECK_CXX_SOURCE_COMPILES([=[
 	}
 	]=] "HAVE_STRUCT_STATVFS_F_MNTONNAME")
 file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_STRUCT_STATVFS_F_MNTONNAME\n")
+
 if(HAVE_STRUCT_STATFS_F_MNTONNAME OR
 	HAVE_STRUCT_STATVFS_F_MNTONNAME OR
 	HAVE_STRUCT_MNTENT_MNT_DIR OR
@@ -631,6 +669,34 @@ if(RANDOM_DEVICE)
 endif()
 file(APPEND "${boxconfig_h_file}" "#cmakedefine RANDOM_DEVICE \"${RANDOM_DEVICE}\"\n")
 file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_RANDOM_DEVICE\n")
+
+# Build an intermediate version of BoxConfig.cmake.h for use in the following tests:
+configure_file("${boxconfig_h_file}" "${boxconfig_cmake_h_dir}/BoxConfig.cmake.h")
+
+# Emulate ax_func_syscall.m4: Autoconf's AC_CHECK_FUNC (which we emulate above,
+# using check_function_exists) defines the function when testing for its
+# presence, so HAVE___SYSCALL will be true even if __syscall has no definition
+# in the system libraries, and this is precisely the case that we want to test
+# for, so now we test whether a test program compiles with no explicit
+# definition (only the system headers) and if that fails, we set
+# HAVE___SYSCALL_NEED_DEFN to 1.
+
+CHECK_CXX_SOURCE_COMPILES(
+	[=[
+		#include "BoxConfig.cmake.h"
+
+		#ifdef HAVE_SYS_SYSCALL_H
+		#	include <sys/syscall.h>
+		#endif
+
+		int main()
+		{
+			__syscall(SYS_exit, 0);
+			return 0;
+		}
+	]=] HAVE___SYSCALL_NO_DEFN)
+set(HAVE___SYSCALL_NEED_DEFN !HAVE___SYSCALL_NO_DEFN)
+file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE___SYSCALL_NEED_DEFN\n")
 
 # Build an intermediate version of BoxConfig.cmake.h for use in the following tests:
 configure_file("${boxconfig_h_file}" "${boxconfig_cmake_h_dir}/BoxConfig.cmake.h")
@@ -670,6 +736,71 @@ foreach(struct_member_name "struct ucred.uid" "struct ucred.cr_uid")
 		]=] "HAVE_${platform_var_name}")
 	file(APPEND "${boxconfig_h_file}" "#cmakedefine HAVE_${platform_var_name}\n")
 endforeach()
+
+function(AX_TRY_RUN_FD code var)
+	CHECK_CXX_SOURCE_RUNS([=[
+		#include "BoxConfig.cmake.h"
+		#include <fcntl.h>
+		#include <unistd.h>
+		#include <sys/syscall.h>
+		#include <sys/types.h>
+
+		#ifdef HAVE___SYSCALL_NEED_DEFN
+		extern "C" off_t __syscall(quad_t number, ...);
+		#endif
+
+		#ifdef HAVE___SYSCALL // always use it if we have it
+		#	undef syscall
+		#	define syscall __syscall
+		#endif
+
+		int main()
+		{
+			int fd = creat("lseektest", 0600);
+			int res = 1;
+			if(fd>=0)
+			{
+				${code}
+				close(fd);
+			}
+			unlink("lseektest");
+			return res;
+		}
+		]=] ${var})
+	file(APPEND "${boxconfig_h_file}" "#cmakedefine ${var}\n")
+endfunction()
+
+AX_TRY_RUN_FD(
+	[=[
+		// This test tries first to seek to position 0, with NO "dummy
+		// argument". If lseek does actually require a dummy argument,
+		// then it will eat SEEK_SET for the offset and try to use 99
+		// as whence, which is invalid, so res will be 0, the program
+		// will return 0 and we will define HAVE_LSEEK_DUMMY_PARAM
+		// (whew! that took 1 hour to figure out) The "dummy argument"
+		// probably means that it takes a 64-bit offset.
+		res = (syscall(SYS_lseek, fd, (int32_t)10, SEEK_SET, 99) == 10) ? 2 : 0;
+	]=] HAVE_LSEEK_DUMMY_PARAM)
+
+AX_TRY_RUN_FD(
+	[=[
+		// Try to seek to a position that requires a 64-bit
+		// representation, and check the return value, which is the
+		// current position.
+		if(syscall(SYS_lseek, fd, (int64_t)5, SEEK_SET) != 5)
+		{
+			res = 2;
+		}
+		else if(syscall(SYS_lseek, fd, (int64_t)10, SEEK_CUR) != 15)
+		{
+			res = 3;
+		}
+		else
+		{
+			res = 0;
+		}
+	]=] HAVE_LSEEK_64_BIT)
+
 set(CMAKE_REQUIRED_INCLUDES "")
 
 # Build the final version of BoxConfig.cmake.h, as a temporary file.
