@@ -96,7 +96,6 @@
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION 12
 #define SHORT_TIMEOUT 5000
 #define BACKUP_ERROR_DELAY_SHORTENED 10
-#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
 
 void wait_for_backup_operation(const char* message)
 {
@@ -408,23 +407,6 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 	bbackupd.InitCrypto();
 
 	return true;
-}
-
-bool kill_running_daemons()
-{
-	bool success = true;
-
-	if(FileExists("testfiles/bbstored.pid"))
-	{
-		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
-	}
-
-	if(FileExists("testfiles/bbackupd.pid"))
-	{
-		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
-	}
-
-	return success;
 }
 
 bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_files = true,
