@@ -43,7 +43,8 @@ static void WriteNewIndex(IOStream &rDiff, int64_t DiffNumBlocks, FromIndexEntry
 //		Created: 16/1/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &rFrom, IOStream &rOut)
+void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &rFrom, IOStream &rOut,
+	bool block_indexes_only)
 {
 	// Read and copy the header.
 	file_StreamFormat hdr;
@@ -57,6 +58,7 @@ void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &r
 	}
 	// Copy
 	rOut.Write(&hdr, sizeof(hdr));
+
 	// Copy over filename and attributes
 	// BLOCK
 	{
@@ -96,41 +98,26 @@ void BackupStoreFile::CombineFile(IOStream &rDiff, IOStream &rDiff2, IOStream &r
 	// Allocate memory for the block index of the From file
 	int64_t fromNumBlocks = box_ntoh64(fromHdr.mNumBlocks);
 	// NOTE: An extra entry is required so that the length of the last block can be calculated
-	FromIndexEntry *pFromIndex = (FromIndexEntry*)::malloc((fromNumBlocks+1) * sizeof(FromIndexEntry));
-	if(pFromIndex == 0)
-	{
-		throw std::bad_alloc();
-	}
+	MemoryBlockGuard<FromIndexEntry *> guard((fromNumBlocks+1) * sizeof(FromIndexEntry));
+	FromIndexEntry *pFromIndex = guard.GetPtr();
 	
-	try
+	// Load the index from the From file, calculating the offsets in the
+	// file as we go along, and enforce that everything should be present.
+	LoadFromIndex(rFrom, pFromIndex, fromNumBlocks);
+
+	// Read in the block index of the Diff file in small chunks, and output data
+	// for each block, either from this file, or the other file.
+	int64_t diffNumBlocks = box_ntoh64(hdr.mNumBlocks);
+
+	if(!block_indexes_only)
 	{
-		// Load the index from the From file, calculating the offsets in the
-		// file as we go along, and enforce that everything should be present.
-		LoadFromIndex(rFrom, pFromIndex, fromNumBlocks);
-		
-		// Read in the block index of the Diff file in small chunks, and output data
-		// for each block, either from this file, or the other file.
-		int64_t diffNumBlocks = box_ntoh64(hdr.mNumBlocks);
-		CopyData(rDiff /* positioned at start of data */, rDiff2, diffNumBlocks, rFrom, pFromIndex, fromNumBlocks, rOut);
-		
-		// Read in the block index again, and output the new block index, simply
-		// filling in the sizes of blocks from the old file.
-		WriteNewIndex(rDiff, diffNumBlocks, pFromIndex, fromNumBlocks, rOut);
-		
-		// Free buffers
-		::free(pFromIndex);
-		pFromIndex = 0;
+		CopyData(rDiff /* positioned at start of data */, rDiff2, diffNumBlocks,
+			rFrom, pFromIndex, fromNumBlocks, rOut);
 	}
-	catch(...)
-	{
-		// Clean up
-		if(pFromIndex != 0)
-		{
-			::free(pFromIndex);
-			pFromIndex = 0;
-		}	
-		throw;
-	}
+
+	// Read in the block index again, and output the new block index, simply
+	// filling in the sizes of blocks from the old file.
+	WriteNewIndex(rDiff, diffNumBlocks, pFromIndex, fromNumBlocks, rOut);
 }
 
 

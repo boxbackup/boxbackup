@@ -204,16 +204,24 @@ DeleteFile	33	Command(Success)
 GetBlockIndexByID	34	Command(Success)
 	int64		ObjectID
 
-	# stream of the block index follows the reply
-	# returns an error if the object didn't exist
+	# Stream of the block index follows the reply. Returns an error if the object didn't exist.
 
 
 GetBlockIndexByName	35	Command(Success)
 	int64		InDirectory
 	Filename	Filename
 
-	# Success object contains the found ID -- or 0 if the entry wasn't found in the directory
-	# stream of the block index follows the reply if found ID != 0
+	# This command returns the block index that that file would have if it was stored as a
+	# complete file. For files which are stored complete (not depending on any older/newer
+	# version) the block index can be read directly from disk. For files stored as patches
+	# (older versions in RaidBackupFileSystems, and newer versions in S3BackupFileSystems)i
+	# this command applies each patch in the chain in turn, to assemble the block index that
+	# the specified version would have, if it were stored as a complete file, or equivalently
+	# if it were downloaded using GetFile.
+	#
+	# Success object contains the object ID of the found object, or 0 if no entry with this
+	# name was found in the directory.
+	# Stream of the block index follows the reply if found ID != 0.
 
 
 UndeleteFile	36	Command(Success)

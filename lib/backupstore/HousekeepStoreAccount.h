@@ -100,6 +100,7 @@ private:
 
 	// Deltas from deletion
 	int64_t mBlocksUsedDelta;
+	int64_t mBlocksInCurrentFilesDelta;
 	int64_t mBlocksInOldFilesDelta;
 	int64_t mBlocksInDeletedFilesDelta;
 	int64_t mBlocksInDirectoriesDelta;

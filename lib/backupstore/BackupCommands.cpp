@@ -781,12 +781,18 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByID::DoCommand(
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolGetBlockIndexByName::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
-//		Purpose: Get the block index from a file, by name within a directory
+//		Name:    BackupProtocolGetBlockIndexByName::DoCommand(
+//		         BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Get the block index from a file, by name within a
+//		         directory. Unlike BackupProtocolGetBlockIndexByID,
+//		         this version can recreate the block index of the
+//		         latest version on S3 stores, by simulating combining
+//		         patches.
 //		Created: 19/1/04
 //
 // --------------------------------------------------------------------------
-std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
 {
 	CHECK_PHASE(Phase_Commands)
 
@@ -817,10 +823,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetBlockIndexByName::DoComman
 	}
 
 	// Open the file
-	std::auto_ptr<IOStream> stream(rContext.OpenObject(objectID));
-
-	// Move the file pointer to the block index
-	BackupStoreFile::MoveStreamPositionToBlockIndex(*stream);
+	std::auto_ptr<IOStream> stream(rContext.GetBlockIndexReconstructed(objectID, mInDirectory));
 
 	// Return the stream to the client
 	rProtocol.SendStreamAfterCommand(stream);

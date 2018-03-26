@@ -1528,16 +1528,7 @@ std::auto_ptr<IOStream> BackupStoreContext::OpenObject(int64_t ObjectID)
 	return mpFileSystem->GetObject(ObjectID);
 }
 
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    BackupStoreContext::GetFile()
-//		Purpose: Retrieve a file from the store
-//		Created: 2015/08/10
-//
-// --------------------------------------------------------------------------
-std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t InDirectory)
+std::vector<int64_t> BackupStoreContext::GetPatchChain(int64_t ObjectID, int64_t InDirectory)
 {
 	CHECK_FILESYSTEM_INITIALISED();
 
@@ -1553,7 +1544,7 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 	}
 
 	// The result
-	std::auto_ptr<IOStream> stream;
+	std::vector<int64_t> patch_chain;
 
 	// Does this depend on anything?
 	if(pfileEntry->GetDependsOnObject() != 0)
@@ -1563,32 +1554,46 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 		// the complete object, and rewrites the old version as a patch, but with S3 stores
 		// that logic cannot be implemented in S3, so the new version is simply stored as a
 		// patch instead).
-		std::vector<int64_t> patchChain;
 		int64_t id = ObjectID;
 		BackupStoreDirectory::Entry *en = 0;
 		do
 		{
-			patchChain.push_back(id);
+			patch_chain.push_back(id);
 			en = rdir.FindEntryByID(id);
 			if(en == 0)
 			{
 				THROW_EXCEPTION_MESSAGE(BackupStoreException,
 					PatchChainInfoBadInDirectory,
-					"Object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" in dir " <<
-					BOX_FORMAT_OBJECTID(InDirectory) <<
-					" for account " <<
-					BOX_FORMAT_ACCOUNT(mClientID) <<
-					" references object " <<
-					BOX_FORMAT_OBJECTID(id) <<
+					"Object " << BOX_FORMAT_OBJECTID(ObjectID) <<
+					" in dir " << BOX_FORMAT_OBJECTID(InDirectory) <<
+					" for account " << BOX_FORMAT_ACCOUNT(mClientID) <<
+					" references object " << BOX_FORMAT_OBJECTID(id) <<
 					" which does not exist in dir");
 			}
 			id = en->GetDependsOnObject();
 		}
 		while(en != 0 && id != 0);
+	}
 
-		stream = mpFileSystem->GetFilePatch(ObjectID, patchChain);
+	return patch_chain;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::GetFile()
+//		Purpose: Retrieve a file from the store
+//		Created: 2015/08/10
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t InDirectory)
+{
+	std::vector<int64_t> patch_chain = GetPatchChain(ObjectID, InDirectory);
+	std::auto_ptr<IOStream> stream;
+
+	if(patch_chain.size() > 0)
+	{
+		stream = mpFileSystem->GetFilePatch(ObjectID, patch_chain);
 	}
 	else
 	{
@@ -1614,15 +1619,44 @@ std::auto_ptr<IOStream> BackupStoreContext::GetFile(int64_t ObjectID, int64_t In
 			stream = t;
 		}
 
-		// Object will be deleted when the stream is deleted,
-		// so can release the object auto_ptr here to avoid
-		// premature deletion
+		// Object will be deleted when the stream is deleted, so we must release the
+		// auto_ptr here to avoid premature deletion when it goes out of scope.
 		object.release();
 	}
 
 	return stream;
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupStoreContext::GetBlockIndexReconstructed()
+//		Purpose: Returns the block index that this file (ObjectID)
+//		         would have if it was stored as a complete file. For
+//		         files which are stored as patches, it applies each
+//		         patch in the chain in turn, to assemble the block
+//		         index that the specified version would have, if it
+//		         were stored as a complete file, or equivalently if
+//		         it were downloaded using GetFile.
+//		Created: 2018/02/20
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<IOStream> BackupStoreContext::GetBlockIndexReconstructed(int64_t ObjectID,
+	int64_t InDirectory)
+{
+	std::vector<int64_t> patch_chain = GetPatchChain(ObjectID, InDirectory);
+	if(patch_chain.size() == 0)
+	{
+		std::auto_ptr<IOStream> blockIndex = mpFileSystem->GetObject(ObjectID);
+		// Move the file pointer to the block index
+		BackupStoreFile::MoveStreamPositionToBlockIndex(*blockIndex);
+		return blockIndex;
+	}
+	else
+	{
+		return mpFileSystem->GetBlockIndexReconstructed(ObjectID, patch_chain);
+	}
+}
 
 // --------------------------------------------------------------------------
 //

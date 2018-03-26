@@ -116,10 +116,12 @@ public:
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID) = 0;
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain);
+	virtual std::auto_ptr<IOStream> GetBlockIndexReconstructed(int64_t ObjectID,
+		std::vector<int64_t>& rPatchChain);
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
 	virtual void DeleteObjectUnknown(int64_t ObjectID) = 0;
-	virtual bool CanMergePatches() = 0;
+	virtual bool CanMergePatchesEasily() = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID) = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
@@ -264,7 +266,7 @@ public:
 		DeleteObjectUnknown(ObjectID);
 	}
 	virtual void DeleteObjectUnknown(int64_t ObjectID);
-	virtual bool CanMergePatches() { return true; }
+	virtual bool CanMergePatchesEasily() { return true; }
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID);
 	std::auto_ptr<BackupFileSystem::Transaction>
@@ -391,17 +393,11 @@ public:
 	{
 		return (bytes + S3_NOTIONAL_BLOCK_SIZE - 1) / S3_NOTIONAL_BLOCK_SIZE;
 	}
-	virtual bool CanMergePatches() { return false; }
+	virtual bool CanMergePatchesEasily() { return true; }
 	std::auto_ptr<BackupFileSystem::Transaction>
-		CombineFile(int64_t OlderPatchID, int64_t NewerFileID)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
+		CombineFile(int64_t OlderPatchID, int64_t NewerFileID);
 	std::auto_ptr<BackupFileSystem::Transaction>
-		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
+		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID);
 	virtual std::string GetAccountIdentifier();
 	virtual int GetAccountID() { return S3_FAKE_ACCOUNT_ID; }
 	virtual int64_t GetFileSizeInBlocks(int64_t ObjectID);
@@ -413,6 +409,8 @@ public:
 
 protected:
 	virtual void TryGetLock();
+	std::auto_ptr<BackupFileSystem::Transaction>
+		CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch);
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
 	virtual std::auto_ptr<IOStream> GetTemporaryFileStream(int64_t id);
 

@@ -56,6 +56,7 @@ HousekeepStoreAccount::HousekeepStoreAccount(BackupFileSystem& FileSystem,
 	  mBlocksInDeletedFiles(0),
 	  mBlocksInDirectories(0),
 	  mBlocksUsedDelta(0),
+	  mBlocksInCurrentFilesDelta(0),
 	  mBlocksInOldFilesDelta(0),
 	  mBlocksInDeletedFilesDelta(0),
 	  mBlocksInDirectoriesDelta(0),
@@ -231,6 +232,10 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 	{
 		mBlocksUsedDelta = (0 - pInfo->GetBlocksUsed());
 	}
+	if(mBlocksInCurrentFilesDelta < (0 - pInfo->GetBlocksInCurrentFiles()))
+	{
+		mBlocksInCurrentFilesDelta = (0 - pInfo->GetBlocksInCurrentFiles());
+	}
 	if(mBlocksInOldFilesDelta < (0 - pInfo->GetBlocksInOldFiles()))
 	{
 		mBlocksInOldFilesDelta = (0 - pInfo->GetBlocksInOldFiles());
@@ -246,6 +251,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// Update the usage counts in the store
 	pInfo->ChangeBlocksUsed(mBlocksUsedDelta);
+	pInfo->ChangeBlocksInCurrentFiles(mBlocksInCurrentFilesDelta);
 	pInfo->ChangeBlocksInOldFiles(mBlocksInOldFilesDelta);
 	pInfo->ChangeBlocksInDeletedFiles(mBlocksInDeletedFilesDelta);
 	pInfo->ChangeBlocksInDirectories(mBlocksInDirectoriesDelta);
@@ -343,8 +349,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			if((enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
 				&& (en->IsDeleted() || en->IsOld()))
 			{
-				if(!mrFileSystem.CanMergePatches() &&
-					en->GetDependsOnObject() != 0)
+				if(!mrFileSystem.CanMergePatchesEasily() &&
+					en->GetRequiredByObject() != 0)
 				{
 					BOX_ERROR("Cannot delete file " <<
 						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
@@ -352,7 +358,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 						"another file depends on it (" <<
 						BOX_FORMAT_OBJECTID(en->GetDependsOnObject()) <<
 						" and the filesystem does not "
-						"support merging patches");
+						"support merging patches easily");
 					continue;
 				}
 
@@ -418,15 +424,15 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			// or deleted:
 			if(en->IsOld() || en->IsDeleted())
 			{
-				if(!mrFileSystem.CanMergePatches() &&
-					en->GetDependsOnObject() != 0)
+				if(!mrFileSystem.CanMergePatchesEasily() &&
+					en->GetRequiredByObject() != 0)
 				{
 					BOX_TRACE("Cannot remove old/deleted file " <<
 						BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
 						" now, because another file depends on it (" <<
 						BOX_FORMAT_OBJECTID(en->GetDependsOnObject()) <<
 						" and the filesystem does not support merging "
-						"patches");
+						"patches easily");
 					continue;
 				}
 
@@ -681,7 +687,7 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 	int64_t deletedFileSizeInBlocks = 0;
 
 	// A pointer to an object which requires committing if the directory save goes OK
-	std::auto_ptr<BackupFileSystem::Transaction> apAdjustedEntry;
+	std::auto_ptr<BackupFileSystem::Transaction> ap_combine_files_trans;
 
 	// BLOCK
 	{
@@ -739,89 +745,102 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		// If the entry is involved in a chain of patches, it needs to be handled a bit
 		// more carefully.
 
+		BackupStoreDirectory::Entry *p_required = NULL, *p_requirer = NULL;
+
+		if(pentry->GetDependsOnObject() != 0)
+		{
+			p_required = rDirectory.FindEntryByID(pentry->GetDependsOnObject());
+			if(p_required == NULL ||
+				p_required->GetRequiredByObject() != ObjectID)
+			{
+				THROW_EXCEPTION(BackupStoreException,
+					PatchChainInfoBadInDirectory);
+			}
+		}
+
+		if(pentry->GetRequiredByObject() != 0)
+		{
+			p_requirer = rDirectory.FindEntryByID(pentry->GetRequiredByObject());
+			if(p_requirer == 0 || p_requirer->GetDependsOnObject() != ObjectID)
+			{
+				THROW_EXCEPTION(BackupStoreException,
+					PatchChainInfoBadInDirectory);
+			}
+		}
+
 		if(pentry->GetDependsOnObject() != 0 && pentry->GetRequiredByObject() == 0)
 		{
-			// This entry is a patch from a newer entry. Just need to update the info on that entry.
-			BackupStoreDirectory::Entry *pnewer = rDirectory.FindEntryByID(pentry->GetDependsOnObject());
-			if(pnewer == 0 || pnewer->GetRequiredByObject() != ObjectID)
-			{
-				THROW_EXCEPTION(BackupStoreException, PatchChainInfoBadInDirectory);
-			}
-			// Change the info in the newer entry so that this no longer points to this entry
-			pnewer->SetRequiredByObject(0);
+			// This entry is a patch with no dependencies, so we can just delete it and
+			// update the dependency info on the directory entry.
+			// Change the info in the entry that this entry depends on, so that it no
+			// longer points back to this entry:
+			p_required->SetRequiredByObject(0);
 		}
 		else if(pentry->GetRequiredByObject() != 0)
 		{
 			// We should have checked whether the BackupFileSystem can merge patches
 			// before this point:
-			ASSERT(mrFileSystem.CanMergePatches());
+			ASSERT(mrFileSystem.CanMergePatchesEasily());
 
-			BackupStoreDirectory::Entry *polder = rDirectory.FindEntryByID(pentry->GetRequiredByObject());
 			if(pentry->GetDependsOnObject() == 0)
 			{
-				// There exists an older version which depends on this
-				// one. Need to combine the two over that one.
+				// This object is at the end of a patch chain: it is a complete
+				// file, but there exists another object which depends on it. Need
+				// to combine the two, replacing that one (so that we can delete
+				// this one).
 
-				// Adjust the other entry in the directory
-				if(polder == 0 || polder->GetDependsOnObject() != ObjectID)
-				{
-					THROW_EXCEPTION(BackupStoreException,
-						PatchChainInfoBadInDirectory);
-				}
-				// Change the info in the older entry so that this no
-				// longer points to this entry.
-				polder->SetDependsOnObject(0);
+				// Adjust the other entry in the directory, so that it no longer
+				// points to this entry:
+				p_requirer->SetDependsOnObject(0);
 
 				// Actually combine the patch and file, but don't commit
 				// the resulting file yet.
-				apAdjustedEntry = mrFileSystem.CombineFile(
+				ap_combine_files_trans = mrFileSystem.CombineFile(
 					pentry->GetRequiredByObject(), ObjectID);
 			}
 			else
 			{
-				// This entry is in the middle of a chain, and two
-				// patches need combining.
+				// This entry (pentry, ObjectID) is in the middle of a chain, and
+				// two patches need combining.
 
 				// First, adjust the directory entries
-				BackupStoreDirectory::Entry *pnewer =
-					rDirectory.FindEntryByID(pentry->GetDependsOnObject());
-				if(pnewer == 0 ||
-					pnewer->GetRequiredByObject() != ObjectID ||
-					polder == 0 ||
-					polder->GetDependsOnObject() != ObjectID)
+				if(p_required == 0 ||
+					p_required->GetRequiredByObject() != ObjectID)
 				{
 					THROW_EXCEPTION(BackupStoreException,
 						PatchChainInfoBadInDirectory);
 				}
 				// Remove the middle entry from the linked list by simply using the values from this entry
-				pnewer->SetRequiredByObject(pentry->GetRequiredByObject());
-				polder->SetDependsOnObject(pentry->GetDependsOnObject());
+				p_required->SetRequiredByObject(pentry->GetRequiredByObject());
+				p_requirer->SetDependsOnObject(pentry->GetDependsOnObject());
 
 				// Actually combine the patch and file, but don't commit
 				// the resulting file yet.
-				apAdjustedEntry = mrFileSystem.CombineDiffs(
+				ap_combine_files_trans = mrFileSystem.CombineDiffs(
 					pentry->GetRequiredByObject(), ObjectID);
 			}
 
 			// COMMON CODE to both cases. The file will be committed later,
-			// when the directory is safely commited.
+			// after the updated directory is safely committed.
 
 			// Work out the adjusted size
-			int64_t newSize = apAdjustedEntry->GetNumBlocks();
-			int64_t sizeDelta = newSize - polder->GetSizeInBlocks();
+			int64_t newSize = ap_combine_files_trans->GetNumBlocks();
+			int64_t sizeDelta = newSize - p_requirer->GetSizeInBlocks();
 			mBlocksUsedDelta += sizeDelta;
-			if(polder->IsDeleted())
+			if(p_requirer->IsDeleted())
 			{
 				mBlocksInDeletedFilesDelta += sizeDelta;
 			}
-			if(polder->IsOld())
+			if(p_requirer->IsOld())
 			{
 				mBlocksInOldFilesDelta += sizeDelta;
 			}
-			polder->SetSizeInBlocks(newSize);
+			if(!p_requirer->IsOld() && !p_requirer->IsDeleted())
+			{
+				mBlocksInCurrentFilesDelta += sizeDelta;
+			}
+			p_requirer->SetSizeInBlocks(newSize);
 		}
-
-		// pentry no longer valid
 	}
 
 	// Delete it from the directory
@@ -842,11 +861,11 @@ BackupStoreRefCountDatabase::refcount_t HousekeepStoreAccount::DeleteFile(
 		UpdateDirectorySize(rDirectory, original_size, new_size);
 	}
 
-	// Commit any new adjusted entry
-	if(apAdjustedEntry.get() != 0)
+	// Commit the combined file to permanent storage
+	if(ap_combine_files_trans.get() != 0)
 	{
-		apAdjustedEntry->Commit();
-		apAdjustedEntry.reset(); // delete it now
+		ap_combine_files_trans->Commit();
+		ap_combine_files_trans.reset(); // delete it now
 	}
 
 	// Drop reference count by one. Must now be zero, to delete the file.

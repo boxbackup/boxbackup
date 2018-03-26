@@ -212,6 +212,51 @@ std::auto_ptr<IOStream> BackupFileSystem::GetFilePatch(int64_t ObjectID,
 }
 
 
+std::auto_ptr<IOStream> BackupFileSystem::GetBlockIndexReconstructed(int64_t ObjectID,
+	std::vector<int64_t>& rPatchChain)
+{
+	// File exists, but is a patch from a newer/older version of the same file. Generate the
+	// block index of the requested version, as though reconstructing it for restoration.
+
+	// The last entry in the chain is the full file, the others are patches to/from it.
+	// Open the full file first:
+	std::auto_ptr<IOStream> from(GetFile(rPatchChain[rPatchChain.size() - 1]));
+
+	// Then, for each patch in the chain, do a combine
+	for(int p = ((int)rPatchChain.size()) - 2; p >= 0; --p)
+	{
+		// ID of patch
+		int64_t patchID = rPatchChain[p];
+
+		// TODO: we shouldn't have to fetch the entire file just to build its block index
+		// on S3 stores.
+		std::auto_ptr<IOStream> diff(GetFile(patchID));
+
+		// Store the reconstructed metadata (not block data) in a buffer in memory,
+		// instead of a file on disk, as it's not too large.
+		std::auto_ptr<CollectInBufferStream> combined(new CollectInBufferStream());
+
+		// Do the combining. CombineFile takes two copies of the diff file, but doesn't
+		// use the second one if block_indexes_only is true, as here:
+		BackupStoreFile::CombineFile(*diff, *diff, *from, *combined,
+			true); // block_indexes_only
+
+		// Prepare to start reading back the combined file, as the new "from" file:
+		combined->SetForReading();
+
+		// Then shuffle round for the next go
+		from->Close();
+		from.reset(combined.release());
+	}
+
+	// Although "from" does not contain a complete file, it contains a proper file header, and
+	// ends with a proper block index, so MoveStreamPositionToBlockIndex() does the right thing
+	// even though the middle part (the actual block data) is missing:
+	BackupStoreFile::MoveStreamPositionToBlockIndex(*from);
+	return from;
+}
+
+
 void BackupFileSystem::RefCountDatabaseBeforeCommit(BackupStoreRefCountDatabase& refcount_db)
 {
 	ASSERT(&refcount_db == mapPotentialRefCountDatabase.get());
@@ -1485,7 +1530,8 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 				FileDownloadedIncorrectly, "Downloaded invalid file from "
 				"S3: expected MD5 digest to be " <<
 				response.GetHeaders().GetHeaderValue("etag") << " but "
-				"it was actually " << digest);
+				"it was actually " << digest << " (saved as " <<
+				local_path << ")");
 		}
 	}
 	else if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
@@ -1829,6 +1875,74 @@ S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	S3PutFileCompleteTransaction* pTrans = new S3PutFileCompleteTransaction(*this,
 		mrClient, GetFileURI(ObjectID), validator);
 	return std::auto_ptr<BackupFileSystem::Transaction>(pTrans);
+}
+
+
+std::auto_ptr<BackupFileSystem::Transaction>
+S3BackupFileSystem::CombineFileOrDiff(int64_t OlderObjectID, int64_t NewerPatchID, bool OlderIsPatch)
+{
+	// This normally only happens during housekeeping, which is using a temporary
+	// refcount database, so insist on that for now:
+	BackupStoreRefCountDatabase* pRefCount = mapPotentialRefCountDatabase.get();
+	ASSERT(pRefCount != NULL);
+	ASSERT(mapPermanentRefCountDatabase.get() == NULL ||
+		mapPermanentRefCountDatabase->IsReadOnly());
+
+	// Open the newer object (the patch file to be overwritten) twice:
+	std::auto_ptr<IOStream> ap_newer_1 = GetFile(NewerPatchID);
+	std::auto_ptr<IOStream> ap_newer_2 = GetFile(NewerPatchID);
+
+	// Open the older object (the complete file or patch, to be deleted):
+	std::auto_ptr<IOStream> ap_older = GetFile(OlderObjectID);
+
+	// And open a temporary file to store the resulting combined object, which will be uploaded
+	// to replace the "older" object:
+	std::auto_ptr<IOStream> ap_combined_file = GetTemporaryFileStream(OlderObjectID);
+
+	if(OlderIsPatch)
+	{
+		// Combine two adjacent patches (forward diffs) into a single one object:
+		BackupStoreFile::CombineDiffs(*ap_older, *ap_newer_1, *ap_newer_2,
+			*ap_combined_file);
+	}
+	else
+	{
+		// Combine an older object (complete file patch) with the subsequent patch:
+		BackupStoreFile::CombineFile(*ap_newer_1, *ap_newer_2, *ap_older,
+			*ap_combined_file);
+	}
+
+	ap_combined_file->Seek(0, IOStream::SeekType_Absolute);
+
+	ASSERT(BackupStoreFile::VerifyEncodedFileFormat(*ap_combined_file));
+	ap_combined_file->Seek(0, IOStream::SeekType_Absolute);
+
+	S3PutFileCompleteTransaction* p_trans = new S3PutFileCompleteTransaction(*this,
+		mrClient, GetFileURI(NewerPatchID), *ap_combined_file);
+
+	// The replacement for the "old" object will be committed later, when the directory is
+	// safely committed.
+	return std::auto_ptr<BackupFileSystem::Transaction>(p_trans);
+}
+
+
+// The order of the arguments appears to be reversed here, compared to the prototype, but this is
+// deliberate as it allows HousekeepStoreAccount to call it the same way as
+// RaidBackupFileSystem::CombineFile().
+std::auto_ptr<BackupFileSystem::Transaction>
+S3BackupFileSystem::CombineFile(int64_t NewerPatchID, int64_t OlderFileID)
+{
+	return CombineFileOrDiff(OlderFileID, NewerPatchID, false); // !OlderIsPatch
+}
+
+
+// The order of the arguments appears to be reversed here, compared to the prototype, but this is
+// deliberate as it allows HousekeepStoreAccount to call it the same way as
+// RaidBackupFileSystem::CombineDiffs().
+std::auto_ptr<BackupFileSystem::Transaction>
+S3BackupFileSystem::CombineDiffs(int64_t NewerPatchID, int64_t OlderPatchID)
+{
+	return CombineFileOrDiff(OlderPatchID, NewerPatchID, true); // NewerIsPatch
 }
 
 

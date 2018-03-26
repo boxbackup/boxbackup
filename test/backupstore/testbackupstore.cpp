@@ -842,6 +842,7 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 	BackupStoreFile::MoveStreamPositionToBlockIndex(enc);
 
 	bool same = true;
+	int pos = 0;
 
 	// Now compare the two...
 	while(enc.StreamDataLeft())
@@ -849,23 +850,31 @@ bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
 		char buffer1[2048];
 		char buffer2[2048];
 		int s = enc.Read(buffer1, sizeof(buffer1), SHORT_TIMEOUT);
-		if(rBlockIndex.Read(buffer2, s, SHORT_TIMEOUT) != s)
+		int s2 = rBlockIndex.Read(buffer2, s, SHORT_TIMEOUT);
+		if(s2 != s)
 		{
+			TEST_FAIL_WITH_MESSAGE("Short read from rBlockIndex at position " << pos <<
+				": expected " << s << " bytes but read " << s2);
 			same = false;
 			break;
 		}
 		if(::memcmp(buffer1, buffer2, s) != 0)
 		{
+			TEST_FAIL_WITH_MESSAGE("Blocks differ at " << pos << "-" << (pos+s) <<
+				" bytes");
 			same = false;
 			break;
 		}
+		pos += s;
 	}
 
 	if(rBlockIndex.StreamDataLeft())
 	{
+		TEST_FAIL_WITH_MESSAGE("Unexpected extra data found in rBlockIndex at position " <<
+			pos);
 		same = false;
 
-		// Absorb all this excess data so procotol is in the first state
+		// Absorb all this excess data so protocol is in the first state
 		char buffer[2048];
 		while(rBlockIndex.StreamDataLeft())
 		{
@@ -959,10 +968,22 @@ bool test_temporary_refcount_db_is_independent()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_server_housekeeping()
+bool test_server_housekeeping(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+
+	// We need complete control over housekeeping, so use a local client
+	// instead of a network client + daemon.
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(rwContext, 0x01234567, false)); // !ReadOnly
+	std::auto_ptr<BackupProtocolLocal2> apProtocolReadOnly(
+		new BackupProtocolLocal2(roContext, 0x01234567, true)); // ReadOnly
 
 	int encfile[ENCFILE_SIZE];
 	{
@@ -978,15 +999,10 @@ bool test_server_housekeeping()
 		}
 	}
 
-	// We need complete control over housekeeping, so use a local client
-	// instead of a network client + daemon.
-
-	BackupProtocolLocal2 protocol(0x01234567, "test", "backup/01234567/",
-		0, false);
-
-	int root_dir_blocks = get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID)->GetDiscUsageInBlocks();
+	int64_t root_dir_blocks = get_disc_usage_in_blocks(true, // IsDirectory
+		BACKUPSTORE_ROOT_DIRECTORY_ID, specialisation_name, control);
 	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
+	TEST_THAT(check_num_blocks(*apProtocol, 0, 0, 0, root_dir_blocks,
 		root_dir_blocks));
 
 	// Store a file -- first make the encoded file
@@ -1005,22 +1021,19 @@ bool test_server_housekeeping()
 	// TODO FIXME use COMMAND macro for all commands to check the returned
 	// object ID.
 	#define COMMAND(command, objectid) \
-		TEST_EQUAL(objectid, protocol.command->GetObjectID());
+		TEST_EQUAL(objectid, apProtocol->command->GetObjectID());
 
 	// Then send it
-	int64_t store1objid;
+	int64_t store1objid = BACKUPSTORE_ROOT_DIRECTORY_ID + 1;
 	{
 		std::auto_ptr<IOStream> upload(new FileStream("testfiles/file1_upload1"));
-		std::auto_ptr<BackupProtocolSuccess> stored(protocol.QueryStoreFile(
+		COMMAND(QueryStoreFile(
 			BACKUPSTORE_ROOT_DIRECTORY_ID,
 			0x123456789abcdefLL,		/* modification time */
 			0x7362383249872dfLL,		/* attr hash */
 			0,							/* diff from ID */
 			store1name,
-			upload));
-		store1objid = stored->GetObjectID();
-		TEST_EQUAL_LINE(2, store1objid, "wrong ObjectID for newly "
-			"uploaded file");
+			upload), store1objid);
 	}
 
 	// Update expected reference count of this new object
@@ -1034,7 +1047,7 @@ bool test_server_housekeeping()
 		// BLOCK
 		{
 			// Get stream
-			std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			// Need to put it in another stream, because it's not in stream order
 			CollectInBufferStream f;
 			filestream->CopyStreamTo(f);
@@ -1052,7 +1065,7 @@ bool test_server_housekeeping()
 			UNLINK_IF_EXISTS("testfiles/file1_upload_retrieved_str");
 
 			// Get stream
-			std::auto_ptr<IOStream> filestream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> filestream(apProtocol->ReceiveStream());
 			// Get and decode
 			BackupStoreFile::DecodeFile(*filestream, "testfiles/file1_upload_retrieved_str", IOStream::TimeOutInfinite);
 		}
@@ -1074,18 +1087,18 @@ bool test_server_housekeeping()
 
 		// Retrieve the block index, by ID
 		{
-			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByID(store1objid));
+			std::auto_ptr<BackupProtocolSuccess> getblockindex(apProtocol->QueryGetBlockIndexByID(store1objid));
 			TEST_THAT(getblockindex->GetObjectID() == store1objid);
-			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
 			// Check against uploaded file
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
 		}
 
 		// and again, by name
 		{
-			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByName(BACKUPSTORE_ROOT_DIRECTORY_ID, store1name));
+			std::auto_ptr<BackupProtocolSuccess> getblockindex(apProtocol->QueryGetBlockIndexByName(BACKUPSTORE_ROOT_DIRECTORY_ID, store1name));
 			TEST_THAT(getblockindex->GetObjectID() == store1objid);
-			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
+			std::auto_ptr<IOStream> blockIndexStream(apProtocol->ReceiveStream());
 			// Check against uploaded file
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
 		}
@@ -1094,12 +1107,15 @@ bool test_server_housekeeping()
 	// Get the directory again, and see if the entry is in it
 	{
 		// Command
-		std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
-				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
-				BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
-		// Stream
-		BackupStoreDirectory dir(protocol.ReceiveStream(), SHORT_TIMEOUT);
+		COMMAND(QueryListDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+			false /* no attributes */),
+			BACKUPSTORE_ROOT_DIRECTORY_ID);
+
+		// Download the response-following stream (the directory):
+		BackupStoreDirectory dir(apProtocol->ReceiveStream(), SHORT_TIMEOUT);
 		TEST_THAT(dir.GetNumberOfEntries() == 1);
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = i.Next();
@@ -1111,41 +1127,44 @@ bool test_server_housekeeping()
 			TEST_THAT(en->GetModificationTime() == 0x123456789abcdefLL);
 			TEST_THAT(en->GetAttributesHash() == 0x7362383249872dfLL);
 			TEST_THAT(en->GetObjectID() == store1objid);
-			TEST_EQUAL(6, en->GetSizeInBlocks());
+			int expected_size = (specialisation_name == "store") ? 6 : 1;
+			TEST_EQUAL(expected_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetFlags() == BackupStoreDirectory::Entry::Flags_File);
 		}
 	}
 
-	int file1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
+	int file1_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
+		store1objid, specialisation_name, control);
 	TEST_THAT(check_num_files(fs, 1, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
+	TEST_THAT(check_num_blocks(*apProtocol, file1_blocks, 0, 0, root_dir_blocks,
 		file1_blocks + root_dir_blocks));
 
 	// Upload again, as a patch to the original file.
-	int64_t patch1_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+	int64_t patch1_id = BackupStoreFile::QueryStoreFileDiff(*apProtocol,
 		"testfiles/file1", // LocalFilename
 		BACKUPSTORE_ROOT_DIRECTORY_ID, // DirectoryObjectID
 		store1objid, // DiffFromFileID
 		0x7362383249872dfLL, // AttributesHash
 		store1name // StoreFilename
 		);
-	TEST_EQUAL_LINE(3, patch1_id, "wrong ObjectID for newly uploaded "
-		"patch file");
+	TEST_EQUAL_LINE(store1objid + 1, patch1_id, "wrong ObjectID for newly uploaded full file");
 	// Update expected reference count of this new object
 	set_refcount(patch1_id, 1);
 
+	// How many extra blocks used by uploading patch1?
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
-	int patch1_blocks = get_raid_file(store1objid)->GetDiscUsageInBlocks();
+	int patch1_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
+		store1objid, specialisation_name, control);
 
 	// It will take extra blocks, even though there are no changes, because
 	// the server code is not smart enough to realise that the file
 	// contents are identical, so it will create an empty patch.
 
 	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks, 0,
+	TEST_THAT(check_num_blocks(*apProtocol, file1_blocks, patch1_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + root_dir_blocks));
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Change the file and upload again, as a patch to the original file.
 	{
@@ -1155,7 +1174,7 @@ bool test_server_housekeeping()
 		out.Close();
 	}
 
-	int64_t patch2_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+	int64_t patch2_id = BackupStoreFile::QueryStoreFileDiff(*apProtocol,
 		"testfiles/file1", // LocalFilename
 		BACKUPSTORE_ROOT_DIRECTORY_ID, // DirectoryObjectID
 		patch1_id, // DiffFromFileID
@@ -1166,32 +1185,33 @@ bool test_server_housekeeping()
 		"patch file");
 	set_refcount(patch2_id, 1);
 
-	// How many blocks used by the new file?
+	// How many extra blocks used by uploading patch2?
 	// We need to check the old file's size, because it's been replaced
-	// by a reverse diff, and patch1_id is a complete file, not a diff.
-	int patch2_blocks = get_raid_file(patch1_id)->GetDiscUsageInBlocks();
+	// by a reverse diff, and patch2_id is a complete file, not a diff.
+	int patch2_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
+		patch1_id, specialisation_name, control);
 
 	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
+	TEST_THAT(check_num_blocks(*apProtocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Housekeeping should not change anything just yet
-	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
+	apProtocol->QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account(fs));
+	apProtocol->Reopen();
 
 	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
+	TEST_THAT(check_num_blocks(*apProtocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
 		root_dir_blocks, file1_blocks + patch1_blocks + patch2_blocks +
 		root_dir_blocks));
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Upload not as a patch, but as a completely different file. This
 	// marks the previous file as old (because the filename is the same)
 	// but used to not adjust the number of old/deleted files properly.
-	int64_t replaced_id = BackupStoreFile::QueryStoreFileDiff(protocol,
+	int64_t replaced_id = BackupStoreFile::QueryStoreFileDiff(*apProtocol,
 		"testfiles/file1", // LocalFilename
 		BACKUPSTORE_ROOT_DIRECTORY_ID, // DirectoryObjectID
 		0, // DiffFromFileID
@@ -1202,73 +1222,77 @@ bool test_server_housekeeping()
 		"full file");
 	set_refcount(replaced_id, 1);
 
-	// How many blocks used by the new file? This time we need to check
-	// the new file, because it's not a patch.
-	int replaced_blocks = get_raid_file(replaced_id)->GetDiscUsageInBlocks();
+	// How many blocks used by the new file? This time we need to check the new file, because
+	// it's not a patch, so the old file wasn't converted to a reverse diff.
+	int replaced_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
+		replaced_id, specialisation_name, control);
 
 	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+	TEST_THAT(check_num_blocks(*apProtocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Housekeeping should not change anything just yet
-	protocol.QueryFinished();
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
+	apProtocol->QueryFinished();
+	TEST_THAT(run_housekeeping_and_check_account(fs));
+	apProtocol->Reopen();
 
 	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+	TEST_THAT(check_num_blocks(*apProtocol, replaced_blocks, // current
 		file1_blocks + patch1_blocks + patch2_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + patch1_blocks + patch2_blocks + replaced_blocks +
 		root_dir_blocks)); // total
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// But if we reduce the limits, then it will
-	protocol.QueryFinished();
+	std::ostringstream new_limit;
+	new_limit << (replaced_blocks + file1_blocks + root_dir_blocks) << "B";
+	apProtocol->QueryFinished();
 	TEST_THAT(change_account_limits(
-		"14B", // replaced_blocks + file1_blocks + root_dir_blocks
+		control,
+		new_limit.str().c_str(),
 		"2000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
+	TEST_THAT(run_housekeeping_and_check_account(fs));
+	apProtocol->Reopen();
 
 	// We expect housekeeping to have removed the two oldest versions:
 	set_refcount(store1objid, 0);
 	set_refcount(patch1_id, 0);
 
 	TEST_THAT(check_num_files(fs, 1, 1, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
+	TEST_THAT(check_num_blocks(*apProtocol, replaced_blocks, // current
 		file1_blocks, // old
 		0, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks)); // total
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Check that deleting files is accounted for as well
-	protocol.QueryDeleteFile(
+	apProtocol->QueryDeleteFile(
 		BACKUPSTORE_ROOT_DIRECTORY_ID, // InDirectory
 		store1name); // Filename
 
 	// The old version file is deleted as well!
 	TEST_THAT(check_num_files(fs, 0, 1, 2, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, // current
+	TEST_THAT(check_num_blocks(*apProtocol, 0, // current
 		file1_blocks, // old
 		replaced_blocks + file1_blocks, // deleted
 		root_dir_blocks, // directories
 		file1_blocks + replaced_blocks + root_dir_blocks));
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Reduce limits again, check that removed files are subtracted from
 	// block counts.
-	protocol.QueryFinished();
-	TEST_THAT(change_account_limits("0B", "2000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
-	protocol.Reopen();
+	apProtocol->QueryFinished();
+	TEST_THAT(change_account_limits(control, "0B", "2000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
+	apProtocol->Reopen();
 	set_refcount(store1objid, 0);
 
 	// We expect housekeeping to have removed the two most recent versions
@@ -1277,13 +1301,13 @@ bool test_server_housekeeping()
 	set_refcount(replaced_id, 0);
 
 	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
-	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
-	TEST_THAT(check_reference_counts());
+	TEST_THAT(check_num_blocks(*apProtocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Close the protocol, so we can housekeep the account
-	protocol.QueryFinished();
+	apProtocol->QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
@@ -1449,7 +1473,7 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 
 			apProtocol->QueryFinished();
 			apProtocolReadOnly->QueryFinished();
-			TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+			TEST_THAT(run_housekeeping_and_check_account(fs));
 			apProtocol->Reopen();
 			apProtocolReadOnly->Reopen();
 
@@ -1473,7 +1497,7 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 
 		apProtocol->QueryFinished();
 		apProtocolReadOnly->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(run_housekeeping_and_check_account(fs));
 		apProtocol->Reopen();
 		apProtocolReadOnly->Reopen();
 
@@ -1488,7 +1512,7 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 
 		apProtocol->QueryFinished();
 		apProtocolReadOnly->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(run_housekeeping_and_check_account(fs));
 		apProtocol->Reopen();
 		apProtocolReadOnly->Reopen();
 
@@ -1557,7 +1581,7 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 		// of files
 		apProtocol->QueryFinished();
 		apProtocolReadOnly->QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(run_housekeeping_and_check_account(fs));
 		apProtocol->Reopen();
 		apProtocolReadOnly->Reopen();
 
@@ -2058,7 +2082,7 @@ bool test_server_commands(const std::string& specialisation_name,
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
+		TEST_THAT(run_housekeeping_and_check_account(fs));
 		apProtocol->Reopen();
 		protocolReadOnly.Reopen();
 
@@ -2114,8 +2138,7 @@ bool test_server_commands(const std::string& specialisation_name,
 			}
 		}
 
-		TEST_THAT(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		// Create some nice recursive directories
 		write_test_file(1);
@@ -2129,14 +2152,12 @@ bool test_server_commands(const std::string& specialisation_name,
 				"test_delete", 6 /* depth */, &rRefCount);
 		}
 
-		TEST_THAT(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
-		TEST_THAT(run_housekeeping_and_check_account(control.GetFileSystem()));
-		TEST_THAT(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+		TEST_THAT(run_housekeeping_and_check_account(fs));
+		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 		// Close the refcount database and reopen it, check that the counts are
 		// still the same.
@@ -2165,8 +2186,7 @@ bool test_server_commands(const std::string& specialisation_name,
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account(fs));
-		TEST_THAT(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 		protocolReadOnly.Reopen();
 
 		// Get the root dir, checking for deleted items
@@ -2209,8 +2229,7 @@ bool test_server_commands(const std::string& specialisation_name,
 		protocolReadOnly.QueryFinished();
 
 		TEST_THAT(run_housekeeping_and_check_account(fs));
-		TEST_THAT(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 	}
 
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
@@ -3760,11 +3779,11 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_login_without_account());
 	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
-	TEST_THAT(test_server_housekeeping());
 
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
+		RUN_SPECIALISED_TEST(i->first, i->second, test_server_housekeeping);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_multiple_uploads);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);

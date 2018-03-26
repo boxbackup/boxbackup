@@ -27,7 +27,7 @@
 //		Name:    BackupStoreFile::CombineDiffs(IOStream &, IOStream &, IOStream &rOut)
 //		Purpose: Given two diffs, combine them into a single diff, to produce a diff
 //				 which, combined with the original file, creates the result of applying
-//				 rDiff, then rDiff2. Two opens of rDiff2 are required
+//				 rDiff1, then rDiff2. Two opens of rDiff2 are required
 //		Created: 12/7/04
 //
 // --------------------------------------------------------------------------

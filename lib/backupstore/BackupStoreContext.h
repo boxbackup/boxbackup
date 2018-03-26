@@ -192,6 +192,7 @@ public:
 	bool ObjectExists(int64_t ObjectID, int MustBe = ObjectExists_Anything);
 	std::auto_ptr<IOStream> OpenObject(int64_t ObjectID);
 	std::auto_ptr<IOStream> GetFile(int64_t ObjectID, int64_t InDirectory);
+	std::auto_ptr<IOStream> GetBlockIndexReconstructed(int64_t ObjectID, int64_t InDirectory);
 
 	// Info
 	int32_t GetClientID() const {return mClientID;}
@@ -211,6 +212,7 @@ private:
 	void RemoveDirectoryFromCache(int64_t ObjectID);
 	void DeleteDirectoryRecurse(int64_t ObjectID, bool Undelete);
 	int64_t AllocateObjectID();
+	std::vector<int64_t> GetPatchChain(int64_t ObjectID, int64_t InDirectory);
 
 	std::string mConnectionDetails;
 	int32_t mClientID;
