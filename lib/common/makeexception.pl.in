@@ -85,7 +85,7 @@ public:
 	{
 	}
 	
-	~${class}Exception() throw ()
+	virtual ~${class}Exception() throw ()
 	{
 	}
 	
