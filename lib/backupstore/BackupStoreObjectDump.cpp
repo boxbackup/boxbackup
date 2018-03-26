@@ -214,7 +214,7 @@ void BackupStoreFile::DumpFile(std::ostream& output, bool ToTrace, IOStream &rFi
 		if(s > 0)
 		{
 			nnew++;
-			output << b << " this  s=" << std::setw(8) << s;
+			output << std::setw(8) << b << " this  s=" << std::setw(8) << s << "\n";
 			if(ToTrace)
 			{
 				BOX_TRACE(std::setw(8) << b << " this  s=" << std::setw(8) << s);
@@ -223,7 +223,7 @@ void BackupStoreFile::DumpFile(std::ostream& output, bool ToTrace, IOStream &rFi
 		else
 		{
 			nold++;
-			output << std::setw(8) << b << " other i=" << std::setw(8) << 0 - s;
+			output << std::setw(8) << b << " other i=" << std::setw(8) << 0 - s << "\n";
 			if(ToTrace)
 			{
 				BOX_TRACE(std::setw(8) << b << " other i=" << std::setw(8) << 0 - s);
