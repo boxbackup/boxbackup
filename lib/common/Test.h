@@ -46,6 +46,10 @@
 #define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
 #endif
 
+#define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
+#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
+
 extern int num_failures;
 extern int first_fail_line;
 extern int num_tests_selected;

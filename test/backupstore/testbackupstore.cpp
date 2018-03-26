@@ -68,10 +68,6 @@
 
 #define SHORT_TIMEOUT 5000
 
-#define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
-#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
-#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
-
 int attr1[ATTR1_SIZE];
 int attr2[ATTR2_SIZE];
 int attr3[ATTR3_SIZE];
@@ -153,34 +149,6 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 
 #define UNLINK_IF_EXISTS(filename) \
 	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
-
-int s3simulator_pid = 0;
-
-bool StartSimulator()
-{
-	s3simulator_pid = StartDaemon(s3simulator_pid,
-		"../../bin/s3simulator/s3simulator " + bbstored_args +
-		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
-	return s3simulator_pid != 0;
-}
-
-bool StopSimulator()
-{
-	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
-		"s3simulator.memleaks", true);
-	s3simulator_pid = 0;
-	return result;
-}
-
-bool kill_running_daemons()
-{
-#ifndef WIN32
-	TEST_THAT_OR(::system("test ! -r testfiles/s3simulator.pid || "
-		"kill `cat testfiles/s3simulator.pid`") == 0, FAIL);
-	TEST_THAT_OR(::system("rm -f testfiles/s3simulator.pid") == 0, FAIL);
-#endif
-	return true;
-}
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \

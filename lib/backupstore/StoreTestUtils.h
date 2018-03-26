@@ -106,6 +106,12 @@ bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.con
 //! Stops the currently running bbackupd client.
 bool StopClient(bool wait_for_process = false);
 
+bool StartSimulator();
+
+bool StopSimulator();
+
+bool kill_running_daemons();
+
 //! Creates the standard test account, for example after delete_account().
 bool create_account(int soft, int hard);
 
