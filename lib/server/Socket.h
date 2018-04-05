@@ -48,6 +48,7 @@ namespace Socket
 	void NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 		enum Type type, const std::string& rName, int Port,
 		int &rSockAddrLenOut);
+	std::string NamePretty(enum Type type, const std::string& rName, const SocketAllAddr &addr);
 	void LogIncomingConnection(const struct sockaddr *addr, socklen_t addrlen);
 	std::string IncomingConnectionLogMessage(const struct sockaddr *addr, socklen_t addrlen);
 };

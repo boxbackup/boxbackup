@@ -15,6 +15,10 @@
 
 #include <sys/types.h>
 
+#ifdef WIN32
+	#include <ws2tcpip.h> // for InetNtop
+#endif
+
 #ifndef WIN32
 #include <sys/socket.h>
 #include <netdb.h>
@@ -107,7 +111,43 @@ void Socket::NameLookupToSockAddr(SocketAllAddr &addr, int &sockDomain,
 	rSockAddrLenOut = sockAddrLen;
 }
 
+std::string Socket::NamePretty(enum Type type, const std::string& rName,
+	const SocketAllAddr &addr)
+{
+	if(type == Socket::TypeINET)
+	{
+		// For an IP socket, try to include the resolved IP address as well as the hostname:
+		int sockDomain = AF_INET;
+		char name_buf[256];
 
+#ifdef WIN32
+		SocketAllAddr addr_copy = addr;
+		const char* addr_str = InetNtop(sockDomain, &addr_copy.sa_inet.sin_addr, name_buf,
+			sizeof(name_buf));
+#else
+		const char* addr_str = inet_ntop(sockDomain, &addr.sa_inet.sin_addr, name_buf,
+			sizeof(name_buf));
+#endif
+
+		std::ostringstream name_oss;
+		name_oss << rName << " (";
+		if(addr_str == NULL)
+		{
+			name_oss << "failed to convert IP address to string";
+		}
+		else
+		{
+			name_oss << addr_str;
+		}
+		name_oss << ")";
+		return name_oss.str();
+	}
+	else
+	{
+		// For a UNIX socket, the path is all we need to show the user:
+		return rName;
+	}
+}
 
 
 // --------------------------------------------------------------------------
