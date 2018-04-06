@@ -64,7 +64,8 @@ public:
 	virtual bool StreamClosed() = 0;
 
 	// Utility functions
-	bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout = IOStream::TimeOutInfinite);
+	virtual bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead,
+		int Timeout = IOStream::TimeOutInfinite);
 	IOStream::pos_type CopyStreamTo(IOStream &rCopyTo,
 		int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
 	void Flush(int Timeout = IOStream::TimeOutInfinite);

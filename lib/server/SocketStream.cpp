@@ -288,6 +288,31 @@ int SocketStream::Read(void *pBuffer, int NBytes, int Timeout)
 	return r;
 }
 
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    SocketStream::ReadFullBuffer(void *, int, int)
+//		Purpose: Reads bytes into buffer, returning whether or not it
+//		         managed to detect when the peer disconnects us (as
+//		         opposed to reaching end of file) and throw an
+//		         appropriate exception.
+//		Created: 2018/04/06
+//
+// --------------------------------------------------------------------------
+bool SocketStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, int Timeout)
+{
+	bool result = IOStream::ReadFullBuffer(pBuffer, NBytes, pNBytesRead, Timeout);
+	if(!result && mReadClosed)
+	{
+		// Could be a timeout, but if the socket is no longer readable then it means that
+		// the peer disconnected us, so raise an exception instead.
+		THROW_EXCEPTION(ConnectionException, SocketClosedByPeer);
+	}
+	return result;
+}
+
+
 bool SocketStream::Poll(short Events, int Timeout)
 {
 	// Wait for data to send.

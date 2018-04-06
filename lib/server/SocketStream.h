@@ -49,6 +49,9 @@ public:
 	void Attach(int socket);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
+	virtual bool ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead,
+		int Timeout = IOStream::TimeOutInfinite);
+
 	virtual void Write(const void *pBuffer, int NBytes,
 		int Timeout = IOStream::TimeOutInfinite);
 	using IOStream::Write;

@@ -862,7 +862,8 @@ int test(int argc, const char *argv[])
 				catch(ConnectionException &e)
 				{
 					if(e.GetSubType() == ConnectionException::SocketReadError ||
-						e.GetSubType() == ConnectionException::SocketWriteError)
+						e.GetSubType() == ConnectionException::SocketWriteError ||
+						e.GetSubType() == ConnectionException::SocketClosedByPeer)
 					{
 						didthrow = true;
 					}
