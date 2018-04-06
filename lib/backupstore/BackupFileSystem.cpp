@@ -992,7 +992,17 @@ RaidBackupFileSystem::CheckObjects(bool fix_errors)
 	// Find the maximum start ID of directories -- worked out by looking at disc
 	// contents, not trusting anything.
 	CheckObjectsResult result;
-	CheckObjectsScanDir(0, 1, mAccountRootDir, result, fix_errors);
+
+	// The root directory is unusual because its path always ends with a slash (this is enforced by
+	// (RaidBackupFileSystem::RaidBackupFileSystem). But all the other paths passed to
+	// CheckObjectsScanDir do not, so it appends one, and double slashes cause errors which
+	// OpenFileByNameUtf8 tries to write to the syslog, which we don't want, so we check for and
+	// remove the trailing slash from mAccountRootDir here:
+	ASSERT(mAccountRootDir[mAccountRootDir.size() - 1] == '/' ||
+		mAccountRootDir[mAccountRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
+
+	CheckObjectsScanDir(0, 1, mAccountRootDir.substr(0, mAccountRootDir.size() - 1), result,
+		fix_errors);
 
 	// Then go through and scan all the objects within those directories
 	for(int64_t start_id = 0; start_id <= result.maxObjectIDFound;

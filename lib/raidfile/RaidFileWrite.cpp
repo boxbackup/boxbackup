@@ -674,8 +674,7 @@ void RaidFileWrite::TransformToRaidStorage()
 		{ \
 			if (EMU_UNLINK(file) != 0 && errno != ENOENT) \
 			{ \
-				THROW_EMU_ERROR("Failed to unlink raidfile " \
-					"stripe: " << file, RaidFileException, \
+				THROW_EMU_ERROR("Failed to unlink raidfile stripe: " << file, RaidFileException, \
 					OSError); \
 			} \
 		}
