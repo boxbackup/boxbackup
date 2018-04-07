@@ -5,8 +5,10 @@ compiler:
   - clang
 
 cache:
-  - apt
-  - ccache
+  apt: true
+  ccache: true
+  directories:
+  - infrastructure/cmake/build/cache
 
 sudo: false
 
