@@ -89,7 +89,8 @@ void testservers_connection(SocketStream &rStream)
 	if(typeid(rStream) == typeid(SocketStreamTLS))
 	{
 		// need to wait for some data before sending stuff, otherwise timeout test doesn't work
-		std::string line = getline.GetLine(false); // !preprocess
+		std::string line = getline.GetLine(false, // !preprocess
+			PROTOCOL_DEFAULT_TIMEOUT);
 		SocketStreamTLS &rtls = (SocketStreamTLS&)rStream;
 		std::string line1("CONNECTED:");
 		line1 += rtls.GetPeerCommonName();
@@ -104,7 +105,8 @@ void testservers_connection(SocketStream &rStream)
 
 	while(!getline.IsEOF())
 	{
-		std::string line = getline.GetLine(false); // !preprocess
+		std::string line = getline.GetLine(false, // !preprocess
+			PROTOCOL_DEFAULT_TIMEOUT);
 		if(line == "QUIT")
 		{
 			break;

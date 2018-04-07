@@ -94,7 +94,7 @@ std::auto_ptr<TestProtocolMessage> TestProtocolSendStream::DoCommand(
 	char buffer[125];
 	while(rDataStream.StreamDataLeft())
 	{
-		bytes += rDataStream.Read(buffer, sizeof(buffer));
+		bytes += rDataStream.Read(buffer, sizeof(buffer), PROTOCOL_DEFAULT_TIMEOUT);
 	}
 
 	// tell the caller how many bytes there were
@@ -117,5 +117,6 @@ std::auto_ptr<TestProtocolMessage> TestProtocolDeliberateError::DoCommand(
 std::auto_ptr<TestProtocolMessage> TestProtocolUnexpectedError::DoCommand(
 	TestProtocolReplyable &rProtocol, TestContext &rContext) const
 {
-	THROW_EXCEPTION_MESSAGE(CommonException, Internal, "unexpected error");
+	THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+		"This exception is thrown deliberately to simulate an unexpected error");
 }
