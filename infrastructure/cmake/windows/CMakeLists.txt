@@ -143,7 +143,7 @@ if(EXISTS ${pcre_package_file})
 	ExternalProject_Cached(pcre ${pcre_package_file} ${pcre_install_dir})
 else()
 	ExternalProject_Add(pcre
-		URL "http://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-${PCRE_VERSION}.tar.bz2"
+		URL "https://ftp.pcre.org/pub/pcre/pcre-${PCRE_VERSION}.tar.bz2"
 		URL_HASH ${PCRE_HASH}
 		DOWNLOAD_NO_PROGRESS 1
 		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${pcre_install_dir} ${SUB_CMAKE_EXTRA_ARGS}
