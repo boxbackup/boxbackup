@@ -42,7 +42,6 @@ init:
 
 # scripts that run after cloning repository (before the build step, not after!)
 install:
-  - dir %CMAKE_UNIBUILD_DIR%\cache
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
@@ -70,6 +69,10 @@ install:
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
+
+  # Check contents of the cache. We can't do this until after running cmake, because if the cache
+  # was invalidated then it won't be restored and the directory won't exist until this point.
+  - dir %CMAKE_UNIBUILD_DIR%\cache
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
 
