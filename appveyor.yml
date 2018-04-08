@@ -24,7 +24,7 @@ environment:
   BOXBACKUP_VERSION_BASE: 0.12
 
 cache:
-  - '%CMAKE_UNIBUILD_DIR%\cache -> appveyor.yml'
+  - '%CMAKE_UNIBUILD_DIR%\cache -> infrastructure\cmake\windows\CMakeLists.txt'
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
