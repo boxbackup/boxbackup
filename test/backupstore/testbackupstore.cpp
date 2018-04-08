@@ -3032,11 +3032,6 @@ bool test_housekeeping_deletes_files()
 	// teardown_test_backupstore() don't fail.
 	ExpectedRefCounts.resize(2);
 
-	// Delete the account to stop teardown_test_backupstore from checking it.
-	// TODO FIXME investigate the block count mismatch that teardown_test_backupstore
-	// catches if we don't delete the account.
-	delete_account();
-
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
