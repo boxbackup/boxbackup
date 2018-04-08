@@ -220,28 +220,32 @@ bool teardown_test_backupstore()
 
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_backupstore_specialised(const std::string& spec_name,
-	BackupAccountControl& control)
+	BackupAccountControl& control, bool check_for_errors = true)
 {
 	bool status = true;
 
 	BackupFileSystem& fs(control.GetFileSystem());
-	TEST_THAT_OR(check_reference_counts(
-		fs.GetPermanentRefCountDatabase(true)), // ReadOnly
-		status = false);
-	TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
-	control.GetFileSystem().ReleaseLock();
+	if(check_for_errors)
+	{
+		TEST_THAT_OR(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true)), // ReadOnly
+			status = false);
+		TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
+	}
+	fs.ReleaseLock();
 
 	return status;
 }
 
-#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+#define _TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, check_for_errors) \
 		if (ServerIsAlive(bbstored_pid)) \
 			StopServer(); \
 		if(control.GetCurrentFileSystem() != NULL) \
 		{ \
 			control.GetCurrentFileSystem()->ReleaseLock(); \
 		} \
-		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
+		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control, \
+			check_for_errors), FAIL); \
 	} \
 	catch (BoxException &e) \
 	{ \
@@ -253,10 +257,17 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 		{ \
 			control.GetCurrentFileSystem()->ReleaseLock(); \
 		} \
-		TEST_THAT(teardown_test_backupstore_specialised(name, control)); \
+		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control, \
+			check_for_errors), FAIL); \
 		throw; \
 	} \
 	TEARDOWN();
+
+#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+	_TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, true)
+
+#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED_NO_CHECK(name, control) \
+	_TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, false)
 
 // Nice random data for testing written files
 class R250 {
@@ -2717,14 +2728,20 @@ bool test_symlinks()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_store_info()
+bool test_store_info(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	RaidBackupFileSystem fs(76, "test-info/", 0);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
+	BackupStoreContext context(fs, 0x01234567, NULL, // mpHousekeeping
+		"fake test connection"); // rConnectionDetails
+	std::auto_ptr<BackupProtocolLocal2> apProtocol(
+		new BackupProtocolLocal2(context, 0x01234567, false)); // !ReadOnly
 
 	{
-		RaidFileWrite::CreateDirectory(0, "test-info");
-		BackupStoreInfo info(76, 3461231233455433LL, 2934852487LL);
+		BackupStoreInfo info(
+			specialisation_name == "s3" ?  S3_FAKE_ACCOUNT_ID : 0x01234567,
+			3461231233455433LL, 2934852487LL);
 		fs.PutBackupStoreInfo(info);
 	}
 
@@ -2740,7 +2757,8 @@ bool test_store_info()
 	}
 
 	{
-		BackupStoreInfo& info(fs.GetBackupStoreInfo(false)); // !ReadOnly
+		BackupStoreInfo& info(fs.GetBackupStoreInfo(false, // !ReadOnly
+			true)); // Refresh
 		info.ChangeBlocksUsed(8);
 		info.ChangeBlocksInOldFiles(9);
 		info.ChangeBlocksInDeletedFiles(10);
@@ -2765,19 +2783,19 @@ bool test_store_info()
 
 	{
 		std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
-		TEST_THAT(info->GetBlocksUsed() == 7);
-		TEST_THAT(info->GetBlocksInOldFiles() == 5);
-		TEST_THAT(info->GetBlocksInDeletedFiles() == 1);
-		TEST_THAT(info->GetBlocksSoftLimit() == 3461231233455433LL);
-		TEST_THAT(info->GetBlocksHardLimit() == 2934852487LL);
-		TEST_THAT(info->GetAccountName() == "whee");
+		TEST_EQUAL(7, info->GetBlocksUsed());
+		TEST_EQUAL(5, info->GetBlocksInOldFiles());
+		TEST_EQUAL(1, info->GetBlocksInDeletedFiles());
+		TEST_EQUAL(3461231233455433LL, info->GetBlocksSoftLimit());
+		TEST_EQUAL(2934852487LL, info->GetBlocksHardLimit());
+		TEST_EQUAL("whee", info->GetAccountName());
 		const std::vector<int64_t> &delfiles(info->GetDeletedDirectories());
-		TEST_THAT(delfiles.size() == 2);
-		TEST_THAT(delfiles[0] == 2);
-		TEST_THAT(delfiles[1] == 4);
+		TEST_EQUAL(2, delfiles.size());
+		TEST_EQUAL(2, delfiles[0]);
+		TEST_EQUAL(4, delfiles[1]);
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED_NO_CHECK(specialisation_name, control);
 }
 
 bool test_login_without_account()
@@ -3774,7 +3792,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_cannot_open_multiple_writable_connections());
 	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
-	TEST_THAT(test_store_info());
 
 	TEST_THAT(test_login_without_account());
 	TEST_THAT(test_login_with_disabled_account());
@@ -3783,6 +3800,7 @@ int test(int argc, const char *argv[])
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
+		RUN_SPECIALISED_TEST(i->first, i->second, test_store_info);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_server_housekeeping);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_multiple_uploads);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
