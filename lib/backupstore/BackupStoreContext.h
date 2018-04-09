@@ -61,15 +61,15 @@ public:
 	void CleanUp();
 	int32_t GetClientID() {return mClientID;}
 
-	enum
+	typedef enum
 	{
 		Phase_START    = 0,
 		Phase_Version  = 0,
 		Phase_Login    = 1,
 		Phase_Commands = 2
-	};
+	} ProtocolPhase;
 
-	int GetPhase() const {return mProtocolPhase;}
+	ProtocolPhase GetPhase() const {return mProtocolPhase;}
 	std::string GetPhaseName() const
 	{
 		switch(mProtocolPhase)
@@ -83,7 +83,7 @@ public:
 				return oss.str();
 		}
 	}
-	void SetPhase(int NewPhase) {mProtocolPhase = NewPhase;}
+	void SetPhase(ProtocolPhase NewPhase) {mProtocolPhase = NewPhase;}
 
 	// Read only locking
 	bool SessionIsReadOnly() {return mReadOnly;}
@@ -217,7 +217,7 @@ private:
 	std::string mConnectionDetails;
 	int32_t mClientID;
 	HousekeepingInterface *mpHousekeeping;
-	int mProtocolPhase;
+	ProtocolPhase mProtocolPhase;
 	bool mClientHasAccount;
 	bool mReadOnly;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
