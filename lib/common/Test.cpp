@@ -120,6 +120,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			StartsWith("notifyscript.tag", filename) ||
 			StartsWith("restore", filename) ||
 			filename == "bbackupd-cache" ||
+			filename == "bbackupd-cache-2" ||
 			filename == "bbackupd-data" ||
 			filename == "store" ||
 			filename == "syncallowscript.control" ||
@@ -229,6 +230,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/0_2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-data", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache", 0755) == 0);
+	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache-2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
 

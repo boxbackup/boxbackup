@@ -144,7 +144,10 @@ public:
 
 	void AddKeyValue(const std::string& rKey, const std::string& rValue);
 	void AddSubConfig(const std::string& rName, const Configuration& rSubConfig);
-
+	void SetKeyValue(const std::string& rKey, const std::string& rValue)
+	{
+		mKeys[rKey] = rValue;
+	}
 	bool Verify(const ConfigurationVerify &rVerify, std::string &rErrorMsg)
 	{
 		return Verify(rVerify, std::string(), rErrorMsg);

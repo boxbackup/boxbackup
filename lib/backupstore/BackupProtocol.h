@@ -30,6 +30,7 @@ private:
 	std::auto_ptr<BackupStoreContext> mapLocalContext;
 	int32_t mAccountNumber;
 	bool mReadOnly;
+	int64_t mClientStoreMarker;
 
 public:
 	BackupProtocolLocal2(int32_t AccountNumber,
@@ -51,8 +52,8 @@ public:
 	{
 		GetContext().SetClientHasAccount(AccountRootDir, DiscSetNumber);
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
-		QueryLogin(AccountNumber,
-			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
+		mClientStoreMarker = QueryLogin(AccountNumber,
+			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0)->GetClientStoreMarker();
 	}
 
 	BackupProtocolLocal2(BackupStoreContext& rContext, int32_t AccountNumber,
@@ -63,8 +64,8 @@ public:
 	{
 		GetContext().SetClientHasAccount();
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
-		QueryLogin(AccountNumber,
-			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
+		mClientStoreMarker = QueryLogin(AccountNumber,
+			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0)->GetClientStoreMarker();
 	}
 
 	std::auto_ptr<BackupProtocolFinished> Query(const BackupProtocolFinished &rQuery)
@@ -81,6 +82,13 @@ public:
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
 		QueryLogin(mAccountNumber,
 			mReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0);
+	}
+
+	// Returns the initial client store marker (at login time), not the current one if changed
+	// using the SetClientStoreMarker command!
+	int64_t GetClientStoreMarker()
+	{
+		return mClientStoreMarker;
 	}
 };
 

@@ -2443,50 +2443,80 @@ bool test_directory_parent_entry_tracks_directory_size(
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-bool test_cannot_open_multiple_writable_connections()
+bool test_cannot_open_multiple_writable_connections(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 
-	// First try a local protocol (makes debugging easier):
-	BackupProtocolLocal2 protocolWritable(0x01234567, "test",
-		"backup/01234567/", 0, false); // Not read-only
+	BackupFileSystem& fs(control.GetFileSystem());
+
+	// We need another filesystem to be able to create conflicting locks:
+	std::auto_ptr<Configuration> ap_config_2;
+	std::auto_ptr<BackupAccountControl> ap_control_2;
+
+	if(specialisation_name == "s3")
+	{
+		ap_config_2 = load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE,
+			BackupDaemonConfigVerify);
+		// We need to use a different cache directory, otherwise the cache lock will cause
+		// a different exception to be thrown when the S3BackupFileSystem tries to lock it:
+		ap_config_2->GetSubConfigurationEditable("S3Store").SetKeyValue("CacheDirectory",
+			"testfiles/bbackupd-cache-2");
+		ap_control_2.reset(new S3BackupAccountControl(*ap_config_2));
+	}
+	else
+	{
+		ap_config_2 = load_config_file(DEFAULT_BBSTORED_CONFIG_FILE,
+			BackupConfigFileVerify);
+		ap_control_2.reset(new BackupStoreAccountControl(*ap_config_2, 0x01234567));
+	}
+
+	BackupFileSystem& fs_2(ap_control_2->GetFileSystem());
+
+	// First try a local protocol (makes debugging easier, and also works for s3):
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, bs_context, protocol_writable, false); // !ReadOnly
 
 	// Set the client store marker
-	protocolWritable.QuerySetClientStoreMarker(0x8732523ab23aLL);
+	protocol_writable.QuerySetClientStoreMarker(0x8732523ab23aLL);
 
 	// This works on platforms that have non-reentrant file locks (all but F_SETLK)
 #ifndef BOX_LOCK_TYPE_F_SETLK
 	{
-		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
-		bsContext.SetClientHasAccount("backup/01234567/", 0);
-		BackupProtocolLocal protocolWritable2(bsContext);
-		TEST_THAT(assert_writable_connection_fails(protocolWritable2));
+		BackupStoreContext context_2(fs_2, 0x01234567, NULL,
+			"fake test connection");
+		context_2.SetClientHasAccount();
+		BackupProtocolLocal protocol_writable_2(context_2); // !ReadOnly
+		protocol_writable_2.QueryVersion(BACKUP_STORE_SERVER_VERSION);
+		TEST_COMMAND_RETURNS_ERROR(protocol_writable_2, QueryLogin(0x01234567, 0),
+			Err_CannotLockStoreForWriting);
 	}
 #endif
 
+	// But a read-only context should work:
 	{
-		BackupStoreContext bsContext(0x01234567, (HousekeepingInterface *)NULL, "test");
-		bsContext.SetClientHasAccount("backup/01234567/", 0);
-		BackupProtocolLocal protocolReadOnly(bsContext);
-		TEST_EQUAL(0x8732523ab23aLL,
-			assert_readonly_connection_succeeds(protocolReadOnly));
+		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs_2, context_2, protocol_read_only,
+			true); // !ReadOnly
+		TEST_EQUAL(0x8732523ab23aLL, protocol_read_only.GetClientStoreMarker());
 	}
 
-	// Try network connections too.
-	TEST_THAT_OR(StartServer(), return false);
-
-	BackupProtocolClient protocolWritable3(open_conn("localhost", context));
-	TEST_THAT(assert_writable_connection_fails(protocolWritable3));
-
-	// Do not dedent. Object needs to go out of scope to release lock
+	// Try network connections too (but only for store tests):
+	if(specialisation_name == "store")
 	{
-		BackupProtocolClient protocolReadOnly2(open_conn("localhost", context));
-		TEST_EQUAL(0x8732523ab23aLL,
-			assert_readonly_connection_succeeds(protocolReadOnly2));
+		TEST_THAT_OR(StartServer(), return false);
+
+		BackupProtocolClient protocol_writable_3(open_conn("localhost", context));
+		TEST_THAT(assert_writable_connection_fails(protocol_writable_3));
+
+		// Do not dedent. Object needs to go out of scope to release lock
+		{
+			BackupProtocolClient protocol_read_only_2(open_conn("localhost", context));
+			TEST_EQUAL(0x8732523ab23aLL,
+				assert_readonly_connection_succeeds(protocol_read_only_2));
+		}
 	}
 
-	protocolWritable.QueryFinished();
-	TEARDOWN_TEST_BACKUPSTORE();
+	protocol_writable.QueryFinished();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_file_encoding()
@@ -3763,9 +3793,10 @@ int test(int argc, const char *argv[])
 	{
 		RUN_SPECIALISED_TEST(i->first, i->second,
 			test_directory_parent_entry_tracks_directory_size);
+		RUN_SPECIALISED_TEST(i->first, i->second,
+			test_cannot_open_multiple_writable_connections);
 	}
 
-	TEST_THAT(test_cannot_open_multiple_writable_connections());
 	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
 
