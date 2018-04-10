@@ -846,7 +846,7 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 	return flags && BackupStoreDirectory::Entry::Flags_Deleted;
 }
 
-bool compare(BackupQueries::ReturnCode::Type expected_status,
+bool compare_external(BackupQueries::ReturnCode::Type expected_status,
 	const std::string& bbackupquery_options = "",
 	const std::string& compare_options = "-acQ")
 {
@@ -870,7 +870,7 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 	return (returnValue == expected_system_result);
 }
 
-bool compare_local(BackupQueries::ReturnCode::Type expected_status,
+bool compare_in_process(BackupQueries::ReturnCode::Type expected_status,
 	BackupProtocolCallable& client,
 	const std::string& compare_options = "acQ")
 {
@@ -937,10 +937,21 @@ bool touch_and_wait(const std::string& filename)
 
 TLSContext sTlsContext;
 
-#define TEST_COMPARE(...) \
-	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
-#define TEST_COMPARE_LOCAL(...) \
-	TEST_THAT(compare_local(BackupQueries::ReturnCode::__VA_ARGS__));
+#define TEST_COMPARE(expected_status) \
+	BOX_INFO("Running external compare, expecting " #expected_status); \
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status));
+#define TEST_COMPARE_EXTRA(expected_status, ...) \
+	BOX_INFO("Running external compare, expecting " #expected_status); \
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status, __VA_ARGS__));
+
+#define TEST_COMPARE_LOCAL(expected_status, client) \
+	BOX_INFO("Running compare in-process, expecting " #expected_status); \
+	TEST_THAT(compare_in_process(BackupQueries::ReturnCode::expected_status, client));
+#define TEST_COMPARE_LOCAL_EXTRA(expected_status, client, compare_options) \
+	BOX_INFO("Running compare in-process, expecting " #expected_status); \
+	TEST_THAT(compare_in_process(BackupQueries::ReturnCode::expected_status, client, \
+		compare_options));
+
 
 bool search_for_file(const std::string& filename)
 {
@@ -1813,7 +1824,7 @@ bool test_bbackupd_exclusions()
 
 		// Check that the contents of the store are the same
 		// as the contents of the disc
-		TEST_COMPARE(Compare_Same, "-c testfiles/bbackupd-exclude.conf");
+		TEST_COMPARE_EXTRA(Compare_Same, "-c testfiles/bbackupd-exclude.conf");
 		BOX_TRACE("done.");
 
 		// BLOCK
@@ -2152,11 +2163,11 @@ bool test_read_only_dirs_can_be_restored()
 			#endif
 
 			bbackupd.RunSyncNow();
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
 
 			// check that we can restore it
 			TEST_THAT(restore("Test1", "testfiles/restore1"));
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 testfiles/restore1");
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/restore1");
 
 			// Try a restore with just the remote directory name,
 			// check that it uses the same name in the local
@@ -2164,7 +2175,7 @@ bool test_read_only_dirs_can_be_restored()
 			TEST_THAT(::mkdir("testfiles/restore-test", 0700) == 0);
 			TEST_THAT(bbackupquery("\"lcd testfiles/restore-test\" "
 				"\"restore Test1\""));
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 "
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 "
 				"testfiles/restore-test/Test1");
 
 			// put the permissions back to sensible values
@@ -2373,7 +2384,7 @@ bool test_unicode_filenames_can_be_backed_up()
 
 		// Check that bbackupquery can compare the dir when given
 		// on the command line in system encoding.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/TestDir1/" + systemDirName);
 
 		// Check that bbackupquery can restore the dir when given
@@ -2382,7 +2393,7 @@ bool test_unicode_filenames_can_be_backed_up()
 			"testfiles/restore-" + systemDirName));
 
 		// Compare to make sure it was restored properly.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
 
 		std::string fileToUnlink = "testfiles/restore-" +
@@ -2414,7 +2425,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		// Compare to make sure it was restored properly. The Get
 		// command does restore attributes, so we don't need to
 		// specify the -A option for this to succeed.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
 
 		// Check that no read error has been reported yet
@@ -2570,7 +2581,7 @@ bool test_delete_update_and_symlink_files()
 		TEST_COMPARE(Compare_Same);
 
 		// Try a quick compare, just for fun
-		TEST_COMPARE(Compare_Same, "", "-acqQ");
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-acqQ");
 	}
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -3085,8 +3096,8 @@ bool test_excluded_files_are_not_backed_up()
 		TEST_COMPARE_LOCAL(Compare_Same, client);
 
 		// compare without exclusions, should find differences
-		// TEST_COMPARE(Compare_Different, "", "-acEQ");
-		TEST_COMPARE_LOCAL(Compare_Different, client, "acEQ");
+		// TEST_COMPARE_EXTRA(Compare_Different, "", "-acEQ");
+		TEST_COMPARE_LOCAL_EXTRA(Compare_Different, client, "acEQ");
 
 		// check that the excluded files did not make it
 		// into the store, and the included files did
@@ -3487,7 +3498,7 @@ bool test_rename_operations()
 		TEST_COMPARE(Compare_Same);
 
 		// and again, but with quick flag
-		TEST_COMPARE(Compare_Same, "", "-acqQ");
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-acqQ");
 
 		// Rename some files -- one under the threshold, others above
 		TEST_THAT(rename("testfiles/TestDir1/df324",
@@ -3795,7 +3806,7 @@ bool test_restore_deleted_files()
 			client.reset();
 
 			// Do a compare with the now undeleted files
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1/x1 "
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/x1 "
 				"testfiles/restore-Test1-x1-2");
 		}
 
