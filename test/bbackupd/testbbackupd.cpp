@@ -3199,48 +3199,48 @@ bool test_continuously_updated_file()
 	{
 		// Make sure everything happens at the same point in the
 		// sync cycle: wait until exactly the start of a sync
-		wait_for_sync_start();
-
-		// Then wait a second, to make sure the scan is complete
-		::safe_sleep(1);
+		wait_for_sync_end();
 
 		{
+			// The file will be uploaded after 3 seconds (until the next sync) +
+			// 8 seconds (MaxUploadWait) + 1 second (the next sync after that, at which
+			// point it's been pending for >MaxUploadWait seconds). We wait, still
+			// touching the file, for 2 seconds less than that:
 			BOX_INFO("Open a file, then save something to it "
-				"every second for 12 seconds");
-			for(int l = 0; l < 12; ++l)
+				"every second for 10 seconds");
+
+			for(int l = 0; l < 10; ++l)
 			{
-				FILE *f = ::fopen("testfiles/TestDir1/continousupdate", "w+");
-				TEST_THAT(f != 0);
-				fprintf(f, "Loop iteration %d\n", l);
-				fflush(f);
-				fclose(f);
+				FileStream fs("testfiles/TestDir1/continousupdate",
+					O_CREAT | O_WRONLY);
+				fs.Write("a", 1);
+				fs.Close();
 				safe_sleep(1);
 			}
 
 			// Check there's a difference
+			BOX_INFO("Comparing all files to check that it was not uploaded yet");
 			int compareReturnValue = ::system("perl testfiles/"
 				"extcheck1.pl");
-
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
+			// And then another 4 seconds, until 2 seconds after it should have been
+			// synced:
 			BOX_INFO("Keep on continuously updating file for "
-				"28 seconds, check it is uploaded eventually");
+				"another 4 seconds, check it is uploaded eventually");
 
-			for(int l = 0; l < 28; ++l)
+			for(int l = 0; l < 4; ++l)
 			{
-				FILE *f = ::fopen("testfiles/TestDir1/"
-					"continousupdate", "w+");
-				TEST_THAT(f != 0);
-				fprintf(f, "Loop 2 iteration %d\n", l);
-				fflush(f);
-				fclose(f);
+				FileStream fs("testfiles/TestDir1/continousupdate", O_WRONLY);
+				fs.Write("a", 1);
+				fs.Close();
 				safe_sleep(1);
 			}
 
+			BOX_INFO("Comparing all files to check that it was uploaded by now");
 			compareReturnValue = ::system("perl testfiles/"
 				"extcheck2.pl");
-
 			TEST_RETURN(compareReturnValue, 1);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
@@ -3338,9 +3338,7 @@ bool test_restore_files_and_directories()
 				== Restore_Complete);
 
 			// Make sure you can't restore to a nonexistant path
-			printf("\n==== Try to restore to a path "
-				"that doesn't exist\n");
-			fflush(stdout);
+			BOX_INFO("Try to restore to a path that doesn't exist");
 
 			{
 				Logger::LevelGuard(Logging::GetConsole(),

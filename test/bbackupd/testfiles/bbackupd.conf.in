@@ -14,7 +14,7 @@ AccountNumber = 0x01234567
 UpdateStoreInterval = 3
 BackupErrorDelay = 10
 MinimumFileAge = 4
-MaxUploadWait = 24
+MaxUploadWait = 8
 DeleteRedundantLocationsAfter = 10
 
 FileTrackingSizeThreshold = 1024
