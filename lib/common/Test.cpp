@@ -452,42 +452,37 @@ int LaunchServer(const std::string& rCommandLine, const char *pidFile)
 
 int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 {
-	#ifdef WIN32
-	if (pidFile == NULL)
+#ifdef WIN32
+	if(pidFile == NULL)
 	{
 		return pidIfKnown;
 	}
-	#else
+#else
 	// on other platforms there is no other way to get 
 	// the PID, so a NULL pidFile doesn't make sense.
 	ASSERT(pidFile != NULL);
-	#endif
+#endif
 
 	// time for it to start up
 	BOX_TRACE("Waiting for server to start");
 
-	for (int i = 0; i < 15; i++)
+	for (int i = 0; i < 150; i++)
 	{
 		if (TestFileNotEmpty(pidFile))
 		{
 			break;
 		}
 
+		// on Win32 we can check whether the process is alive
+		// without even checking the PID file
+
 		if (pidIfKnown && !ServerIsAlive(pidIfKnown))
 		{
-			break;
+			TEST_FAIL_WITH_MESSAGE("Server died!");
+			return -1;
 		}
 
-		::sleep(1);
-	}
-
-	// on Win32 we can check whether the process is alive
-	// without even checking the PID file
-
-	if (pidIfKnown && !ServerIsAlive(pidIfKnown))
-	{
-		TEST_FAIL_WITH_MESSAGE("Server died!");
-		return -1;
+		ShortSleep(MilliSecondsToBoxTime(100), false);
 	}
 
 	if (!TestFileNotEmpty(pidFile))
@@ -497,9 +492,6 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown)
 	}
 
 	BOX_TRACE("Server started");
-
-	// wait a second for the pid to be written to the file
-	::sleep(1);
 
 	// read pid file
 	int pid = ReadPidFile(pidFile);

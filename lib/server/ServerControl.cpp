@@ -302,8 +302,6 @@ int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_fi
 	int new_pid = LaunchServer(cmd_line, pid_file);
 	TEST_THAT_OR(new_pid != -1 && new_pid != 0, return 0);
 
-	::sleep(1);
-	TEST_THAT_OR(ServerIsAlive(new_pid), return 0);
 	return new_pid;
 }
 
@@ -313,20 +311,18 @@ bool StopDaemon(int current_pid, const std::string& pid_file,
 	TEST_THAT_OR(current_pid != 0, return false);
 	TEST_THAT_OR(ServerIsAlive(current_pid), return false);
 	TEST_THAT_OR(KillServer(current_pid, wait_for_process), return false);
-	::sleep(1);
-
 	TEST_THAT_OR(!ServerIsAlive(current_pid), return false);
 
-	#ifdef WIN32
-		int unlink_result = EMU_UNLINK(pid_file.c_str());
-		TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
-		if(unlink_result != 0)
-		{
-			return false;
-		}
-	#else
-		TestRemoteProcessMemLeaks(memleaks_file.c_str());
-	#endif
+#ifdef WIN32
+	int unlink_result = EMU_UNLINK(pid_file.c_str());
+	TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
+	if(unlink_result != 0)
+	{
+		return false;
+	}
+#else
+	TestRemoteProcessMemLeaks(memleaks_file.c_str());
+#endif
 
 	return true;
 }
