@@ -2200,15 +2200,12 @@ bool test_read_only_dirs_can_be_restored()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+#ifdef WIN32
 // Check that filenames in UTF-8 can be backed up
 bool test_unicode_filenames_can_be_backed_up()
 {
 	SETUP_WITH_BBSTORED();
 
-#ifndef WIN32
-	BOX_NOTICE("skipping test on this platform");
-	// requires ConvertConsoleToUtf8()
-#else
 	// TODO FIXME dedent
 	{
 		// We have no guarantee that a random Unicode string can be
@@ -2431,10 +2428,10 @@ bool test_unicode_filenames_can_be_backed_up()
 		// Check that no read error has been reported yet
 		TEST_THAT(!TestFileExists("testfiles/notifyran.read-error.1"));
 	}
-#endif // WIN32
 
 	TEARDOWN_TEST_BBACKUPD();
 }
+#endif // WIN32
 
 bool test_sync_allow_script_can_pause_backup()
 {
@@ -3376,14 +3373,11 @@ bool test_restore_files_and_directories()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+#ifdef WIN32
 bool test_compare_detects_attribute_changes()
 {
 	SETUP_WITH_BBSTORED();
 
-#ifndef WIN32
-	BOX_NOTICE("skipping test on this platform");
-	// requires openfile(), GetFileTime() and attrib.exe
-#else
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
@@ -3439,10 +3433,10 @@ bool test_compare_detects_attribute_changes()
 			lastAccessTime));
 		TEST_COMPARE(Compare_Same);
 	}
-#endif // WIN32
 
 	TEARDOWN_TEST_BBACKUPD();
 }
+#endif // WIN32
 
 bool test_sync_new_files()
 {
@@ -3973,7 +3967,13 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_initially_missing_locations_are_not_forgotten());
 	TEST_THAT(test_redundant_locations_deleted_on_time());
 	TEST_THAT(test_read_only_dirs_can_be_restored());
+
+#ifndef WIN32
+	// requires ConvertConsoleToUtf8()
+#else
 	TEST_THAT(test_unicode_filenames_can_be_backed_up());
+#endif
+
 	TEST_THAT(test_sync_allow_script_can_pause_backup());
 	TEST_THAT(test_delete_update_and_symlink_files());
 	TEST_THAT(test_store_error_reporting());
@@ -3985,7 +3985,13 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_continuously_updated_file());
 	TEST_THAT(test_delete_dir_change_attribute());
 	TEST_THAT(test_restore_files_and_directories());
+
+#ifndef WIN32
+	// requires openfile(), GetFileTime() and attrib.exe
+#else
 	TEST_THAT(test_compare_detects_attribute_changes());
+#endif
+
 	TEST_THAT(test_sync_new_files());
 	TEST_THAT(test_rename_operations());
 	TEST_THAT(test_sync_files_with_timestamps_in_future());
