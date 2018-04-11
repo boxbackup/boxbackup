@@ -323,7 +323,7 @@ bool StartServer(const std::string& daemon_args)
 {
 	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbstored_args);
 	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + daemon_args_final +
-		" testfiles/bbstored.conf", "testfiles/bbstored.pid");
+		" testfiles/bbstored.conf", "testfiles/bbstored.pid", 22011);
 	return bbstored_pid != 0;
 }
 
@@ -338,8 +338,8 @@ bool StopServer(bool wait_for_process)
 bool StartClient(const std::string& bbackupd_conf_file, const std::string& daemon_args)
 {
 	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbackupd_args);
-	bbackupd_pid = StartDaemon(bbackupd_pid, BBACKUPD " " + daemon_args_final +
-		" -c " + bbackupd_conf_file, "testfiles/bbackupd.pid");
+	bbackupd_pid = StartDaemon(bbackupd_pid, BBACKUPD " " + daemon_args_final + " -c " +
+		bbackupd_conf_file, "testfiles/bbackupd.pid", 0, "testfiles/bbackupd.sock");
 	return bbackupd_pid != 0;
 }
 
@@ -355,7 +355,7 @@ bool StartSimulator()
 {
 	s3simulator_pid = StartDaemon(s3simulator_pid,
 		"../../bin/s3simulator/s3simulator " + bbstored_args +
-		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
+		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid", 22080);
 	return s3simulator_pid != 0;
 }
 

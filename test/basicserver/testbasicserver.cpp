@@ -19,18 +19,17 @@
 
 #include <typeinfo>
 
-#include "Test.h"
-#include "Daemon.h"
-#include "Configuration.h"
-#include "ServerStream.h"
-#include "SocketStream.h"
-#include "IOStreamGetLine.h"
-#include "ServerTLS.h"
 #include "CollectInBufferStream.h"
-
+#include "Configuration.h"
+#include "Daemon.h"
+#include "IOStreamGetLine.h"
+#include "ServerControl.h"
+#include "ServerStream.h"
+#include "ServerTLS.h"
+#include "SocketStream.h"
+#include "Test.h"
 #include "TestContext.h"
 #include "autogen_TestProtocol.h"
-#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
@@ -603,8 +602,7 @@ int test(int argc, const char *argv[])
 		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv2 testfiles/srv2.conf";
-		int pid = LaunchServer(cmd, "testfiles/srv2.pid");
-
+		int pid = LaunchServer(cmd, "testfiles/srv2.pid", 2003, "testfiles/srv2.sock");
 		TEST_THAT(pid != -1 && pid != 0);
 
 		if(pid > 0)
@@ -673,8 +671,7 @@ int test(int argc, const char *argv[])
 		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv3 testfiles/srv3.conf";
-		int pid = LaunchServer(cmd, "testfiles/srv3.pid");
-
+		int pid = LaunchServer(cmd, "testfiles/srv3.pid", 2003, "testfiles/srv3.sock");
 		TEST_THAT(pid != -1 && pid != 0);
 
 		if(pid > 0)
@@ -754,8 +751,7 @@ int test(int argc, const char *argv[])
 		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv4 testfiles/srv4.conf";
-		int pid = LaunchServer(cmd, "testfiles/srv4.pid");
-
+		int pid = LaunchServer(cmd, "testfiles/srv4.pid", 2003, "testfiles/srv4.sock");
 		TEST_THAT(pid != -1 && pid != 0);
 
 		if(pid > 0)

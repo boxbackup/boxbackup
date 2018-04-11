@@ -3120,7 +3120,7 @@ int multi_server()
 	// First, try logging in without an account having been created... just make sure login fails.
 
 	int pid = LaunchServer(BBSTORED " testfiles/bbstored_multi.conf",
-		"testfiles/bbstored.pid");
+		"testfiles/bbstored.pid", 2201);
 
 	TEST_THAT(pid != -1 && pid != 0);
 	if(pid > 0)

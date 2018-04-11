@@ -19,9 +19,12 @@
 #include <string>
 
 #include "BoxTime.h"
+#include "Exception.h"
 #include "IOStreamGetLine.h"
 #include "ServerControl.h"
+#include "SocketStream.h"
 #include "Test.h"
+#include "autogen_ServerException.h"
 
 #ifdef WIN32
 
@@ -295,11 +298,182 @@ bool KillServer(const std::string& pid_file, bool WaitForProcess)
 	return status;
 }
 
-int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file)
+int LaunchServer(const std::string& rCommandLine, const char *pidFile, int port,
+	const std::string& socket_path)
+{
+	BOX_INFO("Starting server: " << rCommandLine);
+
+#ifdef WIN32
+
+	// Use a Windows "Job Object" as a container for all our child
+	// processes. The test runner will create this job object when
+	// it starts, and close the handle (killing any running daemons)
+	// when it exits. This is the best way to avoid daemons hanging
+	// around and causing subsequent tests to fail, and/or the test
+	// runner to hang waiting for a daemon that will never terminate.
+
+	PROCESS_INFORMATION procInfo;
+
+	STARTUPINFO startInfo;
+	startInfo.cb = sizeof(startInfo);
+	startInfo.lpReserved = NULL;
+	startInfo.lpDesktop  = NULL;
+	startInfo.lpTitle    = NULL;
+	startInfo.dwFlags = 0;
+	startInfo.cbReserved2 = 0;
+	startInfo.lpReserved2 = NULL;
+
+	std::string cmd = ConvertPaths(rCommandLine);
+	CHAR* tempCmd = strdup(cmd.c_str());
+
+	DWORD result = CreateProcess
+	(
+		NULL,        // lpApplicationName, naughty!
+		tempCmd,     // lpCommandLine
+		NULL,        // lpProcessAttributes
+		NULL,        // lpThreadAttributes
+		false,       // bInheritHandles
+		0,           // dwCreationFlags
+		NULL,        // lpEnvironment
+		NULL,        // lpCurrentDirectory
+		&startInfo,  // lpStartupInfo
+		&procInfo    // lpProcessInformation
+	);
+
+	free(tempCmd);
+
+	TEST_THAT_OR(result != 0,
+		BOX_LOG_WIN_ERROR("Failed to CreateProcess: " << rCommandLine);
+		return -1;
+		);
+
+	if(sTestChildDaemonJobObject != INVALID_HANDLE_VALUE)
+	{
+		if(!AssignProcessToJobObject(sTestChildDaemonJobObject, procInfo.hProcess))
+		{
+			BOX_LOG_WIN_WARNING("Failed to add child process to job object");
+		}
+	}
+
+	CloseHandle(procInfo.hProcess);
+	CloseHandle(procInfo.hThread);
+
+	return WaitForServerStartup(pidFile, (int)procInfo.dwProcessId, port, socket_path);
+
+#else // !WIN32
+
+	TEST_THAT_OR(RunCommand(rCommandLine) == 0,
+		TEST_FAIL_WITH_MESSAGE("Failed to start server: " << rCommandLine);
+		return -1;
+		)
+
+	return WaitForServerStartup(pidFile, 0, port, socket_path);
+
+#endif // WIN32
+}
+
+int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
+	const std::string& socket_path)
+{
+#ifdef WIN32
+	if(pidFile == NULL && port == 0 && socket_path == "")
+	{
+		return pidIfKnown;
+	}
+#else
+	// On other platforms there is no other way to get the PID, so a NULL pidFile doesn't
+	// make sense.
+	ASSERT(pidFile != NULL);
+#endif
+
+	// time for it to start up
+	BOX_TRACE("Waiting for server to start");
+
+	for (int i = 150; i >= 0; i--)
+	{
+		if(i == 0)
+		{
+			// ran out of time waiting
+			TEST_FAIL_WITH_MESSAGE("Server didn't start within expected time");
+			return -1;
+		}
+
+		ShortSleep(MilliSecondsToBoxTime(100), false);
+
+		if(!TestFileNotEmpty(pidFile))
+		{
+			// Hasn't written a complete PID file yet, go round again
+			continue;
+		}
+
+		// Once we know what PID the process has/had, we can check if it has died during or
+		// shortly after startup:
+		if (pidIfKnown && !ServerIsAlive(pidIfKnown))
+		{
+			TEST_FAIL_WITH_MESSAGE("Server died!");
+			return -1;
+		}
+
+		if(port != 0 || socket_path != "")
+		{
+			try
+			{
+				if(port != 0)
+				{
+					SocketStream conn;
+					conn.Open(Socket::TypeINET, "localhost", port);
+				}
+
+				if(socket_path != "")
+				{
+					SocketStream conn;
+					conn.Open(Socket::TypeUNIX, socket_path);
+				}
+			}
+			catch(ServerException &e)
+			{
+				if(EXCEPTION_IS_TYPE(e, ServerException, SocketOpenError))
+				{
+					// not listening on port, go round again
+					continue;
+				}
+				else
+				{
+					// something bad happened, break
+					throw;
+				}
+			}
+		}
+
+		// All tests that we can do have passed, looks good!
+		break;
+	}
+
+	BOX_TRACE("Server started");
+
+	// read pid file
+	int pid = ReadPidFile(pidFile);
+
+	// On Win32 we can check whether the PID in the pidFile matches
+	// the one returned by the system, which it always should.
+	if (pidIfKnown && pid != pidIfKnown)
+	{
+		BOX_ERROR("Server wrote wrong pid to file (" << pidFile <<
+			"): expected " << pidIfKnown << " but found " <<
+			pid);
+		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");
+		return -1;
+	}
+
+	return pid;
+}
+
+int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file, int port,
+	const std::string& socket_path)
 {
 	TEST_THAT_OR(current_pid == 0, return 0);
 
-	int new_pid = LaunchServer(cmd_line, pid_file);
+	int new_pid = LaunchServer(cmd_line, pid_file, port, socket_path);
 	TEST_THAT_OR(new_pid != -1 && new_pid != 0, return 0);
 
 	return new_pid;
