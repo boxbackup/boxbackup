@@ -729,6 +729,8 @@ int test(int argc, const char *argv[])
 			accountRootDir + "01/randomfile"));
 	}
 
+	RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
+
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Delete an entry for an object from dir, change that "
 		"object to be a patch, check it's deleted");
@@ -738,7 +740,6 @@ int test(int argc, const char *argv[])
 		// background. We could just stop the server, but on Windows that can leave the
 		// account half-cleaned and always leaves a PID file lying around, which breaks
 		// the rest of the test, so we do it this way on all platforms instead.
-		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
 		fs.GetLock();
 
 		// Open dir and find entry
@@ -826,17 +827,21 @@ int test(int argc, const char *argv[])
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Delete directory, change container ID of another, "
 		"duplicate entry in dir, spurious file size, delete file");
+	int64_t duplicatedID = 0;
+	int64_t notSpuriousFileSize = 0;
+
 	{
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
+		fs.GetLock();
+
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 		dir.SetContainerID(73773);
 		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-	}
-	int64_t duplicatedID = 0;
-	int64_t notSpuriousFileSize = 0;
-	{
-		BackupStoreDirectory dir;
+
 		LoadDirectory("Test1/cannes/ict/peep", dir);
+
 		// Duplicate the second entry
 		{
 			BackupStoreDirectory::Iterator i(dir);
@@ -846,6 +851,7 @@ int test(int argc, const char *argv[])
 			duplicatedID = en->GetObjectID();
 			dir.AddEntry(*en);
 		}
+
 		// Adjust file size of first file
 		{
 			BackupStoreDirectory::Iterator i(dir);
@@ -855,15 +861,18 @@ int test(int argc, const char *argv[])
 			en->SetSizeInBlocks(3473874);
 			TEST_THAT(en->GetSizeInBlocks() == 3473874);
 		}
+
 		SaveDirectory("Test1/cannes/ict/peep", dir);
+
+		// Delete a directory. The checker should be able to reconstruct it using the
+		// ContainerID of the contained files.
+		DeleteObject("Test1/pass/cacted/ming");
+
+		// Delete a file
+		DeleteObject("Test1/cannes/ict/scely");
+
+		fs.ReleaseLock();
 	}
-
-	// Delete a directory. The checker should be able to reconstruct it using the
-	// ContainerID of the contained files.
-	DeleteObject("Test1/pass/cacted/ming");
-
-	// Delete a file
-	DeleteObject("Test1/cannes/ict/scely");
 
 	// We don't know quite how good the checker is (or will become) at
 	// spotting errors! But asserting an exact number will help us catch
@@ -931,18 +940,22 @@ int test(int argc, const char *argv[])
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Modify the obj ID of dir, delete dir with no members, "
 		"add extra reference to a file");
-	// Set bad object ID
+
 	{
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
+		fs.GetLock();
+
+		// Set bad object ID
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 		dir.TESTONLY_SetObjectID(73773);
 		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-	}
-	// Delete dir with no members
-	DeleteObject("Test1/dir-no-members");
-	// Add extra reference
-	{
-		BackupStoreDirectory dir;
+
+		// Delete dir with no members
+		DeleteObject("Test1/dir-no-members");
+
+		// Add extra reference
 		LoadDirectory("Test1/divel", dir);
 		BackupStoreDirectory::Iterator i(dir);
 		BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
@@ -951,6 +964,8 @@ int test(int argc, const char *argv[])
 		LoadDirectory("Test1/divel/torsines/cruishery", dir2);
 		dir2.AddEntry(*en);
 		SaveDirectory("Test1/divel/torsines/cruishery", dir2);
+
+		fs.ReleaseLock();
 	}
 
 	// Fix it
@@ -988,7 +1003,6 @@ int test(int argc, const char *argv[])
 		// before damaging it, to avoid a race condition where bbstored runs housekeeping
 		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
 		// bbstoreaccounts check command to time out waiting for a lock.
-		RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
 		fs.GetLock();
 
 		// File
@@ -997,6 +1011,8 @@ int test(int argc, const char *argv[])
 		// Dir
 		CorruptObject("Test1/cannes/imulatrougge/foreomizes", 23,
 			"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
+
+		fs.ReleaseLock();
 	}
 
 	// Fix it
@@ -1008,11 +1024,17 @@ int test(int argc, const char *argv[])
 	// ------------------------------------------------------------------------------------------------
 	BOX_INFO("  === Overwrite root with a file");
 	{
+		// Wait for the server to finish housekeeping (if any) and then lock the account
+		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
+		fs.GetLock();
+
 		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
 		RaidFileWrite w(discSetNum, getObjectName(1 /* root */));
 		w.Open(true /* allow overwrite */);
 		r->CopyStreamTo(w);
 		w.Commit(true /* convert now */);
+
+		fs.ReleaseLock();
 	}
 
 	// Fix it
