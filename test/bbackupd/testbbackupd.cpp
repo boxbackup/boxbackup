@@ -3200,8 +3200,19 @@ bool test_read_error_reporting()
 
 bool test_continuously_updated_file()
 {
+	// Temporarily enable timestamp logging, to help debug race conditions causing
+	// test failures:
+	Console::SettingsGuard save_old_settings;
+	Console::SetShowTime(true);
+	Console::SetShowTimeMicros(true);
+
 	SETUP_WITH_BBSTORED();
-	TEST_THAT(StartClient());
+
+	// Start the bbackupd client. Enable logging to help debug race
+	// conditions causing test failure:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
+		"-kU -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
 	// TODO FIXME dedent
 	{
