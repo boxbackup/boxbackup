@@ -400,9 +400,10 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 
 		ShortSleep(MilliSecondsToBoxTime(100), false);
 
-		if(!TestFileNotEmpty(pidFile))
+		if(pidFile != NULL && !TestFileNotEmpty(pidFile))
 		{
 			// Hasn't written a complete PID file yet, go round again
+			BOX_TRACE("PID file doesn't exist: " << pidFile);
 			continue;
 		}
 
@@ -420,12 +421,14 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 			{
 				if(port != 0)
 				{
+					BOX_TRACE("Testing connection to port " << port);
 					SocketStream conn;
 					conn.Open(Socket::TypeINET, "localhost", port);
 				}
 
 				if(socket_path != "")
 				{
+					BOX_TRACE("Testing connection to socket " << socket_path);
 					SocketStream conn;
 					conn.Open(Socket::TypeUNIX, socket_path);
 				}
@@ -435,6 +438,7 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 				if(EXCEPTION_IS_TYPE(e, ServerException, SocketOpenError))
 				{
 					// not listening on port, go round again
+					BOX_TRACE("Failed to connect, will retry");
 					continue;
 				}
 				else
