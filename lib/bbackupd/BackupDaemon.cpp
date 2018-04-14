@@ -2053,7 +2053,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 	if(!mapCommandSocketInfo.get())
 	{
 		// failure case isn't too bad
-		::sleep(1);
+		BOX_TRACE("No command socket configured, sleeping for " <<
+			BOX_FORMAT_MICROSECONDS(RequiredDelay));
+		ShortSleep(RequiredDelay, false);
 		return;
 	}
 	
@@ -2074,6 +2076,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			// There should be no GetLine, as it would be holding onto a
 			// pointer to a dead mpConnectedSocket.
 			ASSERT(!mapCommandSocketInfo->mapGetLine.get());
+
+			BOX_TRACE("No command socket client connected, listening for a new "
+				"connection for " << BOX_FORMAT_MICROSECONDS(RequiredDelay));
 
 			// No connection, listen for a new one
 			mapCommandSocketInfo->mpConnectedSocket.reset(
@@ -2114,14 +2119,16 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 				if(!uidOK)
 				{
 					// Dump the connection
-					BOX_ERROR("Incoming command connection from peer had different user ID than this process, or security check could not be completed.");
+					BOX_ERROR("Incoming command connection from peer had "
+						"different user ID than this process, or security "
+						"check could not be completed.");
 					mapCommandSocketInfo->mpConnectedSocket.reset();
 					return;
 				}
 				else
 				{
 					// Log
-					BOX_INFO("Connection from command socket");
+					BOX_INFO("A new client connected to the command socket");
 					
 					// Send a header line summarising the configuration and current state
 					const Configuration &conf(GetConfiguration());
@@ -2138,8 +2145,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 					mapCommandSocketInfo->mpConnectedSocket->Write(
 						hello.str(), timeout);
 					
-					// Set the timeout to something very small, so we don't wait too long on waiting
-					// for any incoming data
+					// Set the timeout to something very small, so we don't wait
+					// too long on waiting for any incoming data
 					timeout = 10; // milliseconds
 				}
 			}
@@ -2150,6 +2157,9 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 		}
 
 		// So there must be a connection now.
+		BOX_TRACE("A command socket client is connected, sending ping and waiting for a "
+			"command for " << BOX_FORMAT_MICROSECONDS(RequiredDelay));
+
 		ASSERT(mapCommandSocketInfo->mpConnectedSocket.get() != 0);
 		ASSERT(mapCommandSocketInfo->mapGetLine.get() != 0);
 		
