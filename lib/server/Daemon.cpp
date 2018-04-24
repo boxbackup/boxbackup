@@ -460,7 +460,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 		// Open PID file for writing
 		pidFileName = serverConfig.GetKeyValue("PidFile");
-		FileHandleGuard<(O_WRONLY | O_CREAT | O_TRUNC), (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)> pidFile(pidFileName.c_str());
+		mapPidFile.reset(new FileStream(pidFileName, (O_WRONLY | O_CREAT | O_TRUNC),
+			(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH), FileStream::EXCLUSIVE));
 	
 #ifndef WIN32
 		// Handle changing to a different user
@@ -470,7 +471,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 			UnixUser daemonUser(serverConfig.GetKeyValue("User").c_str());
 			
 			// Change the owner on the PID file, so it can be deleted properly on termination
-			if(::fchown(pidFile, daemonUser.GetUID(), daemonUser.GetGID()) != 0)
+			if(::fchown(mapPidFile->GetFileHandle(), daemonUser.GetUID(),
+				daemonUser.GetGID()) != 0)
 			{
 				THROW_EXCEPTION(ServerException, CouldNotChangePIDFileOwner)
 			}
@@ -556,18 +558,6 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 #endif // !WIN32
 
-		// Write PID to file
-		std::ostringstream pid_buf;
-		pid_buf << getpid();
-		std::string pid_str = pid_buf.str();
-
-		if(::write(pidFile, pid_str.c_str(), pid_str.size()) != pid_str.size())
-		{
-			BOX_LOG_SYS_FATAL("Failed to write PID file: " <<
-				pidFileName);
-			THROW_EXCEPTION(ServerException, DaemoniseFailed)
-		}
-		
 		// Set up memory leak reporting
 		#ifdef BOX_MEMORY_LEAK_TESTING
 		{
@@ -607,6 +597,8 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Log the start message
 		BOX_NOTICE("Starting daemon, version: " << BOX_VERSION);
 		BOX_NOTICE("Using configuration file: " << mConfigFileName);
+
+		ServerIsReady();
 	}
 	catch(BoxException &e)
 	{
@@ -710,6 +702,23 @@ int Daemon::Main(const std::string &rConfigFileName)
 	spDaemon = NULL;
 
 	return retcode;
+}
+
+void Daemon::WritePidFile()
+{
+	// We only want to write the PID file once, but we might be called again by
+	// ServerStream::Run2 (via NotifyListenerIsReady) and we just want to do nothing
+	// in that case.
+
+	if(mapPidFile.get() != NULL)
+	{
+		std::ostringstream pid_buf;
+		pid_buf << getpid();
+		std::string pid_str = pid_buf.str();
+
+		mapPidFile->Write(pid_str);
+		mapPidFile.reset();
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -875,10 +884,10 @@ const Configuration &Daemon::GetConfiguration() const
 //
 // Function
 //		Name:    Daemon::SetupInInitialProcess()
-//		Purpose: A chance for the daemon to do something initial
-//			 setting up in the process which initiates
-//			 everything, and after the configuration file has
-//			 been read and verified.
+//		Purpose: A chance for the daemon to do some initial setup in
+//			 the process which initiates everything, before
+//		         forking, and after the configuration file has been
+//		         read and verified.
 //		Created: 2003/08/20
 //
 // --------------------------------------------------------------------------

@@ -93,6 +93,7 @@ public:
 		return std::string("local file ") + mFileName;
 	}
 	const std::string GetFileName() const { return mFileName; }
+	tOSFileHandle GetFileHandle() { return mOSFileHandle; }
 
 private:
 	tOSFileHandle mOSFileHandle;

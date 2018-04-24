@@ -389,7 +389,7 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 	// time for it to start up
 	BOX_TRACE("Waiting for server to start");
 
-	for (int i = 150; i >= 0; i--)
+	for(int i = 150; i >= 0; i--)
 	{
 		if(i == 0)
 		{
@@ -409,12 +409,16 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 
 		// Once we know what PID the process has/had, we can check if it has died during or
 		// shortly after startup:
-		if (pidIfKnown && !ServerIsAlive(pidIfKnown))
+		if(pidIfKnown && !ServerIsAlive(pidIfKnown))
 		{
 			TEST_FAIL_WITH_MESSAGE("Server died!");
 			return -1;
 		}
 
+#if 0
+		// It would be nice to check that the listening socket is open, but this appears to
+		// upset the listening process, so we simply ensure that the server does not finish
+		// writing the PID file until it's ready to accept connections instead.
 		if(port != 0 || socket_path != "")
 		{
 			try
@@ -448,6 +452,7 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 				}
 			}
 		}
+#endif
 
 		// All tests that we can do have passed, looks good!
 		break;

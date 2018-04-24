@@ -129,7 +129,15 @@ public:
 	}
 	
 protected:
-	virtual void NotifyListenerIsReady() { }
+	virtual void ServerIsReady()
+	{
+		// Daemon::ServerIsReady writes the PID file at this point. We override it here to
+		// delay this until the socket is listening, when NotifyListenerIsReady() is called.
+	}
+	virtual void NotifyListenerIsReady()
+	{
+		WritePidFile();
+	}
 	virtual void LogConnectionDetails(std::string details)
 	{
 		BOX_NOTICE("Handling incoming connection from " << details);

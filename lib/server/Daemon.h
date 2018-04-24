@@ -39,7 +39,6 @@ public:
 private:
 	Daemon(const Daemon &rToCopy);
 public:
-
 	virtual int Main(const std::string& rDefaultConfigFile, int argc,
 		const char *argv[]);
 	virtual int ProcessOptions(int argc, const char *argv[]);
@@ -101,6 +100,13 @@ protected:
 					!mLogLevel.mTruncateLogFile));
 		}
 	}
+	virtual void ServerIsReady()
+	{
+		// Normally we write the PID file at this point. Subclasses may wish to override
+		// this to delay writing.
+		WritePidFile();
+	}
+	void WritePidFile();
 
 private:
 	static void SignalHandler(int sigraised);
@@ -121,6 +127,7 @@ private:
 	std::auto_ptr<FileLogger> mapLogFileLogger;
 	static Daemon *spDaemon;
 	std::string mAppName;
+	std::auto_ptr<FileStream> mapPidFile;
 };
 
 #define DAEMON_VERIFY_SERVER_KEYS \
