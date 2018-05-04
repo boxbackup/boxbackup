@@ -255,6 +255,21 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	return 0;
 }
 
+bool BackupAccountControl::ConfirmDeletion()
+{
+	BOX_WARNING("Really delete account " << mapFileSystem->GetAccountIdentifier() << "? "
+		"(type 'yes' to confirm)");
+	char response[256];
+	if(::fgets(response, sizeof(response), stdin) == 0 || ::strcmp(response, "yes\n") != 0)
+	{
+		BOX_NOTICE("Deletion cancelled.");
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
 
 int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 {
@@ -263,16 +278,9 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	OpenAccount(true); // readWrite
 
 	// Check user really wants to do this
-	if(AskForConfirmation)
+	if(AskForConfirmation && !ConfirmDeletion())
 	{
-		BOX_WARNING("Really delete account " <<
-			BOX_FORMAT_ACCOUNT(mAccountID) << "? (type 'yes' to confirm)");
-		char response[256];
-		if(::fgets(response, sizeof(response), stdin) == 0 || ::strcmp(response, "yes\n") != 0)
-		{
-			BOX_NOTICE("Deletion cancelled.");
-			return 0;
-		}
+		return 0;
 	}
 
 	// Back to original user, but write lock is maintained
@@ -623,4 +631,88 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 	BackupAccountControl::CreateAccount(S3_FAKE_ACCOUNT_ID, SoftLimit, HardLimit, name);
 
 	return 0;
+}
+
+
+void S3BackupAccountControl::OpenAccount(bool readWrite)
+{
+	// We always have an S3BackupFileSystem, because we created one in the constructor.
+	// So all we need to do is maybe lock it for writing.
+	if(readWrite)
+	{
+		mapFileSystem->GetLock();
+	}
+}
+
+
+int S3BackupAccountControl::DeleteAccount(bool AskForConfirmation)
+{
+	// Obtain a write lock, as the daemon user
+	// We definitely need a lock to do something this destructive!
+	OpenAccount(true); // readWrite
+
+	// Check user really wants to do this
+	if(AskForConfirmation && !ConfirmDeletion())
+	{
+		return 0;
+	}
+
+	S3BackupFileSystem& fs(dynamic_cast<S3BackupFileSystem &>(*mapFileSystem));
+
+	// We need to close the refcount DB, if open, otherwise it will be written back to storage
+	// when the FileSystem is destroyed, after we've deleted it below.
+	if(fs.GetCurrentRefCountDatabase() != NULL)
+	{
+		fs.CloseRefCountDatabase(fs.GetCurrentRefCountDatabase());
+	}
+
+	BackupStoreInfo& info(fs.GetBackupStoreInfo(false)); // !ReadOnly
+
+	// Delete any objects that may exist on the store
+	for(int64_t i = 1; i <= info.GetLastObjectIDUsed(); i++)
+	{
+		fs.DeleteObjectUnknown(i, true); // missing_ok
+	}
+
+	int ret = 0;
+
+	// Be robust to the nonexistence of files, so that we can *at least* delete a damaged store.
+	try
+	{
+		fs.mrClient.DeleteObjectChecked(fs.GetMetadataURI(S3_INFO_FILE_NAME),
+			"Failed to delete store info file", false); // !missing_ok
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, FileNotFound))
+		{
+			BOX_WARNING(e.GetMessage());
+			ret = 1;
+		}
+		else
+		{
+			throw;
+		}
+	}
+
+	try
+	{
+		fs.mrClient.DeleteObjectChecked(fs.GetMetadataURI(S3_REFCOUNT_FILE_NAME),
+			"Failed to delete store refcount database", false); // !missing_ok
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, FileNotFound))
+		{
+			BOX_WARNING(e.GetMessage());
+			ret = 1;
+		}
+		else
+		{
+			throw;
+		}
+	}
+
+	// Success!
+	return ret;
 }

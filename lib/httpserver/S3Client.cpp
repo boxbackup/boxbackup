@@ -512,3 +512,47 @@ void S3Client::CheckResponse(const HTTPResponse& response, const std::string& me
 	}
 }
 
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    S3Client::DeleteObjectChecked(std::string rObjectURI,
+//		         std::string message, bool missing_ok)
+//		Purpose: Delete the specified URI, and check the response,
+//		         raising an exception if the file doesn't exist
+//		         (if missing_ok is false, which it is by default) or
+//		         if anything else goes wrong. The supplied message
+//		         will be prepended to any such exception message.
+//		         Returns false if missing_ok is true and the file
+//		         does not exist (and the server does not have
+//		         idempotent DELETEs), true otherwise.
+//		Created: 04/05/2018
+//
+// --------------------------------------------------------------------------
+
+bool S3Client::DeleteObjectChecked(const std::string& rObjectURI, const std::string& message,
+	bool missing_ok)
+{
+	// If DELETE is idempotent, then we won't get an error response if the file doesn't exist,
+	// so we have to check its existence using a HEAD request first. Note that there is a race
+	// condition here, so don't rely on it!
+	if(!missing_ok)
+	{
+		HTTPResponse response = HeadObject(rObjectURI);
+		CheckResponse(response, message + ": failed to HEAD URI " + rObjectURI,
+			false); // !ExpectNoContent
+		// Although there is no content in the response, the HEAD verb is specified to
+		// return exactly the same status as the GET verb, i.e. 200 OK, even so.
+
+	}
+
+	HTTPResponse response = DeleteObject(rObjectURI);
+	if(response.GetResponseCode() == HTTPResponse::Code_NotFound && missing_ok)
+	{
+		// If DELETE is really idempotent, then this will never happen, so don't rely on it!
+		return false;
+	}
+
+	CheckResponse(response, message + ": failed to DELETE URI " + rObjectURI,
+		true); // ExpectNoContent
+	return true;
+}

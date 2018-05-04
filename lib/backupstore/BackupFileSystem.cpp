@@ -322,9 +322,9 @@ public:
 	{ }
 	virtual ~BackupStoreRefCountDatabaseWrapper()
 	{
-		// If this is the permanent database, and not read-only, it to permanent
-		// storage on destruction. (TODO: avoid double Save() by AfterCommit
-		// handler and this destructor)
+		// If this is the permanent database, and not read-only, write it to permanent
+		// storage on object destruction. (TODO: avoid double Save() by AfterCommit
+		// handler and this destructor for potential databases).
 		if(this == mrFileSystem.mapPermanentRefCountDatabase.get() &&
 			// ReadOnly: don't make the database read-write if it isn't already
 			!IsReadOnly())
@@ -909,11 +909,24 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetTemporaryFileStream(int64_t id)
 
 // Delete an object whose type is unknown. For RaidFile, we don't need to know what type
 // it is to use RaidFileWrite::Delete() on it.
-void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
+void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID, bool missing_ok)
 {
 	std::string filename = GetObjectFileName(ObjectID, false);
 	RaidFileWrite deleteFile(mStoreDiscSet, filename);
-	deleteFile.Delete();
+	try
+	{
+		deleteFile.Delete();
+	}
+	catch(RaidFileException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, RaidFileException, RaidFileDoesntExist) && missing_ok)
+		{
+			return;
+		}
+
+		// Otherwise, something bad happened, so rethrow the exception:
+		throw;
+	}
 }
 
 
@@ -1777,38 +1790,37 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetTemporaryFileStream(int64_t id)
 
 void S3BackupFileSystem::DeleteDirectory(int64_t ObjectID)
 {
-	std::string uri = GetDirectoryURI(ObjectID);
-	HTTPResponse response = mrClient.DeleteObject(uri);
-	mrClient.CheckResponse(response,
-		std::string("Failed to delete directory: ") + uri,
-		true); // ExpectNoContent
+	std::ostringstream msg;
+	msg << "Failed to delete directory object " << BOX_FORMAT_OBJECTID(ObjectID);
+	mrClient.DeleteObjectChecked(GetDirectoryURI(ObjectID), msg.str());
 }
 
 
 void S3BackupFileSystem::DeleteFile(int64_t ObjectID)
 {
-	std::string uri = GetFileURI(ObjectID);
-	HTTPResponse response = mrClient.DeleteObject(uri);
-	mrClient.CheckResponse(response,
-		std::string("Failed to delete file: ") + uri,
-		true); // ExpectNoContent
+	std::ostringstream msg;
+	msg << "Failed to delete file object " << BOX_FORMAT_OBJECTID(ObjectID);
+	mrClient.DeleteObjectChecked(GetFileURI(ObjectID), msg.str());
 }
 
-void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID)
+
+void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID, bool missing_ok)
 {
-	std::string uri = GetFileURI(ObjectID);
-	HTTPResponse response = mrClient.DeleteObject(uri);
-	// It might be a directory instead, try that before returning an error.
-	if(response.GetResponseCode() == HTTPResponse::Code_NotFound)
-	{
-		std::string uri = GetDirectoryURI(ObjectID);
-		response = mrClient.DeleteObject(uri);
-	}
-	mrClient.CheckResponse(response,
-		std::string("Failed to delete file or directory: ") + uri,
-		true); // ExpectNoContent
-}
+	// It might be a directory or a file:
+	std::string file_uri = GetFileURI(ObjectID);
+	std::string dir_uri = GetDirectoryURI(ObjectID);
 
+	std::ostringstream msg;
+	msg << "Failed to delete file or directory object " << BOX_FORMAT_OBJECTID(ObjectID);
+
+	bool success = true;
+	success &= mrClient.DeleteObjectChecked(file_uri, msg.str(), true); // missing_ok
+	success &= mrClient.DeleteObjectChecked(dir_uri, msg.str(), true); // missing_ok
+	if(!success)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, ObjectDoesNotExist, msg.str());
+	}
+}
 
 
 class S3PutFileCompleteTransaction : public BackupFileSystem::Transaction
@@ -1869,9 +1881,8 @@ S3PutFileCompleteTransaction::~S3PutFileCompleteTransaction()
 {
 	if(!mCommitted)
 	{
-		HTTPResponse response = mrClient.DeleteObject(mFileURI);
-		mrClient.CheckResponse(response, "Failed to delete uploaded file from Amazon S3",
-			true); // ExpectNoContent
+		mrClient.DeleteObjectChecked(mFileURI,
+			"Failed to delete uploaded file from Amazon S3", false); // !missing_ok
 	}
 }
 
@@ -1987,7 +1998,7 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetObject(int64_t ObjectID, bool req
 	}
 
 	mrClient.CheckResponse(*ap_response,
-		std::string("Failed to download requested file: " + uri));
+		std::string("Failed to download requested file: ") + uri);
 	return static_cast<std::auto_ptr<IOStream> >(ap_response);
 }
 

@@ -9,6 +9,10 @@
 
 #include "Box.h"
 
+#ifdef HAVE_DIRENT_H
+#	include <dirent.h> // for opendir(), struct DIR
+#endif
+
 #ifndef WIN32
 #	include <csignal>
 #endif
@@ -72,7 +76,7 @@ bool kill_running_daemons()
 
 bool check_new_account_info();
 
-bool test_create_account_with_account_control()
+bool test_create_and_delete_account_with_account_control()
 {
 	SETUP_TEST_S3SIMULATOR();
 
@@ -84,9 +88,40 @@ bool test_create_account_with_account_control()
 		S3BackupAccountControl control(*config);
 		control.CreateAccount("test", 1000, 2000);
 		TEST_THAT(check_new_account_info());
+
+		TEST_THAT(FileExists("testfiles/store/subdir/0x1.dir"));
+		TEST_THAT(FileExists("testfiles/store/subdir/boxbackup.info"));
+		TEST_THAT(FileExists("testfiles/store/subdir/boxbackup.refcount.db"));
+
+		control.DeleteAccount(false); // !AskForConfirmation
+
+		TEST_THAT(!FileExists("testfiles/store/subdir/0x1.dir"));
+		TEST_THAT(!FileExists("testfiles/store/subdir/boxbackup.info"));
+		TEST_THAT(!FileExists("testfiles/store/subdir/boxbackup.refcount.db"));
+
 		// Exit scope to release S3BackupFileSystem now, writing the refcount db back to the
 		// store, before stopping the simulator daemon!
 	}
+
+	DIR* pDir = opendir("testfiles/store/subdir");
+	if(!pDir)
+	{
+		THROW_SYS_FILE_ERROR("Failed to open test temporary directory",
+			"testfiles/store/subdir", CommonException, Internal);
+	}
+
+	struct dirent* pEntry;
+	for(pEntry = readdir(pDir); pEntry; pEntry = readdir(pDir))
+	{
+		std::string filename = pEntry->d_name;
+		if(filename != "." && filename != "..")
+		{
+			TEST_FAIL_WITH_MESSAGE("Unexpected file remained in testfiles/store/subdir "
+				"after account deletion: " + filename);
+		}
+	}
+
+	closedir(pDir);
 
 	TEARDOWN_TEST_S3SIMULATOR();
 }
@@ -164,7 +199,7 @@ int test(int argc, const char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
-	TEST_THAT(test_create_account_with_account_control());
+	TEST_THAT(test_create_and_delete_account_with_account_control());
 	TEST_THAT(test_bbstoreaccounts_commands());
 
 	return finish_test_suite();

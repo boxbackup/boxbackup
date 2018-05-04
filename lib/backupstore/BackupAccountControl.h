@@ -30,7 +30,8 @@ protected:
 	bool mMachineReadableOutput;
 	std::auto_ptr<BackupFileSystem> mapFileSystem;
 
-	virtual void OpenAccount(bool readWrite) { }
+	bool ConfirmDeletion();
+	virtual void OpenAccount(bool readWrite) = 0;
 	virtual int GetBlockSize()
 	{
 		return mapFileSystem->GetBlockSize();
@@ -55,6 +56,7 @@ public:
 	virtual BackupFileSystem* GetCurrentFileSystem() { return mapFileSystem.get(); }
 	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
 		const std::string& AccountName);
+	virtual int DeleteAccount(bool AskForConfirmation) = 0;
 };
 
 
@@ -65,6 +67,9 @@ private:
 	std::string mRootDir;
 	int mDiscSetNum;
 	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
+
+protected:
+	virtual void OpenAccount(bool readWrite);
 
 public:
 	BackupStoreAccountControl(const Configuration& config, int32_t AccountID,
@@ -95,8 +100,6 @@ public:
 		OpenAccount(false); // !ReadWrite
 		return *mapFileSystem;
 	}
-protected:
-	virtual void OpenAccount(bool readWrite);
 };
 
 class S3BackupAccountControl : public BackupAccountControl
@@ -104,6 +107,9 @@ class S3BackupAccountControl : public BackupAccountControl
 private:
 	std::auto_ptr<S3Client> mapS3Client;
 	// mapFileSystem is inherited from BackupAccountControl
+
+protected:
+	virtual void OpenAccount(bool readWrite);
 
 public:
 	S3BackupAccountControl(const Configuration& config,
@@ -116,6 +122,7 @@ public:
 	}
 	int CreateAccount(const std::string& name, int32_t SoftLimit, int32_t HardLimit);
 	int GetBlockSize() { return 4096; }
+	int DeleteAccount(bool AskForConfirmation);
 
 	virtual BackupFileSystem& GetFileSystem()
 	{

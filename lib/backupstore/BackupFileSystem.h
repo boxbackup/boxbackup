@@ -120,7 +120,7 @@ public:
 		std::vector<int64_t>& rPatchChain);
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
-	virtual void DeleteObjectUnknown(int64_t ObjectID) = 0;
+	virtual void DeleteObjectUnknown(int64_t ObjectID, bool missing_ok = false) = 0;
 	virtual bool CanMergePatchesEasily() = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID) = 0;
@@ -265,7 +265,7 @@ public:
 		// RaidFile doesn't care what type of object it is
 		DeleteObjectUnknown(ObjectID);
 	}
-	virtual void DeleteObjectUnknown(int64_t ObjectID);
+	virtual void DeleteObjectUnknown(int64_t ObjectID, bool missing_ok = false);
 	virtual bool CanMergePatchesEasily() { return true; }
 	std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID);
@@ -355,7 +355,7 @@ public:
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
 	virtual void DeleteFile(int64_t ObjectID);
 	virtual void DeleteDirectory(int64_t ObjectID);
-	virtual void DeleteObjectUnknown(int64_t ObjectID);
+	virtual void DeleteObjectUnknown(int64_t ObjectID, bool missing_ok = false);
 
 	// These should not really be APIs, but they are public to make them testable:
 	const std::string& GetSimpleDBDomain() const { return mSimpleDBDomain; }
