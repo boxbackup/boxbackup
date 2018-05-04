@@ -2528,6 +2528,7 @@ bool test_file_encoding()
 	SETUP_TEST_BACKUPSTORE();
 
 	int encfile[ENCFILE_SIZE];
+
 	{
 		for(int l = 0; l < ENCFILE_SIZE; ++l)
 		{
@@ -2591,7 +2592,7 @@ bool test_file_encoding()
 			free(decoded);
 		}
 
-		// The test block to a file
+		// Write the test block to a file
 		{
 			FileStream f("testfiles/testenc1", O_WRONLY | O_CREAT);
 			f.Write(encfile, sizeof(encfile));
@@ -2837,28 +2838,51 @@ bool test_login_without_account()
 	TEARDOWN_TEST_BACKUPSTORE();
 }
 
-bool test_bbstoreaccounts_create()
+bool test_bbstoreaccounts_create(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
 
 	// Delete the account, and create it again using bbstoreaccounts
-	delete_account();
+	control.DeleteAccount(false); // !AskForConfirmation
+	fs.ReleaseLock();
 
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf -Wwarning create 01234567 0 "
-		"10000B 20000B") == 0, FAIL);
+	if(specialisation_name == "s3")
+	{
+		// Note: this is very similar to test_s3store/test_bbstoreaccounts_commands
+		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -3 -c " DEFAULT_BBACKUPD_CONFIG_FILE " "
+			"-Wwarning create test 10000B 20000B") == 0, FAIL);
+	}
+	else
+	{
+		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf "
+			"-Wwarning create 01234567 0 10000B 20000B") == 0, FAIL);
+	}
+
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
-	TEST_EQUAL(0x01234567, info->GetAccountID());
+	if(specialisation_name == "s3")
+	{
+		TEST_EQUAL(S3_FAKE_ACCOUNT_ID, info->GetAccountID());
+		TEST_EQUAL(1, info->GetBlocksUsed());
+		TEST_EQUAL(1, info->GetBlocksInDirectories());
+		TEST_EQUAL("test", info->GetAccountName());
+	}
+	else
+	{
+		TEST_EQUAL(0x01234567, info->GetAccountID());
+		TEST_EQUAL(2, info->GetBlocksUsed());
+		TEST_EQUAL(2, info->GetBlocksInDirectories());
+		TEST_EQUAL("", info->GetAccountName());
+	}
+
 	TEST_EQUAL(1, info->GetLastObjectIDUsed());
-	TEST_EQUAL(2, info->GetBlocksUsed());
 	TEST_EQUAL(0, info->GetBlocksInCurrentFiles());
 	TEST_EQUAL(0, info->GetBlocksInOldFiles());
 	TEST_EQUAL(0, info->GetBlocksInDeletedFiles());
-	TEST_EQUAL(2, info->GetBlocksInDirectories());
 	TEST_EQUAL(0, info->GetDeletedDirectories().size());
 	TEST_EQUAL(10000, info->GetBlocksSoftLimit());
 	TEST_EQUAL(20000, info->GetBlocksHardLimit());
@@ -2869,14 +2893,12 @@ bool test_bbstoreaccounts_create()
 	TEST_EQUAL(true, info->IsAccountEnabled());
 	TEST_EQUAL(true, info->IsReadOnly());
 	TEST_EQUAL(0, info->GetClientStoreMarker());
-	TEST_EQUAL("", info->GetAccountName());
 
-	std::auto_ptr<RaidFileRead> root_stream =
-		get_raid_file(BACKUPSTORE_ROOT_DIRECTORY_ID);
-	BackupStoreDirectory root_dir(*root_stream);
+	BackupStoreDirectory root_dir;
+	fs.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, root_dir);
 	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_bbstoreaccounts_delete()
@@ -3781,7 +3803,6 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(test_filename_encoding());
 	TEST_THAT(test_temporary_refcount_db_is_independent());
-	TEST_THAT(test_bbstoreaccounts_create());
 	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
 
@@ -3791,6 +3812,8 @@ int test(int argc, const char *argv[])
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
 	{
+		RUN_SPECIALISED_TEST(i->first, i->second,
+			test_bbstoreaccounts_create);
 		RUN_SPECIALISED_TEST(i->first, i->second,
 			test_directory_parent_entry_tracks_directory_size);
 		RUN_SPECIALISED_TEST(i->first, i->second,
