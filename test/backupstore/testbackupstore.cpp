@@ -240,6 +240,9 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 			status = false);
 		TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
 	}
+
+	// Release the lock (acquired by check_account_and_fix_errors if it wasn't already held)
+	// before the next test's setUp deletes all files in the store, including the lockfile:
 	fs.ReleaseLock();
 
 	return status;
@@ -248,10 +251,6 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 #define _TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, check_for_errors) \
 		if (ServerIsAlive(bbstored_pid)) \
 			StopServer(); \
-		if(control.GetCurrentFileSystem() != NULL) \
-		{ \
-			control.GetCurrentFileSystem()->ReleaseLock(); \
-		} \
 		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control, \
 			check_for_errors), FAIL); \
 	} \
@@ -261,10 +260,6 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 			name << ": " << e.what()); \
 		if (ServerIsAlive(bbstored_pid)) \
 			StopServer(); \
-		if(control.GetCurrentFileSystem() != NULL) \
-		{ \
-			control.GetCurrentFileSystem()->ReleaseLock(); \
-		} \
 		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control, \
 			check_for_errors), FAIL); \
 		throw; \
@@ -3167,40 +3162,6 @@ bool test_account_limits_respected(const std::string& specialisation_name,
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-int multi_server()
-{
-	printf("Starting server for connection from remote machines...\n");
-
-	// Create an account for the test client
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf create 01234567 0 "
-		"30000B 40000B") == 0, FAIL);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-	// First, try logging in without an account having been created... just make sure login fails.
-
-	int pid = LaunchServer(BBSTORED " testfiles/bbstored_multi.conf",
-		"testfiles/bbstored.pid", 2201);
-
-	TEST_THAT(pid != -1 && pid != 0);
-	if(pid > 0)
-	{
-		::sleep(1);
-		TEST_THAT(ServerIsAlive(pid));
-
-		// Wait for a keypress
-		printf("Press ENTER to terminate the server\n");
-		char line[512];
-		fgets(line, 512, stdin);
-		printf("Terminating server...\n");
-
-		// Kill it
-		TEST_THAT(StopServer());
-	}
-
-	return 0;
-}
-
 bool test_open_files_with_limited_win32_permissions()
 {
 #ifdef WIN32
@@ -3766,7 +3727,6 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 
 	TEARDOWN_TEST_BACKUPSTORE();
 }
-
 
 int test(int argc, const char *argv[])
 {
