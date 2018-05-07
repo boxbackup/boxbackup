@@ -325,14 +325,21 @@ int main(int argc, const char *argv[])
 		else if(command == "delete")
 		{
 			// Delete an account
-			STORE_ONLY;
-
 			bool askForConfirmation = true;
+
 			if(argc >= 1 && (::strcmp(argv[0], "yes") == 0))
 			{
 				askForConfirmation = false;
 			}
-			return apStoreControl->DeleteAccount(askForConfirmation);
+
+			if(amazon_S3_mode)
+			{
+				return apS3Control->DeleteAccount(askForConfirmation);
+			}
+			else
+			{
+				return apStoreControl->DeleteAccount(askForConfirmation);
+			}
 		}
 		else if(command == "check")
 		{

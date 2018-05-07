@@ -159,17 +159,9 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1); \
 	TEST_THAT_OR(create_account(10000, 20000), FAIL);
 
-bool setup_test_backupstore_specialised(const std::string& spec_name,
+bool create_test_account_specialised(const std::string& spec_name,
 	BackupAccountControl& control)
 {
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), FAIL);
-	}
-
-	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
 	if(spec_name == "s3")
 	{
 		TEST_THAT_OR(
@@ -188,6 +180,22 @@ bool setup_test_backupstore_specialised(const std::string& spec_name,
 			"Don't know how to create accounts for store type: " <<
 			spec_name);
 	}
+
+	return true;
+}
+
+bool setup_test_backupstore_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	TEST_THAT_OR(create_test_account_specialised(spec_name, control), FAIL);
 
 	return true;
 }
@@ -2745,10 +2753,6 @@ bool test_store_info(const std::string& specialisation_name,
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
-	BackupStoreContext context(fs, 0x01234567, NULL, // mpHousekeeping
-		"fake test connection"); // rConnectionDetails
-	std::auto_ptr<BackupProtocolLocal2> apProtocol(
-		new BackupProtocolLocal2(context, 0x01234567, false)); // !ReadOnly
 
 	{
 		BackupStoreInfo info(
@@ -2901,17 +2905,30 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-bool test_bbstoreaccounts_delete()
+bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf -Wwarning delete 01234567 yes") == 0, FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
+	fs.ReleaseLock();
+
+	if(specialisation_name == "s3")
+	{
+		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -3 -c " DEFAULT_BBACKUPD_CONFIG_FILE " "
+			"-Wwarning delete yes") == 0, FAIL);
+	}
+	else
+	{
+		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf "
+			"-Wwarning delete 01234567 yes") == 0, FAIL);
+	}
+
 	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
 
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
-	TEST_THAT(create_account(10000, 20000));
+	TEST_THAT(create_test_account_specialised(specialisation_name, control));
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 // Test that login fails on a disabled account
@@ -3803,7 +3820,6 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(test_filename_encoding());
 	TEST_THAT(test_temporary_refcount_db_is_independent());
-	TEST_THAT(test_bbstoreaccounts_delete());
 	TEST_THAT(test_backupstore_directory());
 
 	// Run all tests that take a BackupAccountControl argument twice, once with an
@@ -3814,6 +3830,8 @@ int test(int argc, const char *argv[])
 	{
 		RUN_SPECIALISED_TEST(i->first, i->second,
 			test_bbstoreaccounts_create);
+		RUN_SPECIALISED_TEST(i->first, i->second,
+			test_bbstoreaccounts_delete);
 		RUN_SPECIALISED_TEST(i->first, i->second,
 			test_directory_parent_entry_tracks_directory_size);
 		RUN_SPECIALISED_TEST(i->first, i->second,
