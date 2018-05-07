@@ -251,7 +251,7 @@ int ReadPidFile(const char *pidFile);
 #define TestRemoteProcessMemLeaks(filename) \
 	TestRemoteProcessMemLeaksFunc(filename, __FILE__, __LINE__)
 
-void TestRemoteProcessMemLeaksFunc(const char *filename,
+bool TestRemoteProcessMemLeaksFunc(const char *filename,
 	const char* file, int line);
 
 void force_sync();

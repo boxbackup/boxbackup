@@ -429,6 +429,29 @@ std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
 	}
 }
 
+bool run_bbstoreaccounts_specialised(const std::string& specialisation_name,
+	const std::string& command, const std::string& common_args,
+	const std::string& s3_args = "", const std::string& store_args = "")
+{
+	if(specialisation_name == "s3")
+	{
+		// Note: this is very similar to test_s3store/test_bbstoreaccounts_commands
+		TEST_THAT_OR(::system((BBSTOREACCOUNTS " -3 -c " DEFAULT_BBACKUPD_CONFIG_FILE " "
+			"-Wwarning " + command + " " + common_args + " " +
+			s3_args).c_str()) == 0, FAIL);
+	}
+	else
+	{
+		TEST_THAT_OR(::system((BBSTOREACCOUNTS " -c testfiles/bbstored.conf "
+			"-Wwarning " + command + " 01234567 " + common_args + " " +
+			store_args).c_str()) == 0, FAIL);
+	}
+
+	TEST_THAT_OR(TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks"), FAIL);
+
+	return true;
+}
+
 bool test_filename_encoding()
 {
 	SETUP_TEST_BACKUPSTORE();
@@ -2503,7 +2526,7 @@ bool test_cannot_open_multiple_writable_connections(const std::string& specialis
 	// But a read-only context should work:
 	{
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs_2, context_2, protocol_read_only,
-			true); // !ReadOnly
+			true); // ReadOnly
 		TEST_EQUAL(0x8732523ab23aLL, protocol_read_only.GetClientStoreMarker());
 	}
 
@@ -2852,19 +2875,8 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	control.DeleteAccount(false); // !AskForConfirmation
 	fs.ReleaseLock();
 
-	if(specialisation_name == "s3")
-	{
-		// Note: this is very similar to test_s3store/test_bbstoreaccounts_commands
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -3 -c " DEFAULT_BBACKUPD_CONFIG_FILE " "
-			"-Wwarning create test 10000B 20000B") == 0, FAIL);
-	}
-	else
-	{
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf "
-			"-Wwarning create 01234567 0 10000B 20000B") == 0, FAIL);
-	}
-
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "create", "",
+		"test 10000B 20000B", "0 10000B 20000B"));
 
 	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
 	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
@@ -2902,6 +2914,9 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	fs.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, root_dir);
 	TEST_EQUAL(0, root_dir.GetNumberOfEntries());
 
+	BackupStoreRefCountDatabase& refcount_db(fs.GetPermanentRefCountDatabase(true)); // ReadOnly
+	TEST_EQUAL(1, refcount_db.GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
+
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
@@ -2912,18 +2927,7 @@ bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
 	BackupFileSystem& fs(control.GetFileSystem());
 	fs.ReleaseLock();
 
-	if(specialisation_name == "s3")
-	{
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -3 -c " DEFAULT_BBACKUPD_CONFIG_FILE " "
-			"-Wwarning delete yes") == 0, FAIL);
-	}
-	else
-	{
-		TEST_THAT_OR(::system(BBSTOREACCOUNTS " -c testfiles/bbstored.conf "
-			"-Wwarning delete 01234567 yes") == 0, FAIL);
-	}
-
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "delete", "yes"));
 
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	TEST_THAT(create_test_account_specialised(specialisation_name, control));
@@ -2932,40 +2936,29 @@ bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
 }
 
 // Test that login fails on a disabled account
-bool test_login_with_disabled_account()
+bool test_login_with_disabled_account(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
-	TEST_THAT_OR(StartServer(), FAIL);
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
+	fs.ReleaseLock();
 
-	TEST_THAT(TestDirExists("testfiles/0_0/backup/01234567"));
-	TEST_THAT(TestDirExists("testfiles/0_1/backup/01234567"));
-	TEST_THAT(TestDirExists("testfiles/0_2/backup/01234567"));
-	TEST_THAT(TestGetFileSize("testfiles/accounts.txt") > 8);
+	// The account is already enabled, but doing it again shouldn't hurt
+	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "yes"));
 
-	// make sure something is written to it
-	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
-		BackupStoreRefCountDatabase::Load(
-			apAccounts->GetEntry(0x1234567), true);
-	TEST_EQUAL(BACKUPSTORE_ROOT_DIRECTORY_ID,
-		apReferences->GetLastObjectIDUsed());
-	TEST_EQUAL(1, apReferences->GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
-	apReferences.reset();
+	// Check that we can log in
+	{
+		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
+	}
 
-	// Test that login fails on a disabled account
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 no") == 0, FAIL);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "no"));
 
 	// BLOCK
 	{
-		// Open a connection to the server
-		BackupProtocolClient protocol(open_conn("localhost", context));
-
-		// Check the version
-		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+		// Open a local (virtual) connection to the server
+		BackupStoreContext context(fs, 0x01234567, NULL, "fake test connection");
+		BackupProtocolLocal2 protocol(context, 0x01234567, false, // !read_only
+			false); // !login
 
 		// Login
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
@@ -2975,7 +2968,14 @@ bool test_login_with_disabled_account()
 		protocol.QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	// Re-enable the account, check that we can login again
+	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "yes"));
+
+	{
+		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
+	}
+
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_login_with_no_refcount_db()
@@ -3842,7 +3842,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_symlinks());
 
 	TEST_THAT(test_login_without_account());
-	TEST_THAT(test_login_with_disabled_account());
 	TEST_THAT(test_login_with_no_refcount_db());
 
 	for(test_specialisation::iterator i = specialisations.begin();
@@ -3853,6 +3852,7 @@ int test(int argc, const char *argv[])
 		RUN_SPECIALISED_TEST(i->first, i->second, test_multiple_uploads);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_disabled_account);
 	}
 
 	TEST_THAT(test_housekeeping_deletes_files());

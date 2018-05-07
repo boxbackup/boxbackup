@@ -57,15 +57,19 @@ public:
 	}
 
 	BackupProtocolLocal2(BackupStoreContext& rContext, int32_t AccountNumber,
-		bool ReadOnly)
+		bool ReadOnly, bool login = true)
 	: BackupProtocolLocal(rContext),
 	  mAccountNumber(AccountNumber),
 	  mReadOnly(ReadOnly)
 	{
 		GetContext().SetClientHasAccount();
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);
-		mClientStoreMarker = QueryLogin(AccountNumber,
-			ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0)->GetClientStoreMarker();
+		if(login)
+		{
+			mClientStoreMarker = QueryLogin(AccountNumber,
+				ReadOnly ? BackupProtocolLogin::Flags_ReadOnly : 0
+			)->GetClientStoreMarker();
+		}
 	}
 
 	std::auto_ptr<BackupProtocolFinished> Query(const BackupProtocolFinished &rQuery)

@@ -380,9 +380,10 @@ int ReadPidFile(const char *pidFile)
 HANDLE sTestChildDaemonJobObject = INVALID_HANDLE_VALUE;
 #endif
 
-void TestRemoteProcessMemLeaksFunc(const char *filename,
-	const char* file, int line)
+bool TestRemoteProcessMemLeaksFunc(const char *filename, const char* file, int line)
 {
+	bool result = true;
+
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Does the file exist?
 	if(!TestFileExists(filename))
@@ -393,6 +394,7 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 			first_fail_line = line;
 		}
 		++num_failures;
+		result = false;
 		printf("FAILURE: MemLeak report not available (file %s) "
 			"at %s:%d\n", filename, file, line);
 	}
@@ -407,6 +409,7 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 				first_fail_line = line;
 			}
 			++num_failures;
+			result = false;
 			printf("FAILURE: Memory leaks found in other process "
 				"(file %s) at %s:%d\n==========\n", 
 				filename, file, line);
@@ -424,6 +427,8 @@ void TestRemoteProcessMemLeaksFunc(const char *filename,
 		EMU_UNLINK(filename);
 	}
 #endif
+
+	return result;
 }
 
 void force_sync()
