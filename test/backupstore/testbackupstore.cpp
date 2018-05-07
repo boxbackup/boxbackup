@@ -214,7 +214,7 @@ bool teardown_test_backupstore()
 	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
 	{
 		TEST_THAT_OR(check_reference_counts(), status = false);
-		TEST_EQUAL_OR(0, check_account_for_errors(), status = false);
+		TEST_EQUAL_OR(0, check_account_and_fix_errors(), status = false);
 	}
 
 	return status;
@@ -238,7 +238,7 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 		TEST_THAT_OR(check_reference_counts(
 			fs.GetPermanentRefCountDatabase(true)), // ReadOnly
 			status = false);
-		TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
+		TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
 	}
 	fs.ReleaseLock();
 
@@ -2463,7 +2463,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	safe_sleep(1);
 
 	protocol_read_only.QueryFinished();
-	TEST_EQUAL(1, check_account_for_errors(fs));
+	TEST_EQUAL(1, check_account_and_fix_errors(fs));
 
 	protocol_read_only.Reopen();
 	TEST_EQUAL(old_size, get_object_size(protocol_read_only, subdirid,

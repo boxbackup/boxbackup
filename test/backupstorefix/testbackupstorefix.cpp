@@ -429,7 +429,7 @@ void check_root_dir_ok(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired, by removing x1 from the directory.
-	TEST_EQUAL(0, check_account_for_errors());
+	TEST_EQUAL(0, check_account_and_fix_errors());
 
 	// Read the directory back in, check that it's empty
 	BackupStoreDirectory dir;
@@ -444,7 +444,7 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 {
 	// Check the store, check that the error is detected and
 	// repaired.
-	TEST_THAT(check_account_for_errors() > 0);
+	TEST_THAT(check_account_and_fix_errors() > 0);
 	check_root_dir_ok(after_entries, after_deps);
 }
 
@@ -629,7 +629,7 @@ int test(int argc, const char *argv[])
 	// Check that we're starting off with the right numbers of files and blocks.
 	// Otherwise the test that check the counts after breaking things will fail
 	// because the numbers won't match.
-	TEST_EQUAL(0, check_account_for_errors());
+	TEST_EQUAL(0, check_account_and_fix_errors());
 	{
 		std::auto_ptr<BackupProtocolAccountUsage2> usage =
 			BackupProtocolLocal2(0x01234567, "test",
@@ -667,7 +667,7 @@ int test(int argc, const char *argv[])
 		// how good the checker is (or will become) at spotting errors!
 		// But this will help us catch changes in checker behaviour,
 		// so it's not a bad thing to test.
-		TEST_EQUAL(2, check_account_for_errors());
+		TEST_EQUAL(2, check_account_and_fix_errors());
 
 		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
 			fn));
@@ -798,7 +798,7 @@ int test(int argc, const char *argv[])
 		// WARNING: Reference count of object 0x44 changed from 1 to 0
 		fs.ReleaseLock();
 
-		TEST_EQUAL(5, check_account_for_errors());
+		TEST_EQUAL(5, check_account_and_fix_errors());
 		{
 			std::auto_ptr<BackupProtocolAccountUsage2> usage =
 				BackupProtocolLocal2(0x01234567, "test",
@@ -892,7 +892,7 @@ int test(int argc, const char *argv[])
 	// ERROR:   NumFiles changed from 113 to 110
 	// WARNING: Reference count of object 0x3e changed from 1 to 0
 
-	TEST_EQUAL(12, check_account_for_errors());
+	TEST_EQUAL(12, check_account_and_fix_errors());
 
 	{
 		std::auto_ptr<BackupProtocolAccountUsage2> usage =

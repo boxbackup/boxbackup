@@ -338,7 +338,7 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 	TEST_THAT_OR(check_reference_counts(
 		fs.GetPermanentRefCountDatabase(true)), // ReadOnly
 		status = false);
-	TEST_EQUAL_OR(0, check_account_for_errors(fs), status = false);
+	TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
 	control.GetFileSystem().ReleaseLock();
 
 	return status;

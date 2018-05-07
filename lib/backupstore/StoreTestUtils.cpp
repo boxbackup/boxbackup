@@ -191,14 +191,14 @@ bool change_account_limits(BackupAccountControl& control, const char* soft,
 	return (result == 0);
 }
 
-int check_account_for_errors(Log::Level log_level)
+int check_account_and_fix_errors(Log::Level log_level)
 {
 	// TODO FIXME remove this backward-compatibility function
 	RaidBackupFileSystem fs(0x1234567, "backup/01234567/", 0);
-	return check_account_for_errors(fs, log_level);
+	return check_account_and_fix_errors(fs, log_level);
 }
 
-int check_account_for_errors(BackupFileSystem& filesystem, Log::Level log_level)
+int check_account_and_fix_errors(BackupFileSystem& filesystem, Log::Level log_level)
 {
 	Logger::LevelGuard guard(Logging::GetConsole(), log_level);
 	Logging::Tagger tag("check fix", true);
@@ -273,8 +273,8 @@ bool run_housekeeping_and_check_account(BackupFileSystem& filesystem)
 
 	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 
-	int num_check_errors = check_account_for_errors(filesystem);
-	TEST_EQUAL_LINE(0, num_check_errors, "check_account_for_errors");
+	int num_check_errors = check_account_and_fix_errors(filesystem);
+	TEST_EQUAL_LINE(0, num_check_errors, "check_account_and_fix_errors");
 
 	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
 
