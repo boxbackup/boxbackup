@@ -838,12 +838,12 @@ typedef struct
 	int old;
 } recursive_count_objects_results;
 
-void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
+void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t in_directory_id,
 	recursive_count_objects_results &results)
 {
 	// Command
 	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
-			id,
+			in_directory_id,
 			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
 			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
 	// Stream
@@ -869,17 +869,10 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 
 TLSContext tls_context;
 
-void recursive_count_objects(int64_t id, recursive_count_objects_results &results)
+void recursive_count_objects(BackupProtocolCallable &protocol, int64_t in_directory_id,
+	recursive_count_objects_results &results)
 {
-	// Get a connection
-	BackupProtocolLocal2 protocolReadOnly(0x01234567, "test",
-		"backup/01234567/", 0, false);
-
-	// Count objects
-	recursive_count_objects_r(protocolReadOnly, id, results);
-
-	// Close it
-	protocolReadOnly.QueryFinished();
+	recursive_count_objects_r(protocol, in_directory_id, results);
 }
 
 bool check_block_index(const char *encoded_file, IOStream &rBlockIndex)
@@ -2836,9 +2829,14 @@ bool test_store_info(const std::string& specialisation_name,
 
 bool test_login_without_account()
 {
-	// First, try logging in without an account having been created... just make sure login fails.
+	// It doesn't make sense to specialise this test, because S3 filesystems don't have an
+	// accounts database at all. And it's difficult because SetClientHasAccount is called by
+	// BackupStoreDaemon (which has access to the accounts database) and specialised tests
+	// normally use/ a local protocol, which bypasses BackupStoreDaemon.
 
 	SETUP_TEST_BACKUPSTORE();
+
+	// Try logging in with a nonexistent (deleted) account, which should fail:
 	delete_account();
 	TEST_THAT_OR(StartServer(), FAIL);
 
@@ -2870,6 +2868,8 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 
 	// Delete the account, and create it again using bbstoreaccounts
 	control.DeleteAccount(false); // !AskForConfirmation
+
+	// Release the lock to discard the filesystem's cached BackupStoreInfo:
 	fs.ReleaseLock();
 
 	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "create", "",
@@ -2922,6 +2922,8 @@ bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
+
+	// Release the lock so that we can run bbstoreaccounts:
 	fs.ReleaseLock();
 
 	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "delete", "yes"));
@@ -2938,9 +2940,11 @@ bool test_login_with_disabled_account(const std::string& specialisation_name,
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
+
+	// Release the lock so that we can run bbstoreaccounts:
 	fs.ReleaseLock();
 
-	// The account is already enabled, but doing it again shouldn't hurt
+	// The account is already enabled, but doing it again shouldn't hurt:
 	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "yes"));
 
 	// Check that we can log in
@@ -2980,6 +2984,10 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 {
 	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
+
+	// Need to unlock the filesystem because it has an open file handle to the refcount DB, so
+	// it won't notice if we delete the file unless we force it to close and attempt to reopen
+	// that handle.
 	fs.ReleaseLock();
 
 	// Delete the refcount DB:
@@ -3048,47 +3056,45 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-bool test_housekeeping_deletes_files()
+// Test the deletion of objects by the housekeeping system
+bool test_housekeeping_deletes_files(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	// Test the deletion of objects by the housekeeping system
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
 
-	SETUP_TEST_BACKUPSTORE();
-
-	BackupProtocolLocal2 protocolLocal(0x01234567, "test",
-		"backup/01234567/", 0, false); // Not read-only
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 
 	// Create some nice recursive directories
 	write_test_file(1);
-	int64_t dirtodelete = create_test_data_subdirs(protocolLocal,
+	int64_t dirtodelete = create_test_data_subdirs(protocol,
 		BACKUPSTORE_ROOT_DIRECTORY_ID, "test_delete", 6 /* depth */,
 		NULL /* pRefCount */);
 
 	TEST_EQUAL(dirtodelete,
-		protocolLocal.QueryDeleteDirectory(dirtodelete)->GetObjectID());
-	assert_everything_deleted(protocolLocal, dirtodelete);
-	protocolLocal.QueryFinished();
+		protocol.QueryDeleteDirectory(dirtodelete)->GetObjectID());
+	assert_everything_deleted(protocol, dirtodelete);
+	protocol.QueryFinished();
 
 	// First, things as they are now.
-	TEST_THAT_OR(StartServer(), FAIL);
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context_read_only, protocol_read_only,
+		false); // !ReadOnly
 	recursive_count_objects_results before = {0,0,0};
-	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, before);
+	recursive_count_objects(protocol_read_only, BACKUPSTORE_ROOT_DIRECTORY_ID, before);
 
 	TEST_EQUAL(0, before.objectsNotDel);
 	TEST_THAT(before.deleted != 0);
 	TEST_THAT(before.old != 0);
 
-	// Kill it
-	TEST_THAT(StopServer());
-
 	// Reduce the store limits, so housekeeping will remove all old files.
 	// Leave the hard limit high, so we know that housekeeping's target
 	// for freeing space is the soft limit.
-	TEST_THAT(change_account_limits("0B", "20000B"));
-	TEST_THAT(run_housekeeping_and_check_account());
+	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(run_housekeeping_and_check_account(fs));
 
 	// Count the objects again
 	recursive_count_objects_results after = {0,0,0};
-	recursive_count_objects(BACKUPSTORE_ROOT_DIRECTORY_ID, after);
+	recursive_count_objects(protocol_read_only, BACKUPSTORE_ROOT_DIRECTORY_ID, after);
 	TEST_EQUAL(before.objectsNotDel, after.objectsNotDel);
 	TEST_EQUAL(0, after.deleted);
 	TEST_EQUAL(0, after.old);
@@ -3097,7 +3103,7 @@ bool test_housekeeping_deletes_files()
 	// teardown_test_backupstore() don't fail.
 	ExpectedRefCounts.resize(2);
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_account_limits_respected(const std::string& specialisation_name,
@@ -3855,7 +3861,6 @@ int test(int argc, const char *argv[])
 
 	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
-
 	TEST_THAT(test_login_without_account());
 
 	for(test_specialisation::iterator i = specialisations.begin();
@@ -3868,9 +3873,9 @@ int test(int argc, const char *argv[])
 		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_disabled_account);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_no_refcount_db);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_housekeeping_deletes_files);
 	}
 
-	TEST_THAT(test_housekeeping_deletes_files());
 	TEST_THAT(test_read_write_attr_streamformat());
 
 	// Release lock before shutting down the simulator:
