@@ -298,26 +298,11 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 
 	// Remove the store files...
 
-	// First, become the user specified in the config file
-	std::string username;
-	{
-		const Configuration &rserverConfig(mConfig.GetSubConfiguration("Server"));
-		if(rserverConfig.KeyExists("User"))
-		{
-			username = rserverConfig.GetKeyValue("User");
-		}
-	}
+	// Switch back to the user specified in the config file (which we left when we reset
+	// mapChangeUser above):
+	SwitchToUnprivilegedUser(true); // temporary
 
-	// Become the right user
-	if(!username.empty())
-	{
-		// Username specified, change...
-		mapChangeUser.reset(new UnixUser(username));
-		mapChangeUser->ChangeProcessUser(true /* temporary */);
-		// Change will be undone when user goes out of scope
-	}
-
-	// Secondly, work out which directories need wiping
+	// Work out which directories need wiping:
 	std::vector<std::string> toDelete;
 	RaidFileController &rcontroller(RaidFileController::GetController());
 	RaidFileDiscSet discSet(rcontroller.GetDiscSet(mDiscSetNum));
@@ -371,6 +356,28 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	return retcode;
 }
 
+void BackupStoreAccountControl::SwitchToUnprivilegedUser(bool temporary)
+{
+	// Get the user under which the daemon runs
+	std::string username;
+	{
+		const Configuration &rserverConfig(mConfig.GetSubConfiguration("Server"));
+		if(rserverConfig.KeyExists("User"))
+		{
+			username = rserverConfig.GetKeyValue("User");
+		}
+	}
+
+	// Become the right user
+	if(!username.empty())
+	{
+		// Username specified, change...
+		mapChangeUser.reset(new UnixUser(username));
+		mapChangeUser->ChangeProcessUser(temporary);
+		// If temporary, then the change of user will be undone when this
+		// BackupStoreAccountControl is destroyed, or mapChangeUser is reset.
+	}
+}
 
 void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
@@ -404,24 +411,9 @@ void BackupStoreAccountControl::OpenAccount(bool readWrite)
 	BackupStoreAccounts acc(*db);
 	acc.GetAccountRoot(mAccountID, mRootDir, mDiscSetNum);
 
-	// Get the user under which the daemon runs
-	std::string username;
-	{
-		const Configuration &rserverConfig(mConfig.GetSubConfiguration("Server"));
-		if(rserverConfig.KeyExists("User"))
-		{
-			username = rserverConfig.GetKeyValue("User");
-		}
-	}
-
-	// Become the right user
-	if(!username.empty())
-	{
-		// Username specified, change...
-		mapChangeUser.reset(new UnixUser(username));
-		mapChangeUser->ChangeProcessUser(true /* temporary */);
-		// Change will be undone when this BackupStoreAccountControl is destroyed
-	}
+	// Switch to the user under which the daemon runs:
+	SwitchToUnprivilegedUser(true); // temporary
+	// Change of user will be undone when this BackupStoreAccountControl is destroyed.
 
 	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
 
@@ -476,24 +468,8 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 	// As the original user, write the modified account database back
 	db->Write();
 
-	// Get the user under which the daemon runs
-	std::string username;
-	{
-		const Configuration &rserverConfig(mConfig.GetSubConfiguration("Server"));
-		if(rserverConfig.KeyExists("User"))
-		{
-			username = rserverConfig.GetKeyValue("User");
-		}
-	}
-
-	// Become the user specified in the config file?
-	if(!username.empty())
-	{
-		// Username specified, change...
-		mapChangeUser.reset(new UnixUser(username));
-		mapChangeUser->ChangeProcessUser(true /* temporary */);
-		// Change will be undone when this BackupStoreAccountControl is destroyed
-	}
+	// Switch to the user under which the daemon runs:
+	SwitchToUnprivilegedUser(true); // temporary
 
 	// Get directory name:
 	BackupStoreAccounts acc(*db);

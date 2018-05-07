@@ -68,6 +68,8 @@ private:
 	int mDiscSetNum;
 	std::auto_ptr<UnixUser> mapChangeUser; // used to reset uid when we return
 
+	void SwitchToUnprivilegedUser(bool temporary);
+
 protected:
 	virtual void OpenAccount(bool readWrite);
 
