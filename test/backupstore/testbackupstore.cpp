@@ -867,7 +867,7 @@ void recursive_count_objects_r(BackupProtocolCallable &protocol, int64_t id,
 	}
 }
 
-TLSContext context;
+TLSContext tls_context;
 
 void recursive_count_objects(int64_t id, recursive_count_objects_results &results)
 {
@@ -2535,15 +2535,12 @@ bool test_cannot_open_multiple_writable_connections(const std::string& specialis
 	{
 		TEST_THAT_OR(StartServer(), return false);
 
-		BackupProtocolClient protocol_writable_3(open_conn("localhost", context));
+		BackupProtocolClient protocol_writable_3(open_conn("localhost", tls_context));
 		TEST_THAT(assert_writable_connection_fails(protocol_writable_3));
 
-		// Do not dedent. Object needs to go out of scope to release lock
-		{
-			BackupProtocolClient protocol_read_only_2(open_conn("localhost", context));
-			TEST_EQUAL(0x8732523ab23aLL,
-				assert_readonly_connection_succeeds(protocol_read_only_2));
-		}
+		BackupProtocolClient protocol_read_only_2(open_conn("localhost", tls_context));
+		TEST_EQUAL(0x8732523ab23aLL,
+			assert_readonly_connection_succeeds(protocol_read_only_2));
 	}
 
 	protocol_writable.QueryFinished();
@@ -2848,7 +2845,7 @@ bool test_login_without_account()
 	// BLOCK
 	{
 		// Open a connection to the server
-		BackupProtocolClient protocol(open_conn("localhost", context));
+		BackupProtocolClient protocol(open_conn("localhost", tls_context));
 
 		// Check the version
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
@@ -3016,7 +3013,7 @@ bool test_login_with_no_refcount_db()
 	// stepping through.
 	TEST_THAT_THROWONFAIL(StartServer());
 	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-	TEST_CHECK_THROWS(connect_and_login(context),
+	TEST_CHECK_THROWS(connect_and_login(tls_context),
 		ConnectionException, Protocol_UnexpectedReply);
 
 	TEST_THAT(ServerIsAlive(bbstored_pid));
@@ -3028,7 +3025,7 @@ bool test_login_with_no_refcount_db()
 	TEST_THAT(check_reference_counts());
 
 	// And that we can log in afterwards
-	connect_and_login(context)->QueryFinished();
+	connect_and_login(tls_context)->QueryFinished();
 
 	TEARDOWN_TEST_BACKUPSTORE();
 }
@@ -3789,7 +3786,7 @@ int test(int argc, const char *argv[])
 		for(int l = 0; l < ATTR3_SIZE; ++l) {attr3[l] = r.next();}
 	}
 
-	context.Initialise(false /* client */,
+	tls_context.Initialise(false /* client */,
 			"testfiles/clientCerts.pem",
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
