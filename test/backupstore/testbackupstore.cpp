@@ -2975,59 +2975,77 @@ bool test_login_with_disabled_account(const std::string& specialisation_name,
 	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
-bool test_login_with_no_refcount_db()
+bool test_login_with_no_refcount_db(const std::string& specialisation_name,
+	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	BackupFileSystem& fs(control.GetFileSystem());
+	fs.ReleaseLock();
 
-	// The account is already enabled, but doing it again shouldn't hurt
-	TEST_THAT_OR(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf enabled 01234567 yes") == 0, FAIL);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+	// Delete the refcount DB:
+	if(specialisation_name == "s3")
+	{
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/" S3_REFCOUNT_FILE_NAME));
+	}
+	else
+	{
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	}
 
-	// Delete the refcount database and try to log in again. Check that
-	// we're locked out of the account until housekeeping has recreated
-	// the refcount db.
-	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
-		"test", "backup/01234567/", 0, false), // Not read-only
+	// Try to log in again. Check that we're locked out of the account until housekeeping (or
+	// bbstoreaccounts check, in the case of s3 filesystems) has recreated the refcount db.
+	TEST_CHECK_THROWS(
+		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false), // !ReadOnly
 		BackupStoreException, CorruptReferenceCountDatabase);
 
-	// Run housekeeping, check that it fixes the refcount db
-	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
-		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
-	BackupStoreAccountDatabase::Entry account =
-		apAccounts->GetEntry(0x1234567);
-	TEST_EQUAL_LINE(1, run_housekeeping(account),
-		"Housekeeping should report 1 error if the refcount db is missing");
-	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	// Run housekeeping or fix the store, and check that it fixes the refcount db:
+	if(specialisation_name == "s3")
+	{
+		TEST_EQUAL_LINE(1, check_account_and_fix_errors(fs),
+			"Check should report 1 error if the refcount db is missing");
+	}
+	else
+	{
+		TEST_EQUAL_LINE(1, run_housekeeping(fs),
+			"Housekeeping should report 1 error if the refcount db is missing");
+	}
 
-	// And that we can log in afterwards
-	BackupProtocolLocal2(0x01234567, "test", "backup/01234567/", 0,
-		false).QueryFinished(); // Not read-only
+	// Check that housekeeping/check fix fixed the refcounts:
+	TEST_THAT(check_reference_counts(
+		fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
-	// Check that housekeeping fixed the ref counts
-	TEST_THAT(check_reference_counts());
+	// And that we can now log in:
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 
-	// Start a server and try again, remotely. This is difficult to debug
-	// because housekeeping may fix the refcount database while we're
-	// stepping through.
-	TEST_THAT_THROWONFAIL(StartServer());
-	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-	TEST_CHECK_THROWS(connect_and_login(tls_context),
-		ConnectionException, Protocol_UnexpectedReply);
+	// Test with a bbstored server, which doesn't make sense for S3 tests
+	if(specialisation_name == "store")
+	{
+		// Start a server and try again, remotely. This is difficult to debug
+		// because housekeeping may fix the refcount database while we're
+		// stepping through.
+		TEST_THAT_THROWONFAIL(StartServer());
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+		TEST_CHECK_THROWS(connect_and_login(tls_context),
+			ConnectionException, Protocol_UnexpectedReply);
 
-	TEST_THAT(ServerIsAlive(bbstored_pid));
+		TEST_THAT(ServerIsAlive(bbstored_pid));
 
-	// Run housekeeping, check that it fixes the refcount db
-	TEST_EQUAL_LINE(1, run_housekeeping(account),
-		"Housekeeping should report 1 error if the refcount db is missing");
-	TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
-	TEST_THAT(check_reference_counts());
+		// Run housekeeping, check that it fixes the refcount db. We need to close the
+		// permanent DB, if open, because housekeeping wants to open a new (potential) DB,
+		// and the filesystem won't let us have a read/write permanent and a potential DB
+		// open at the same time.
+		fs.CloseRefCountDatabase(fs.GetCurrentRefCountDatabase()); // ReadOnly
 
-	// And that we can log in afterwards
-	connect_and_login(tls_context)->QueryFinished();
+		TEST_EQUAL_LINE(1, run_housekeeping(fs),
+			"Housekeeping should report 1 error if the refcount db is missing");
+		TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+		TEST_THAT(check_reference_counts());
 
-	TEARDOWN_TEST_BACKUPSTORE();
+		// And that we can log in afterwards
+		connect_and_login(tls_context)->QueryFinished();
+	}
+
+	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
 }
 
 bool test_housekeeping_deletes_files()
@@ -3839,7 +3857,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_symlinks());
 
 	TEST_THAT(test_login_without_account());
-	TEST_THAT(test_login_with_no_refcount_db());
 
 	for(test_specialisation::iterator i = specialisations.begin();
 		i != specialisations.end(); i++)
@@ -3850,6 +3867,7 @@ int test(int argc, const char *argv[])
 		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
 		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_disabled_account);
+		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_no_refcount_db);
 	}
 
 	TEST_THAT(test_housekeeping_deletes_files());
