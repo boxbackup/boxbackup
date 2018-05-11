@@ -352,8 +352,6 @@ bool unpack_files(const std::string& archive_file,
 	return true;
 }
 
-Daemon* spDaemon = NULL;
-
 bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 {
 	// Stop bbackupd initialisation from changing the console logging level
@@ -452,7 +450,6 @@ bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_file
 
 	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
 		FAIL);
-	spDaemon = &bbackupd;
 	return true;
 }
 
@@ -770,7 +767,6 @@ int start_internal_daemon()
 	};
 
 	BackupDaemon daemon;
-	spDaemon = &daemon; // to propagate into child
 	int result;
 
 	if (bbackupd_args.size() > 0)
@@ -781,8 +777,6 @@ int start_internal_daemon()
 	{
 		result = daemon.Main("testfiles/bbackupd.conf", 1, argv);
 	}
-
-	spDaemon = NULL; // to ensure not used by parent
 
 	TEST_EQUAL_LINE(0, result, "Daemon exit code");
 
@@ -820,7 +814,6 @@ int start_internal_daemon()
 	fflush(stdout);
 
 	TEST_THAT(pid > 0);
-	spDaemon = &daemon;
 	return pid;
 }
 
