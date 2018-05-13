@@ -996,16 +996,6 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 	// of how often it's modified
 	box_time_t maxUploadWait = SecondsToBoxTime(
 		conf.GetKeyValueInt("MaxUploadWait"));
-	// Adjust by subtracting the minimum file age, so is relative
-	// to sync period end in comparisons
-	if (maxUploadWait > minimumFileAge)
-	{
-		maxUploadWait -= minimumFileAge;
-	}
-	else
-	{
-		maxUploadWait = 0;
-	}
 
 	// Calculate the sync period of files to examine
 	box_time_t syncPeriodStart = mLastSyncTime;

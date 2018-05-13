@@ -980,18 +980,24 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 			// However, just in case things are continually
 			// modified, we check the first seen time.
-			// The two compares of syncPeriodEnd and
-			// pendingFirstSeenTime are because the values
-			// are unsigned.
 
 			if (!doUpload &&
 				pendingFirstSeenTime != 0 &&
+				// The two compares of syncPeriodEnd and
+				// pendingFirstSeenTime are because the values
+				// are unsigned.
 				rParams.mSyncPeriodEnd > pendingFirstSeenTime &&
 				(rParams.mSyncPeriodEnd - pendingFirstSeenTime)
 				> rParams.mMaxUploadWait)
 			{
 				doUpload = true;
-				decisionReason = "continually modified";
+				std::ostringstream s;
+				s << "continually modified for " <<
+					FormatTime(rParams.mSyncPeriodEnd - pendingFirstSeenTime,
+						false, true, false
+						// !include_date, include_millis, !adjust_for_dst
+					) << " seconds";
+				decisionReason = s.str();
 			}
 
 			// Then make sure that if files are added with a
@@ -1195,11 +1201,22 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				mpPendingEntries = new std::map<std::string, box_time_t>;
 			}
+
 			// Adding to mPendingEntries list 
 			if(pendingFirstSeenTime == 0)
 			{
 				// Haven't seen this before -- add to list!
-				(*mpPendingEntries)[*f] = modTime;
+				// Use mSyncPeriodEnd here, instead of modTime, because we want to
+				// back up the file after it's spent MaxUploadWait time on our
+				// pending list, which uses (its own, later) mSyncPeriodEnd to make
+				// that decision. Otherwise we will end up backing up the file too
+				// late (we know that it was modified *after* the current
+				// mSyncPeriodEnd), which normally doesn't matter much, but upsets
+				// the timing-sensitive test_continuously_updated_file.
+				(*mpPendingEntries)[*f] = rParams.mSyncPeriodEnd;
+
+				BOX_INFO("Adding file to pending list with time " <<
+					FormatTime(rParams.mSyncPeriodEnd, false, true));
 			}
 		}
 		

@@ -3215,10 +3215,10 @@ bool test_continuously_updated_file()
 
 		{
 			// The file will be uploaded after 3 seconds (until the next sync) +
-			// 8 seconds (MaxUploadWait) + 1 second (the next sync after that, at which
+			// 7 seconds (MaxUploadWait) + 2 seconds (the next sync after that, at which
 			// point it's been pending for >MaxUploadWait seconds). We wait, still
 			// touching the file, for 2 seconds less than that:
-			BOX_INFO("Open a file, then save something to it "
+			BOX_NOTICE("Open a file, then save something to it "
 				"every second for 10 seconds");
 
 			for(int l = 0; l < 10; ++l)
@@ -3231,7 +3231,7 @@ bool test_continuously_updated_file()
 			}
 
 			// Check there's a difference
-			BOX_INFO("Comparing all files to check that it was not uploaded yet");
+			BOX_NOTICE("Comparing all files to check that it was not uploaded yet");
 			int compareReturnValue = ::system("perl testfiles/"
 				"extcheck1.pl");
 			TEST_RETURN(compareReturnValue, 1);
@@ -3239,7 +3239,7 @@ bool test_continuously_updated_file()
 
 			// And then another 4 seconds, until 2 seconds after it should have been
 			// synced:
-			BOX_INFO("Keep on continuously updating file for "
+			BOX_NOTICE("Keep on continuously updating file for "
 				"another 4 seconds, check it is uploaded eventually");
 
 			for(int l = 0; l < 4; ++l)
@@ -3250,7 +3250,7 @@ bool test_continuously_updated_file()
 				safe_sleep(1);
 			}
 
-			BOX_INFO("Comparing all files to check that it was uploaded by now");
+			BOX_NOTICE("Comparing all files to check that it was uploaded by now");
 			compareReturnValue = ::system("perl testfiles/"
 				"extcheck2.pl");
 			TEST_RETURN(compareReturnValue, 1);

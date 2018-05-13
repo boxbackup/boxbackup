@@ -63,7 +63,7 @@ box_time_t GetCurrentBoxTime()
 	return SecondsToBoxTime(time(0));
 }
 
-std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
+std::string FormatTime(box_time_t time, bool include_date, bool include_millis, bool adjust_for_dst)
 {
 	std::ostringstream buf;
 
@@ -72,15 +72,17 @@ std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
 
 	struct tm tm_now, *tm_ptr = &tm_now;
 
-	#ifdef WIN32
-		if ((tm_ptr = localtime(&seconds)) != NULL)
-	#else
-		if (localtime_r(&seconds, &tm_now) != NULL)
-	#endif
+#ifdef WIN32
+	tm_ptr = adjust_for_dst ? localtime(&seconds) : gmtime(&seconds);
+#else
+	tm_ptr = adjust_for_dst ? localtime_r(&seconds, &tm_now) : gmtime_r(&seconds, &tm_now);
+#endif
+
+	if(tm_ptr != NULL)
 	{
 		buf << std::setfill('0');
 
-		if (includeDate)
+		if(include_date)
 		{
 			buf << 	std::setw(4) << (tm_ptr->tm_year + 1900) << "-" <<
 				std::setw(2) << (tm_ptr->tm_mon  + 1) << "-" <<
@@ -91,7 +93,7 @@ std::string FormatTime(box_time_t time, bool includeDate, bool showMicros)
 			std::setw(2) << tm_ptr->tm_min  << ":" <<
 			std::setw(2) << tm_ptr->tm_sec;
 
-		if (showMicros)
+		if(include_millis)
 		{
 			buf << "." << std::setw(3) << (int)(micros / 1000);
 		}

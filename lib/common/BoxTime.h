@@ -47,8 +47,8 @@ inline uint64_t BoxTimeToMicroSeconds(box_time_t Time)
 	return Time;
 }
 
-std::string FormatTime(box_time_t time, bool includeDate,
-	bool showMicros = false);
+std::string FormatTime(box_time_t time, bool include_date,
+	bool include_millis = false, bool adjust_for_dst = true);
 
 void ShortSleep(box_time_t duration, bool logDuration);
 
