@@ -981,6 +981,14 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// However, just in case things are continually
 			// modified, we check the first seen time.
 
+			if (!doUpload && pendingFirstSeenTime != 0)
+			{
+				BOX_TRACE("Current period ends at " <<
+					FormatTime(rParams.mSyncPeriodEnd, false, true) <<
+					" and file has been pending since " <<
+					FormatTime(pendingFirstSeenTime, false, true));
+			}
+
 			if (!doUpload &&
 				pendingFirstSeenTime != 0 &&
 				// The two compares of syncPeriodEnd and
@@ -1216,7 +1224,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				(*mpPendingEntries)[*f] = rParams.mSyncPeriodEnd;
 
 				BOX_INFO("Adding file to pending list with time " <<
-					FormatTime(rParams.mSyncPeriodEnd, false, true));
+					FormatTime(rParams.mSyncPeriodEnd, false));
 			}
 		}
 		
