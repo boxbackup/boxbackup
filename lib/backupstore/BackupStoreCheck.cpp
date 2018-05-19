@@ -326,7 +326,6 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID)
 		// Read in first four bytes -- don't have to worry about
 		// retrying if not all bytes read as is RaidFile
 		uint32_t signature;
-		int bytes_read;
 		if(!file->ReadFullBuffer(&signature, sizeof(signature),
 			0, // don't care about number of bytes actually read
 			mTimeout))
@@ -549,10 +548,8 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 		if(dir.CheckAndFix())
 		{
 			// Wasn't quite right, and has been modified
-			BOX_ERROR("Directory ID " <<
-				BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
-				" had invalid entries" <<
-				(mFixErrors ? ", fixed" : ""));
+			BOX_ERROR("Directory ID " << BOX_FORMAT_OBJECTID(dir.GetObjectID()) <<
+				" had invalid entries" << (mFixErrors ? ", fixed" : ""));
 			++mNumberErrorsFound;
 			isModified = true;
 		}
@@ -741,8 +738,10 @@ bool BackupStoreCheck::CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		{
 			// Add to will fix later list
 			BOX_ERROR("Directory ID " <<
-				BOX_FORMAT_OBJECTID(rEntry.GetObjectID())
-				<< " has wrong container ID.");
+				BOX_FORMAT_OBJECTID(rEntry.GetObjectID()) <<
+				" has wrong container ID " <<
+				BOX_FORMAT_OBJECTID(piBlock->mContainer[IndexInDirBlock]) <<
+				", should be " << BOX_FORMAT_OBJECTID(DirectoryID));
 			mDirsWithWrongContainerID.push_back(rEntry.GetObjectID());
 			++mNumberErrorsFound;
 		}

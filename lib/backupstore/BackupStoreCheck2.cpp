@@ -396,6 +396,8 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	// Find a suitable name
 	BackupStoreFilename lostAndFound;
 	int n = 0;
+	std::string lost_and_found_name;
+
 	while(true)
 	{
 		char name[32];
@@ -404,19 +406,22 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 		if(!dir.NameInUse(lostAndFound))
 		{
 			// Found a name which can be used
-			BOX_WARNING("Lost and found dir has name " << name);
+			lost_and_found_name = name;
 			break;
 		}
 	}
 
 	// Allocate an ID
-	int64_t id = mLastIDInInfo + 1;
+	int64_t id = (++mLastIDInInfo);
+	BOX_WARNING("Lost and found dir " << BOX_FORMAT_OBJECTID(id) << " has name " <<
+		lost_and_found_name);
 
 	// Create a blank directory
 	CreateBlankDirectory(id, BACKUPSTORE_ROOT_DIRECTORY_ID);
 
-	// Add an entry for it
+	// Add an entry for it:
 	dir.AddEntry(lostAndFound, 0, id, 0, BackupStoreDirectory::Entry::Flags_Dir, 0);
+	mpNewRefs->AddReference(id);
 
 	// Write out root dir
 	mrFileSystem.PutDirectory(dir);
@@ -565,13 +570,6 @@ void BackupStoreCheck::WriteNewStoreInfo()
 		}
 	}
 
-	// Object ID
-	int64_t lastObjID = mLastIDInInfo;
-	if(mLostAndFoundDirectoryID != 0)
-	{
-		mLastIDInInfo++;
-	}
-
 	// Build a new store info
 	std::auto_ptr<MemBlockStream> extra_data;
 	if(apOldInfo.get())
@@ -582,10 +580,11 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	{
 		extra_data.reset(new MemBlockStream(/* empty */));
 	}
+
 	std::auto_ptr<BackupStoreInfo> apNewInfo(BackupStoreInfo::CreateForRegeneration(
 		mAccountID,
 		mAccountName,
-		lastObjID,
+		mLastIDInInfo,
 		mBlocksUsed,
 		mBlocksInCurrentFiles,
 		mBlocksInOldFiles,
