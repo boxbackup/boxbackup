@@ -17,10 +17,13 @@
 #include <map>
 
 #include "Test.h"
+#include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
+#include "BackupDaemonConfigVerify.h"
 #include "BackupProtocol.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreCheck.h"
+#include "BackupStoreConfigVerify.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -36,9 +39,11 @@
 #include "RaidFileRead.h"
 #include "RaidFileUtil.h"
 #include "RaidFileWrite.h"
+#include "SSLLib.h"
 #include "ServerControl.h"
 #include "StoreStructure.h"
 #include "StoreTestUtils.h"
+#include "TLSContext.h"
 #include "ZeroStream.h"
 
 #include "MemLeakFindOn.h"
@@ -69,11 +74,114 @@ delete root, copy a file to it instead (equivalent to deleting it too)
 
 */
 
-std::string accountRootDir("backup/01234567/");
-int discSetNum = 0;
+bool setup_test_backupstorefix_unified()
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	TEST_THAT_OR(create_account(10000, 20000), FAIL);
+
+	// Run the perl script to create the initial directories
+	TEST_THAT_OR(::system(PERL_EXECUTABLE
+		" testfiles/testbackupstorefix.pl init") == 0, FAIL);
+
+	return true;
+}
+
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP_TEST_UNIFIED() \
+	SETUP(); \
+	TEST_THAT(setup_test_backupstorefix_unified());
 
 std::map<std::string, int32_t> nameToID;
 std::map<int32_t, bool> objectIsDir;
+
+bool list_uploaded_files()
+{
+	// Generate a list of all the object IDs
+	TEST_THAT_OR(::system(BBACKUPQUERY " -Wwarning "
+		"-c testfiles/bbackupd.conf \"list -R\" quit "
+		"> testfiles/initial-listing.txt") == 0, FAIL);
+
+	// And load it in
+	{
+		FILE *f = ::fopen("testfiles/initial-listing.txt", "r");
+		TEST_THAT_ABORTONFAIL(f != 0);
+		char line[512];
+		int32_t id;
+		char flags[32];
+		char name[256];
+		while(::fgets(line, sizeof(line), f) != 0)
+		{
+			TEST_THAT(::sscanf(line, "%x %s %s", &id,
+				flags, name) == 3);
+			bool isDir = (::strcmp(flags, "-d---") == 0);
+			//TRACE3("%x,%d,%s\n", id, isDir, name);
+			MEMLEAKFINDER_NO_LEAKS;
+			nameToID[std::string(name)] = id;
+			objectIsDir[id] = isDir;
+			set_refcount(id, 1);
+		}
+		::fclose(f);
+	}
+
+	TEST_EQUAL_OR(141, nameToID.size(), FAIL);
+
+	return true;
+}
+
+bool upload_test_files()
+{
+	TEST_THAT_OR(StartClient("testfiles/bbackupd-backupstorefix.conf"), FAIL);
+	sync_and_wait();
+	TEST_THAT_OR(StopClient(), FAIL);
+	TEST_THAT_OR(list_uploaded_files(), FAIL);
+	return true;
+}
+
+bool setup_test_backupstorefix_unified_with_bbstored()
+{
+	TEST_THAT_OR(setup_test_backupstorefix_unified(), FAIL);
+	TEST_THAT_OR(StartServer(), FAIL);
+	TEST_THAT_OR(upload_test_files(), FAIL);
+	return true;
+}
+
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP_TEST_UNIFIED_WITH_BBSTORED() \
+	SETUP(); \
+	TEST_THAT(setup_test_backupstorefix_unified_with_bbstored());
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_backupstorefix_unified()
+{
+	bool status = true;
+
+	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
+	{
+		TEST_THAT_OR(check_reference_counts(), status = false);
+		TEST_EQUAL_OR(0, check_account_and_fix_errors(), status = false);
+	}
+
+	return status;
+}
+
+#define TEARDOWN_TEST_UNIFIED() \
+	if (ServerIsAlive(bbstored_pid)) \
+		StopServer(); \
+	TEST_THAT(teardown_test_backupstorefix_unified()); \
+	TEARDOWN();
+
+// TODO: delete this code once it's unused:
+std::string accountRootDir("backup/01234567/");
+int discSetNum = 0;
+
+TLSContext tls_context;
 
 #define RUN_CHECK \
 	BOX_INFO("Running bbstoreaccounts to check and then repair the account"); \
@@ -101,10 +209,12 @@ std::string getObjectName(int32_t id)
 }
 
 // Delete an object
-void DeleteObject(const char *name)
+int64_t DeleteObject(const char *name)
 {
-	RaidFileWrite del(discSetNum, getObjectName(getID(name)));
+	int64_t id = getID(name);
+	RaidFileWrite del(discSetNum, getObjectName(id));
 	del.Delete();
+	return id;
 }
 
 // Load a directory
@@ -122,10 +232,11 @@ void SaveDirectory(const char *name, const BackupStoreDirectory &rDir)
 	d.Commit(true /* write now! */);
 }
 
-void CorruptObject(const char *name, int start, const char *rubbish)
+int64_t CorruptObject(const char *name, int start, const char *rubbish)
 {
 	int rubbish_len = ::strlen(rubbish);
-	std::string fn(getObjectName(getID(name)));
+	int64_t id = getID(name);
+	std::string fn(getObjectName(id));
 	std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, fn));
 	RaidFileWrite w(discSetNum, fn);
 	w.Open(true /* allow overwrite */);
@@ -141,6 +252,7 @@ void CorruptObject(const char *name, int start, const char *rubbish)
 	r->Close();
 	// Commit
 	w.Commit(true /* convert now */);
+	return id;
 }
 
 BackupStoreFilename fnames[3];
@@ -208,8 +320,10 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 	TEST_THAT(ck->id == -1);
 }
 
-void test_dir_fixing()
+bool test_dir_fixing()
 {
+	SETUP_TEST_UNIFIED();
+
 	// Test that entries pointing to nonexistent entries are removed
 	{
 		BackupStoreDirectory dir;
@@ -337,6 +451,8 @@ void test_dir_fixing()
 		static checkdepinfoen c2[] = {{4, 5, 0}, {5, 0, 4}, {-1, 0, 0}};
 		check_dir_dep(dir, c2);
 	}
+
+	TEARDOWN_TEST_UNIFIED();
 }
 
 int64_t fake_upload(BackupProtocolLocal& client, const std::string& file_path,
@@ -458,38 +574,9 @@ bool compare_store_contents_with_expected(int phase)
 	return ::system(cmd.str().c_str()) == 0;
 }
 
-int test(int argc, const char *argv[])
+bool test_entry_pointing_to_missing_object_is_deleted()
 {
-	// Enable logging timestamps to help debug race conditions on AppVeyor
-	Console::SetShowTimeMicros(true);
-
-	{
-		MEMLEAKFINDER_NO_LEAKS;
-		fnames[0].SetAsClearFilename("x1");
-		fnames[1].SetAsClearFilename("x2");
-		fnames[2].SetAsClearFilename("x3");
-	}
-
-	// Test the backupstore directory fixing
-	test_dir_fixing();
-
-	// Initialise the raidfile controller
-	RaidFileController &rcontroller = RaidFileController::GetController();
-	rcontroller.Initialise("testfiles/raidfile.conf");
-	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
-
-	// Create an account
-	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS
-		" -c testfiles/bbstored.conf "
-		"create 01234567 0 10000B 20000B") == 0);
-	TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
-
-	// Run the perl script to create the initial directories
-	TEST_THAT_ABORTONFAIL(::system(PERL_EXECUTABLE
-		" testfiles/testbackupstorefix.pl init") == 0);
-
-	BOX_INFO("  === Test that an entry pointing to a file that doesn't "
-		"exist is really deleted");
+	SETUP_TEST_UNIFIED();
 
 	{
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
@@ -513,8 +600,12 @@ int test(int argc, const char *argv[])
 		check_and_fix_root_dir(after_entries, after_deps);
 	}
 
-	BOX_INFO("  === Test that an entry pointing to another that doesn't "
-		"exist is really deleted");
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_entry_depending_on_missing_object_is_deleted()
+{
+	SETUP_TEST_UNIFIED();
 
 	{
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
@@ -559,8 +650,84 @@ int test(int argc, const char *argv[])
 		check_and_fix_root_dir(after_entries, after_deps);
 	}
 
-	BOX_INFO("  === Test that an entry pointing to a directory whose "
-		"raidfile is corrupted doesn't crash");
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_entry_pointing_to_crazy_object_id()
+{
+	SETUP_TEST_UNIFIED();
+
+	{
+		BackupStoreDirectory dir;
+		read_bb_dir(1 /* root */, dir);
+
+		dir.AddEntry(fnames[0], 12, 0x1234567890123456LL /* id */, 1,
+			BackupStoreDirectory::Entry::Flags_File, 2);
+
+		std::string fn;
+		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
+			discSetNum, fn, true /* EnsureDirectoryExists */);
+
+		RaidFileWrite d(discSetNum, fn);
+		d.Open(true /* allow overwrite */);
+		dir.WriteToStream(d);
+		d.Commit(true /* write now! */);
+
+		read_bb_dir(1 /* root */, dir);
+		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
+
+		// Should just be greater than 1 really, we don't know quite
+		// how good the checker is (or will become) at spotting errors!
+		// But this will help us catch changes in checker behaviour,
+		// so it's not a bad thing to test.
+		TEST_EQUAL(2, check_account_and_fix_errors());
+
+		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
+			fn));
+		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
+		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) == 0);
+	}
+
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_store_info_repaired_and_random_files_removed()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
+	{
+		// Delete store info
+		RaidFileWrite del(discSetNum, accountRootDir + "info");
+		del.Delete();
+	}
+
+	{
+		// Add a spurious file
+		RaidFileWrite random(discSetNum,
+			accountRootDir + "randomfile");
+		random.Open();
+		random.Write("test", 4);
+		random.Commit(true);
+	}
+
+	// Fix it
+	RUN_CHECK
+
+	// Check everything is as it was
+	TEST_THAT(compare_store_contents_with_expected(0));
+
+	// Check the random file doesn't exist
+	{
+		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
+			accountRootDir + "01/randomfile"));
+	}
+
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_entry_for_corrupted_directory()
+{
+	SETUP_TEST_UNIFIED();
 
 	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
 	// locked when we try to check or query it (race conditions):
@@ -626,10 +793,14 @@ int test(int argc, const char *argv[])
 		}
 	}
 
+	TEST_THAT(list_uploaded_files());
+
+	TEST_EQUAL(0, check_account_and_fix_errors());
+
 	// Check that we're starting off with the right numbers of files and blocks.
 	// Otherwise the test that check the counts after breaking things will fail
 	// because the numbers won't match.
-	TEST_EQUAL(0, check_account_and_fix_errors());
+
 	{
 		std::auto_ptr<BackupProtocolAccountUsage2> usage =
 			BackupProtocolLocal2(0x01234567, "test",
@@ -642,92 +813,12 @@ int test(int argc, const char *argv[])
 		TEST_EQUAL(usage->GetBlocksInDirectories(), 56);
 	}
 
-	BOX_INFO("  === Add a reference to a file that doesn't exist, check "
-		"that it's removed");
-	{
-		BackupStoreDirectory dir;
-		read_bb_dir(1 /* root */, dir);
-
-		dir.AddEntry(fnames[0], 12, 0x1234567890123456LL /* id */, 1,
-			BackupStoreDirectory::Entry::Flags_File, 2);
-
-		std::string fn;
-		StoreStructure::MakeObjectFilename(1 /* root */, accountRootDir,
-			discSetNum, fn, true /* EnsureDirectoryExists */);
-
-		RaidFileWrite d(discSetNum, fn);
-		d.Open(true /* allow overwrite */);
-		dir.WriteToStream(d);
-		d.Commit(true /* write now! */);
-
-		read_bb_dir(1 /* root */, dir);
-		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) != 0);
-
-		// Should just be greater than 1 really, we don't know quite
-		// how good the checker is (or will become) at spotting errors!
-		// But this will help us catch changes in checker behaviour,
-		// so it's not a bad thing to test.
-		TEST_EQUAL(2, check_account_and_fix_errors());
-
-		std::auto_ptr<RaidFileRead> file(RaidFileRead::Open(discSetNum,
-			fn));
-		dir.ReadFromStream(*file, IOStream::TimeOutInfinite);
-		TEST_THAT(dir.FindEntryByID(0x1234567890123456LL) == 0);
-	}
-
-	// Generate a list of all the object IDs
-	TEST_THAT_ABORTONFAIL(::system(BBACKUPQUERY " -Wwarning "
-		"-c testfiles/bbackupd.conf \"list -R\" quit "
-		"> testfiles/initial-listing.txt") == 0);
-
-	// And load it in
-	{
-		FILE *f = ::fopen("testfiles/initial-listing.txt", "r");
-		TEST_THAT_ABORTONFAIL(f != 0);
-		char line[512];
-		int32_t id;
-		char flags[32];
-		char name[256];
-		while(::fgets(line, sizeof(line), f) != 0)
-		{
-			TEST_THAT(::sscanf(line, "%x %s %s", &id,
-				flags, name) == 3);
-			bool isDir = (::strcmp(flags, "-d---") == 0);
-			//TRACE3("%x,%d,%s\n", id, isDir, name);
-			MEMLEAKFINDER_NO_LEAKS;
-			nameToID[std::string(name)] = id;
-			objectIsDir[id] = isDir;
-		}
-		::fclose(f);
-	}
-
 	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Delete store info, add random file");
-	{
-		// Delete store info
-		RaidFileWrite del(discSetNum, accountRootDir + "info");
-		del.Delete();
-	}
-	{
-		// Add a spurious file
-		RaidFileWrite random(discSetNum,
-			accountRootDir + "randomfile");
-		random.Open();
-		random.Write("test", 4);
-		random.Commit(true);
-	}
 
-	// Fix it
 	RUN_CHECK
 
 	// Check everything is as it was
 	TEST_THAT(compare_store_contents_with_expected(0));
-
-	// Check the random file doesn't exist
-	{
-		TEST_THAT(!RaidFileRead::FileExists(discSetNum,
-			accountRootDir + "01/randomfile"));
-	}
 
 	RaidBackupFileSystem fs(0x01234567, accountRootDir, 0); // discSet
 
@@ -750,6 +841,7 @@ int test(int argc, const char *argv[])
 			TEST_THAT(dir.FindEntryByID(delID) != 0);
 			dir.DeleteEntry(delID);
 			SaveDirectory("Test1/cannes/ict/metegoguered", dir);
+			set_refcount(delID, 0);
 		}
 
 		// Adjust that entry
@@ -824,85 +916,92 @@ int test(int argc, const char *argv[])
 		RaidFileDiscSet rdiscSet(rcontroller.GetDiscSet(discSetNum));
 	}
 
-	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Delete directory, change container ID of another, "
-		"duplicate entry in dir, spurious file size, delete file");
-	int64_t duplicatedID = 0;
-	int64_t notSpuriousFileSize = 0;
+	TEARDOWN_TEST_UNIFIED();
+}
 
-	{
-		// Wait for the server to finish housekeeping (if any) and then lock the account
-		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
-		fs.GetLock();
-
-		BackupStoreDirectory dir;
-		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-		dir.SetContainerID(73773);
-		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
-
-		LoadDirectory("Test1/cannes/ict/peep", dir);
-
-		// Duplicate the second entry
-		{
-			BackupStoreDirectory::Iterator i(dir);
-			i.Next();
-			BackupStoreDirectory::Entry *en = i.Next();
-			TEST_THAT(en != 0);
-			duplicatedID = en->GetObjectID();
-			dir.AddEntry(*en);
-		}
-
-		// Adjust file size of first file
-		{
-			BackupStoreDirectory::Iterator i(dir);
-			BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
-			TEST_THAT(en != 0);
-			notSpuriousFileSize = en->GetSizeInBlocks();
-			en->SetSizeInBlocks(3473874);
-			TEST_THAT(en->GetSizeInBlocks() == 3473874);
-		}
-
-		SaveDirectory("Test1/cannes/ict/peep", dir);
-
-		// Delete a directory. The checker should be able to reconstruct it using the
-		// ContainerID of the contained files.
-		DeleteObject("Test1/pass/cacted/ming");
-
-		// Delete a file
-		DeleteObject("Test1/cannes/ict/scely");
-
-		fs.ReleaseLock();
-	}
+bool check_for_errors(int expected_error_count, int blocks_used, int blocks_in_current,
+	int blocks_in_old, int blocks_in_deleted, int blocks_in_dirs, int num_files)
+{
+	bool success = true;
 
 	// We don't know quite how good the checker is (or will become) at
 	// spotting errors! But asserting an exact number will help us catch
 	// changes in checker behaviour, so it's not a bad thing to test.
-
-	// The 12 errors that we currently expect are:
-	// ERROR:   Directory ID 0xb references object 0x3e which does not exist.
-	// ERROR:   Removing directory entry 0x3e from directory 0xb
-	// ERROR:   Directory ID 0xc had invalid entries, fixed
-	// ERROR:   Directory ID 0xc has wrong size for object 0x40
-	// ERROR:   Directory ID 0x17 has wrong container ID.
-	// ERROR:   Object 0x51 is unattached.
-	// ERROR:   Object 0x52 is unattached.
-	// ERROR:   BlocksUsed changed from 282 to 278
-	// ERROR:   BlocksInCurrentFiles changed from 226 to 220
-	// ERROR:   BlocksInDirectories changed from 56 to 54
-	// ERROR:   NumFiles changed from 113 to 110
-	// WARNING: Reference count of object 0x3e changed from 1 to 0
-
-	TEST_EQUAL(12, check_account_and_fix_errors());
+	TEST_EQUAL_OR(expected_error_count, check_account_and_fix_errors(), success = false);
 
 	{
 		std::auto_ptr<BackupProtocolAccountUsage2> usage =
 			BackupProtocolLocal2(0x01234567, "test",
 				"backup/01234567/", 0,
 				false).QueryGetAccountUsage2();
-		TEST_EQUAL(usage->GetBlocksUsed(), 278);
-		TEST_EQUAL(usage->GetBlocksInCurrentFiles(), 220);
-		TEST_EQUAL(usage->GetBlocksInDirectories(), 54);
-		TEST_EQUAL(usage->GetNumCurrentFiles(), 110);
+		TEST_EQUAL_OR(blocks_used, usage->GetBlocksUsed(), success = false);
+		TEST_EQUAL_OR(blocks_in_current, usage->GetBlocksInCurrentFiles(), success = false);
+		TEST_EQUAL_OR(blocks_in_old, usage->GetBlocksInOldFiles(), success = false);
+		TEST_EQUAL_OR(blocks_in_deleted, usage->GetBlocksInDeletedFiles(), success = false);
+		TEST_EQUAL_OR(blocks_in_dirs, usage->GetBlocksInDirectories(), success = false);
+		TEST_EQUAL_OR(num_files, usage->GetNumCurrentFiles(), success = false);
+	}
+
+	return success;
+}
+
+bool test_delete_directory_change_container_id_duplicate_entry_delete_objects()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
+	int64_t duplicatedID = 0;
+	int64_t notSpuriousFileSize = 0;
+
+	TEST_THAT(check_for_errors(0, 284, 228, 0, 0, 56, 114));
+
+	{
+		BackupStoreDirectory dir;
+		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+		dir.SetContainerID(73773);
+		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
+
+		TEST_THAT(check_for_errors(1, 284, 228, 0, 0, 56, 114));
+
+		// Duplicate the second entry
+		{
+			LoadDirectory("Test1/cannes/ict/peep", dir);
+			BackupStoreDirectory::Iterator i(dir);
+			i.Next();
+			BackupStoreDirectory::Entry *en = i.Next();
+			TEST_THAT(en != 0);
+			duplicatedID = en->GetObjectID();
+			dir.AddEntry(*en);
+			SaveDirectory("Test1/cannes/ict/peep", dir);
+		}
+
+		TEST_THAT(check_for_errors(1, 284, 228, 0, 0, 56, 114));
+
+		// Adjust file size of first file
+		{
+			LoadDirectory("Test1/cannes/ict/peep", dir);
+			BackupStoreDirectory::Iterator i(dir);
+			BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
+			TEST_THAT(en != 0);
+			notSpuriousFileSize = en->GetSizeInBlocks();
+			en->SetSizeInBlocks(3473874);
+			TEST_THAT(en->GetSizeInBlocks() == 3473874);
+			SaveDirectory("Test1/cannes/ict/peep", dir);
+		}
+
+		TEST_THAT(check_for_errors(1, 284, 228, 0, 0, 56, 114));
+
+		// Delete a directory. The checker should be able to reconstruct it using the
+		// ContainerID of the contained files.
+		DeleteObject("Test1/pass/cacted/ming");
+
+		TEST_THAT(check_for_errors(2, 284, 228, 0, 0, 56, 114));
+
+		// Delete a file. The checker should not be able to reconstruct it, so the number
+		// of files and blocks used by current files should both drop by its size.
+		int64_t id = DeleteObject("Test1/cannes/ict/scely");
+		set_refcount(id, 0);
+
+		TEST_THAT(check_for_errors(6, 282, 226, 0, 0, 56, 113));
 	}
 
 	// Check everything is as it should be
@@ -913,6 +1012,7 @@ int test(int argc, const char *argv[])
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 		TEST_THAT(dir.GetContainerID() == getID("Test1/foreomizes/stemptinevidate"));
 	}
+
 	{
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/cannes/ict/peep", dir);
@@ -928,6 +1028,7 @@ int test(int argc, const char *argv[])
 			}
 		}
 		TEST_THAT(count == 1);
+
 		// Check file size has changed
 		{
 			BackupStoreDirectory::Iterator i(dir);
@@ -937,15 +1038,16 @@ int test(int argc, const char *argv[])
 		}
 	}
 
-	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Modify the obj ID of dir, delete dir with no members, "
-		"add extra reference to a file");
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_directory_bad_object_id_delete_empty_dir_add_reference()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
+	TEST_THAT(check_for_errors(0, 284, 228, 0, 0, 56, 114));
 
 	{
-		// Wait for the server to finish housekeeping (if any) and then lock the account
-		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
-		fs.GetLock();
-
 		// Set bad object ID
 		BackupStoreDirectory dir;
 		LoadDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
@@ -953,7 +1055,8 @@ int test(int argc, const char *argv[])
 		SaveDirectory("Test1/foreomizes/stemptinevidate/ict", dir);
 
 		// Delete dir with no members
-		DeleteObject("Test1/dir-no-members");
+		int64_t id = DeleteObject("Test1/dir-no-members");
+		set_refcount(id, 0);
 
 		// Add extra reference
 		LoadDirectory("Test1/divel", dir);
@@ -964,12 +1067,12 @@ int test(int argc, const char *argv[])
 		LoadDirectory("Test1/divel/torsines/cruishery", dir2);
 		dir2.AddEntry(*en);
 		SaveDirectory("Test1/divel/torsines/cruishery", dir2);
-
-		fs.ReleaseLock();
 	}
 
 	// Fix it
 	RUN_CHECK
+
+	TEST_THAT(check_for_errors(0, 282, 228, 0, 0, 54, 114));
 
 	// Check everything is as it should be
 	TEST_THAT(compare_store_contents_with_expected(3));
@@ -980,39 +1083,65 @@ int test(int argc, const char *argv[])
 		TEST_THAT(dir.GetObjectID() == getID("Test1/foreomizes/stemptinevidate/ict"));
 	}
 
-	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Orphan files and dirs without being recoverable");
-	DeleteObject("Test1/dir1");
-	DeleteObject("Test1/dir1/dir2");
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool set_refcount_for_lost_and_found_dir()
+{
+	BackupProtocolLocal2 protocol(0x01234567, "test", accountRootDir,
+		discSetNum, false);
+	std::auto_ptr<BackupProtocolSuccess> dirreply(protocol.QueryListDirectory(
+			BACKUPSTORE_ROOT_DIRECTORY_ID,
+			BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING,
+			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING, false /* no attributes */));
+
+	BackupStoreDirectory dir(protocol.ReceiveStream(), 5000); // timeout in ms
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreFilenameClear lost_found_0("lost+found0");
+	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(lost_found_0);
+	TEST_THAT_OR(en != NULL, FAIL);
+
+	set_refcount(en->GetObjectID(), 1);
+	return true;
+}
+
+bool test_orphan_files_and_directories_unrecoverably()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
+	set_refcount(DeleteObject("Test1/dir1"), 0);
+	set_refcount(DeleteObject("Test1/dir1/dir2"), 0);
 
 	// Fix it
 	RUN_CHECK
 
+	// Fixing created a lost+found directory, which has a reference, so we should expect
+	// it to exist and have a reference:
+	TEST_THAT(set_refcount_for_lost_and_found_dir());
+
 	// Check everything is where it is predicted to be
 	TEST_THAT(compare_store_contents_with_expected(4));
 
-	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Corrupt file and dir");
+	TEARDOWN_TEST_UNIFIED();
+}
+
+bool test_corrupt_file_and_dir()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
 	{
 		// Increase log level for locking errors to help debug random failures on AppVeyor
 		LogLevelOverrideByFileGuard increase_lock_logging("", // rFileName
 			BackupFileSystem::LOCKING.ToString(), Log::TRACE); // NewLevel
 		increase_lock_logging.Install();
 
-		// Wait for the server to finish housekeeping (if any) and then lock the account
-		// before damaging it, to avoid a race condition where bbstored runs housekeeping
-		// after we disconnect, extremely slowly on AppVeyor, and this causes the second
-		// bbstoreaccounts check command to time out waiting for a lock.
-		fs.GetLock();
-
-		// File
-		CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge", 33,
+		// File. This one should be deleted.
+		int64_t id = CorruptObject("Test1/foreomizes/stemptinevidate/algoughtnerge", 33,
 			"34i729834298349283479233472983sdfhasgs");
-		// Dir
+		set_refcount(id, 0);
+		// Dir. This one should be recovered.
 		CorruptObject("Test1/cannes/imulatrougge/foreomizes", 23,
 			"dsf32489sdnadf897fd2hjkesdfmnbsdfcsfoisufio2iofe2hdfkjhsf");
-
-		fs.ReleaseLock();
 	}
 
 	// Fix it
@@ -1021,32 +1150,114 @@ int test(int argc, const char *argv[])
 	// Check everything is where it should be
 	TEST_THAT(compare_store_contents_with_expected(5));
 
-	// ------------------------------------------------------------------------------------------------
-	BOX_INFO("  === Overwrite root with a file");
-	{
-		// Wait for the server to finish housekeeping (if any) and then lock the account
-		// before damaging it, to avoid a race condition with post-disconnect housekeeping.
-		fs.GetLock();
+	TEARDOWN_TEST_UNIFIED();
+}
 
+bool test_overwrite_root_directory_with_a_file()
+{
+	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+
+	{
 		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
 		RaidFileWrite w(discSetNum, getObjectName(1 /* root */));
 		w.Open(true /* allow overwrite */);
 		r->CopyStreamTo(w);
 		w.Commit(true /* convert now */);
-
-		fs.ReleaseLock();
 	}
 
 	// Fix it
 	RUN_CHECK
 
+	// Fixing created a lost+found directory, which has a reference, so we should expect
+	// it to exist and have a reference:
+	TEST_THAT(set_refcount_for_lost_and_found_dir());
+
 	// Check everything is where it should be
 	TEST_THAT(compare_store_contents_with_expected(6));
 
-	// ---------------------------------------------------------
-	// Stop server
-	TEST_THAT(StopServer());
+	TEARDOWN_TEST_UNIFIED();
+}
 
-	return 0;
+int test(int argc, const char *argv[])
+{
+	// Enable logging timestamps to help debug race conditions on AppVeyor
+	Console::SetShowTimeMicros(true);
+
+	{
+		MEMLEAKFINDER_NO_LEAKS;
+		fnames[0].SetAsClearFilename("x1");
+		fnames[1].SetAsClearFilename("x2");
+		fnames[2].SetAsClearFilename("x3");
+	}
+
+	// Initialise the raid file controller
+	RaidFileController &rcontroller = RaidFileController::GetController();
+	rcontroller.Initialise("testfiles/raidfile.conf");
+
+	// SSL library
+	SSLLib::Initialise();
+
+	// Use the setup crypto command to set up all these keys, so that the bbackupquery command can be used
+	// for seeing what's going on.
+	BackupClientCryptoKeys_Setup("testfiles/bbackupd.keys");
+
+	tls_context.Initialise(false /* client */,
+			"testfiles/clientCerts.pem",
+			"testfiles/clientPrivKey.pem",
+			"testfiles/clientTrustedCAs.pem");
+
+	/*
+	std::auto_ptr<Configuration> s3config = load_config_file(
+		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
+	// Use an auto_ptr so we can release it, and thus the lock, before stopping the
+	// daemon on which locking relies:
+	std::auto_ptr<S3BackupAccountControl> ap_s3control(
+		new S3BackupAccountControl(*s3config));
+	*/
+
+	std::auto_ptr<Configuration> storeconfig = load_config_file(
+		DEFAULT_BBSTORED_CONFIG_FILE, BackupConfigFileVerify);
+	BackupStoreAccountControl storecontrol(*storeconfig, 0x01234567);
+
+	TEST_THAT(kill_running_daemons());
+
+	TEST_THAT(test_dir_fixing());
+	TEST_THAT(test_entry_pointing_to_missing_object_is_deleted())
+	TEST_THAT(test_entry_depending_on_missing_object_is_deleted())
+	TEST_THAT(test_entry_pointing_to_crazy_object_id())
+	TEST_THAT(test_store_info_repaired_and_random_files_removed())
+	TEST_THAT(test_entry_for_corrupted_directory())
+	TEST_THAT(test_delete_directory_change_container_id_duplicate_entry_delete_objects())
+	TEST_THAT(test_directory_bad_object_id_delete_empty_dir_add_reference())
+	TEST_THAT(test_orphan_files_and_directories_unrecoverably())
+	TEST_THAT(test_corrupt_file_and_dir())
+	TEST_THAT(test_overwrite_root_directory_with_a_file())
+
+	/*
+	TEST_THAT(StartSimulator());
+
+	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
+	test_specialisation specialisations;
+	specialisations["s3"] = ap_s3control.get();
+	specialisations["store"] = &storecontrol;
+
+#define RUN_SPECIALISED_TEST(name, pControl, function) \
+	TEST_THAT(function(name, *(pControl)));
+
+	// Run all tests that take a BackupAccountControl argument twice, once with an
+	// S3BackupAccountControl and once with a BackupStoreAccountControl.
+
+	for(test_specialisation::iterator i = specialisations.begin();
+		i != specialisations.end(); i++)
+	{
+		// RUN_SPECIALISED_TEST(i->first, i->second, test_bbstoreaccounts_create);
+	}
+
+	// Release lock before shutting down the simulator:
+	ap_s3control.reset();
+	TEST_THAT(StopSimulator());
+	*/
+
+	return finish_test_suite();
 }
 

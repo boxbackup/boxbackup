@@ -151,7 +151,7 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
 
 //! Simplifies calling setUp() with the current function name in each test.
-#define SETUP_TEST_BACKUPSTORE() \
+#define SETUP_TEST_UNIFIED() \
 	SETUP(); \
 	if (ServerIsAlive(bbstored_pid)) \
 		TEST_THAT_OR(StopServer(), FAIL); \
@@ -200,14 +200,14 @@ bool setup_test_backupstore_specialised(const std::string& spec_name,
 	return true;
 }
 
-#define SETUP_TEST_BACKUPSTORE_SPECIALISED(name, control) \
+#define SETUP_TEST_SPECIALISED(name, control) \
 	SETUP_SPECIALISED(name); \
 	TEST_THAT_OR(setup_test_backupstore_specialised(name, control), FAIL); \
 	try \
-	{ // left open for TEARDOWN_TEST_BACKUPSTORE_SPECIALISED()
+	{ // left open for TEARDOWN_TEST_SPECIALISED()
 
 //! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_backupstore()
+bool teardown_test_backupstore_unified()
 {
 	bool status = true;
 
@@ -220,10 +220,10 @@ bool teardown_test_backupstore()
 	return status;
 }
 
-#define TEARDOWN_TEST_BACKUPSTORE() \
+#define TEARDOWN_TEST_UNIFIED() \
 	if (ServerIsAlive(bbstored_pid)) \
 		StopServer(); \
-	TEST_THAT(teardown_test_backupstore()); \
+	TEST_THAT(teardown_test_backupstore_unified()); \
 	TEARDOWN();
 
 //! Checks account for errors and shuts down daemons at end of every test.
@@ -248,7 +248,7 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 	return status;
 }
 
-#define _TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, check_for_errors) \
+#define _TEARDOWN_TEST_SPECIALISED(name, control, check_for_errors) \
 		if (ServerIsAlive(bbstored_pid)) \
 			StopServer(); \
 		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control, \
@@ -266,11 +266,11 @@ bool teardown_test_backupstore_specialised(const std::string& spec_name,
 	} \
 	TEARDOWN();
 
-#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control) \
-	_TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, true)
+#define TEARDOWN_TEST_SPECIALISED(name, control) \
+	_TEARDOWN_TEST_SPECIALISED(name, control, true)
 
-#define TEARDOWN_TEST_BACKUPSTORE_SPECIALISED_NO_CHECK(name, control) \
-	_TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(name, control, false)
+#define TEARDOWN_TEST_SPECIALISED_NO_CHECK(name, control) \
+	_TEARDOWN_TEST_SPECIALISED(name, control, false)
 
 #define CREATE_LOCAL_CONTEXT_AND_PROTOCOL(filesystem, context_name, protocol_name, read_only) \
 	BackupStoreContext context_name(filesystem, 0x01234567, NULL, \
@@ -449,7 +449,7 @@ bool run_bbstoreaccounts_specialised(const std::string& specialisation_name,
 
 bool test_filename_encoding()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	// test some basics -- encoding and decoding filenames
 	{
@@ -530,12 +530,12 @@ bool test_filename_encoding()
 		}
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_backupstore_directory()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	{
 		// Now play with directories
@@ -616,7 +616,7 @@ bool test_backupstore_directory()
 		}
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 void write_test_file(int t)
@@ -972,7 +972,7 @@ bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
 
 bool test_temporary_refcount_db_is_independent()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	std::auto_ptr<BackupStoreAccountDatabase> apAccounts(
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
@@ -1000,13 +1000,13 @@ bool test_temporary_refcount_db_is_independent()
 	// test failure.
 	perm.reset();
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_server_housekeeping(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	// We need complete control over housekeeping, so use a local client instead of a network
@@ -1336,7 +1336,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
@@ -1415,7 +1415,7 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 bool test_multiple_uploads(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, false); // !ReadOnly
@@ -1678,13 +1678,13 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 	protocol.QueryFinished();
 	protocol_read_only.QueryFinished();
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_server_commands(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 
 	// Write the test file for create_file to upload:
 	write_test_file(0);
@@ -2248,7 +2248,7 @@ bool test_server_commands(const std::string& specialisation_name,
 		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -2269,7 +2269,7 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 bool test_directory_parent_entry_tracks_directory_size(
 	const std::string& specialisation_name, BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 
 #ifdef BOX_RELEASE_BUILD
 	BOX_NOTICE("skipping test: takes too long in release mode");
@@ -2459,13 +2459,13 @@ bool test_directory_parent_entry_tracks_directory_size(
 	protocol_read_only.QueryFinished();
 #endif // BOX_RELEASE_BUILD
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_cannot_open_multiple_writable_connections(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 
@@ -2532,7 +2532,7 @@ bool test_cannot_open_multiple_writable_connections(const std::string& specialis
 	}
 
 	protocol_writable.QueryFinished();
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_file_encoding()
@@ -2541,7 +2541,7 @@ bool test_file_encoding()
 	// TODO: This test needs to check failure situations as well as everything working,
 	// but this will be saved for the full implementation.
 
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	int encfile[ENCFILE_SIZE];
 
@@ -2729,12 +2729,12 @@ bool test_file_encoding()
 		}
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_symlinks()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 #ifndef WIN32 // no symlinks on Win32
 	UNLINK_IF_EXISTS("testfiles/testsymlink");
@@ -2753,13 +2753,13 @@ bool test_symlinks()
 	BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 #endif
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_store_info(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	{
@@ -2819,7 +2819,7 @@ bool test_store_info(const std::string& specialisation_name,
 		TEST_EQUAL(4, delfiles[1]);
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED_NO_CHECK(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(specialisation_name, control);
 }
 
 bool test_login_without_account()
@@ -2828,8 +2828,7 @@ bool test_login_without_account()
 	// accounts database at all. And it's difficult because SetClientHasAccount is called by
 	// BackupStoreDaemon (which has access to the accounts database) and specialised tests
 	// normally use/ a local protocol, which bypasses BackupStoreDaemon.
-
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	// Try logging in with a nonexistent (deleted) account, which should fail:
 	delete_account();
@@ -2852,13 +2851,13 @@ bool test_login_without_account()
 		protocol.QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	// Delete the account, and create it again using bbstoreaccounts
@@ -2909,13 +2908,13 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	BackupStoreRefCountDatabase& refcount_db(fs.GetPermanentRefCountDatabase(true)); // ReadOnly
 	TEST_EQUAL(1, refcount_db.GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	// Release the lock so that we can run bbstoreaccounts:
@@ -2926,14 +2925,14 @@ bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
 	TEST_THAT(create_test_account_specialised(specialisation_name, control));
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 // Test that login fails on a disabled account
 bool test_login_with_disabled_account(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	// Release the lock so that we can run bbstoreaccounts:
@@ -2971,13 +2970,13 @@ bool test_login_with_disabled_account(const std::string& specialisation_name,
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	// Need to unlock the filesystem because it has an open file handle to the refcount DB, so
@@ -3048,14 +3047,14 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 		connect_and_login(tls_context)->QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 // Test the deletion of objects by the housekeeping system
 bool test_housekeeping_deletes_files(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 	BackupFileSystem& fs(control.GetFileSystem());
 
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
@@ -3098,13 +3097,13 @@ bool test_housekeeping_deletes_files(const std::string& specialisation_name,
 	// teardown_test_backupstore() don't fail.
 	ExpectedRefCounts.resize(2);
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_account_limits_respected(const std::string& specialisation_name,
 	BackupAccountControl& control)
 {
-	SETUP_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(specialisation_name, control);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
@@ -3159,7 +3158,7 @@ bool test_account_limits_respected(const std::string& specialisation_name,
 		apProtocol->QueryFinished();
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
 }
 
 bool test_open_files_with_limited_win32_permissions()
@@ -3269,7 +3268,7 @@ bool compare_backupstoreinfo_values_to_expected
 
 bool test_read_old_backupstoreinfo_files()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
@@ -3502,7 +3501,7 @@ bool test_read_old_backupstoreinfo_files()
 	apInfoReadOnly.reset();
 	TEST_THAT(delete_account());
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 // Test that attributes can be correctly read from and written to the standard
@@ -3512,7 +3511,7 @@ bool test_read_old_backupstoreinfo_files()
 // details of the problems with packed structs.
 bool test_read_write_attr_streamformat()
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	// Construct a minimal valid directory with 1 entry in memory using Archive, and
 	// try to read it back.
@@ -3590,12 +3589,12 @@ bool test_read_write_attr_streamformat()
 	// one we hand-crafted earlier.
 	TEST_EQUAL(0, memcmp(buf.GetBuffer(), buf2.GetBuffer(), buf.GetSize()));
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	// Test that S3BackupFileSystem returns a RevisionID based on the ETag (MD5
 	// checksum) of the file.
@@ -3623,13 +3622,13 @@ bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3co
 	TEST_THAT(fs.ObjectExists(0, &revision_id));
 	TEST_EQUAL(expected_id, revision_id);
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 // Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
 bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
 {
-	SETUP_TEST_BACKUPSTORE();
+	SETUP_TEST_UNIFIED();
 
 	const Configuration s3config = config.GetSubConfiguration("S3Store");
 	S3Client s3client(s3config);
@@ -3725,7 +3724,7 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 		TEST_THAT(test_equal_maps(expected, attributes));
 	}
 
-	TEARDOWN_TEST_BACKUPSTORE();
+	TEARDOWN_TEST_UNIFIED();
 }
 
 int test(int argc, const char *argv[])

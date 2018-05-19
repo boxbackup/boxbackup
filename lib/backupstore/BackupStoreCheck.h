@@ -116,11 +116,28 @@ private:
 		BackupStoreCheck_Size_t mObjectSizeInBlocks[BACKUPSTORECHECK_BLOCK_SIZE];
 	} IDBlock;
 
+	class DirectoryFixer
+	{
+		private:
+		BackupStoreDirectory mDirectory;
+		BackupFileSystem& mrFileSystem;
+
+		public:
+		DirectoryFixer(BackupFileSystem& rFileSystem, int64_t ID);
+		BackupStoreDirectory::Entry* InsertObject(int64_t ObjectID, bool IsDirectory,
+			int32_t lostDirNameSerial);
+		~DirectoryFixer();
+	};
+
+	typedef std::map<int64_t, DirectoryFixer*> fixers_t;
+	typedef std::pair<int64_t, DirectoryFixer*> fixer_pair_t;
+
 	// Phases of the check
 	void CheckObjects();
 	void CheckDirectories();
 	void CheckRoot();
 	void CheckUnattachedObjects();
+	void HandleUnattachedObject(IDBlock *pblock, int index, fixers_t& fixers);
 	void FixDirsWithWrongContainerID();
 	void FixDirsWithLostDirs();
 	void WriteNewStoreInfo();
@@ -133,14 +150,16 @@ private:
 	bool CheckDirectoryEntry(BackupStoreDirectory::Entry& rEntry,
 		int64_t DirectoryID, bool& rIsModified);
 	void CountDirectoryEntries(BackupStoreDirectory& dir);
+	void CountDirectoryEntry(int64_t object_id, int16_t flags, int64_t size,
+		bool subtract = false);
 	int64_t CheckFile(int64_t ObjectID, IOStream &rStream);
 	int64_t CheckDirInitial(int64_t ObjectID, IOStream &rStream);
 
 	// Fixing functions
-	bool TryToRecreateDirectory(int64_t MissingDirectoryID);
+	int64_t TryToRecreateDirectory(int64_t MissingDirectoryID);
 	void InsertObjectIntoDirectory(int64_t ObjectID, int64_t DirectoryID, bool IsDirectory);
 	int64_t GetLostAndFoundDirID();
-	void CreateBlankDirectory(int64_t DirectoryID, int64_t ContainingDirID);
+	int64_t CreateBlankDirectory(int64_t DirectoryID, int64_t ContainingDirID);
 
 	// Data handling
 	void FreeInfo();
@@ -161,6 +180,12 @@ private:
 		ASSERT(Index < BACKUPSTORECHECK_BLOCK_SIZE);
 
 		return (pBlock->mFlags[Index / Flags__NumItemsPerEntry] >> ((Index % Flags__NumItemsPerEntry) * Flags__NumFlags)) & Flags__MASK;
+	}
+	inline uint8_t GetSize(IDBlock *pBlock, int32_t Index)
+	{
+		ASSERT(pBlock != 0);
+		ASSERT(Index < BACKUPSTORECHECK_BLOCK_SIZE);
+		return pBlock->mObjectSizeInBlocks[Index];
 	}
 
 #ifndef BOX_RELEASE_BUILD

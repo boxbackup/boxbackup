@@ -468,7 +468,7 @@ public:
 	// For recovery of the store
 	// Implemented in BackupStoreCheck2.cpp
 	bool CheckAndFix();
-	void AddUnattachedObject(const BackupStoreFilename &rName,
+	Entry* AddUnattachedObject(const BackupStoreFilename &rName,
 		box_time_t ModificationTime, int64_t ObjectID,
 		int64_t SizeInBlocks, int16_t Flags);
 	bool NameInUse(const BackupStoreFilename &rName);

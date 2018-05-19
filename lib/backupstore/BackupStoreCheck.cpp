@@ -383,13 +383,6 @@ object_exists_t BackupStoreCheck::CheckAndAddObject(int64_t ObjectID)
 	int64_t size = mrFileSystem.GetFileSizeInBlocks(ObjectID);
 	AddID(ObjectID, containerID, size, isFile);
 
-	// Add to usage counts
-	mBlocksUsed += size;
-	if(!isFile)
-	{
-		mBlocksInDirectories += size;
-	}
-
 	// If it looks like a good object, and it's non-RAID, and
 	// this is a RAID set, then convert it to RAID.
 	mrFileSystem.EnsureObjectIsPermanent(ObjectID, mFixErrors);
@@ -480,11 +473,6 @@ void BackupStoreCheck::CheckDirectories()
 	// This phase will check all the files in the directories, make
 	// a note of all directories which are missing, and do initial fixing.
 
-	// The root directory is not contained inside another directory, so
-	// it has no directory entry to scan, but we have to count it
-	// somewhere, so we'll count it here.
-	mNumDirectories++;
-
 	// Scan all objects.
 	for(Info_t::const_iterator i(mInfo.begin()); i != mInfo.end(); ++i)
 	{
@@ -526,6 +514,16 @@ void BackupStoreCheck::CheckDirectories()
 						"storage: " <<
 						BOX_FORMAT_OBJECTID(pblock->mID[e]));
 					mrFileSystem.PutDirectory(dir);
+				}
+
+				// The root directory is not contained inside another directory, so
+				// it has no directory entry to scan, but we have to count it
+				// somewhere, so we'll count it here.
+				if(pblock->mID[e] == BACKUPSTORE_ROOT_DIRECTORY_ID)
+				{
+					mNumDirectories++;
+					mBlocksUsed += dir.GetUserInfo1_SizeInBlocks();
+					mBlocksInDirectories += dir.GetUserInfo1_SizeInBlocks();
 				}
 
 				CountDirectoryEntries(dir);
@@ -590,6 +588,7 @@ bool BackupStoreCheck::CheckDirectory(BackupStoreDirectory& dir)
 			// Is this entry worth keeping?
 			if(badEntry)
 			{
+				// It hasn't been counted yet, so don't uncount here
 				toDelete.push_back(en->GetObjectID());
 			}
 		}
@@ -647,48 +646,64 @@ void BackupStoreCheck::CountDirectoryEntries(BackupStoreDirectory& dir)
 
 		if(wasAlreadyContained)
 		{
-			// don't double-count objects that are
-			// contained by another directory as well.
+			// Don't double-count objects that are contained by another directory
+			// as well.
+			mpNewRefs->AddReference(en->GetObjectID());
 		}
-		else if(en->IsDir())
+		else
 		{
-			mNumDirectories++;
+			CountDirectoryEntry(en->GetObjectID(), en->GetFlags(),
+				en->GetSizeInBlocks());
 		}
-		else if(!en->IsFile())
+	}
+}
+
+void BackupStoreCheck::CountDirectoryEntry(int64_t object_id, int16_t flags, int64_t size,
+	bool subtract)
+{
+	int sense = subtract ? -1 : 1;
+	mBlocksUsed += size * sense;
+
+	if(flags & BackupStoreDirectory::Entry::Flags_Dir)
+	{
+		mNumDirectories += sense;
+		mBlocksInDirectories += size * sense;
+	}
+	else if(!(flags & BackupStoreDirectory::Entry::Flags_File))
+	{
+		BOX_WARNING("Not counting object " << BOX_FORMAT_OBJECTID(object_id) <<
+			" with flags " << flags);
+	}
+	else // it's a file
+	{
+		// It can be both old and deleted. If neither, then it's current.
+		if(flags & BackupStoreDirectory::Entry::Flags_Deleted)
 		{
-			BOX_TRACE("Not counting object " <<
-				BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
-				" with flags " << en->GetFlags());
+			mNumDeletedFiles += sense;
+			mBlocksInDeletedFiles += size * sense;
 		}
-		else // it's a file
+
+		if(flags & BackupStoreDirectory::Entry::Flags_OldVersion)
 		{
-			// Add to sizes?
-			// If piBlock was zero, then wasAlreadyContained
-			// might be uninitialized.
-			ASSERT(piBlock != NULL)
-
-			// It can be both old and deleted.
-			// If neither, then it's current.
-			if(en->IsDeleted())
-			{
-				mNumDeletedFiles++;
-				mBlocksInDeletedFiles += en->GetSizeInBlocks();
-			}
-
-			if(en->IsOld())
-			{
-				mNumOldFiles++;
-				mBlocksInOldFiles += en->GetSizeInBlocks();
-			}
-
-			if(!en->IsDeleted() && !en->IsOld())
-			{
-				mNumCurrentFiles++;
-				mBlocksInCurrentFiles += en->GetSizeInBlocks();
-			}
+			mNumOldFiles += sense;
+			mBlocksInOldFiles += size * sense;
 		}
 
-		mpNewRefs->AddReference(en->GetObjectID());
+		if((flags & (BackupStoreDirectory::Entry::Flags_Deleted |
+			BackupStoreDirectory::Entry::Flags_OldVersion)) == 0)
+		{
+			mNumCurrentFiles += sense;
+			mBlocksInCurrentFiles += size * sense;
+		}
+	}
+
+	if(subtract)
+	{
+		mpNewRefs->RemoveReference(object_id);
+	}
+	else
+	{
+		mpNewRefs->AddReference(object_id);
 	}
 }
 

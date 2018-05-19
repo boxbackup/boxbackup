@@ -55,7 +55,7 @@ void BackupStoreCheck::CheckRoot()
 
 		if(mFixErrors)
 		{
-			// Create a new root directory
+			// Create a new root directory.
 			CreateBlankDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, BACKUPSTORE_ROOT_DIRECTORY_ID);
 		}
 	}
@@ -70,36 +70,25 @@ void BackupStoreCheck::CheckRoot()
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t ContainingDirID)
+int64_t BackupStoreCheck::CreateBlankDirectory(int64_t DirectoryID, int64_t ContainingDirID)
 {
-	if(!mFixErrors)
-	{
-		// Don't do anything if we're not supposed to fix errors
-		return;
-	}
+	// We should not be creating directories if we're not supposed to fix errors!
+	ASSERT(mFixErrors);
 
 	BackupStoreDirectory dir(DirectoryID, ContainingDirID);
 	mrFileSystem.PutDirectory(dir);
 
-	// Record the fact we've done this
+	// Record the fact we've done this, in case this was a missing directory that was
+	// referenced by any other objects.
 	mDirsAdded.insert(DirectoryID);
 
 	// Add to sizes
+	mNumDirectories++;
 	mBlocksUsed += dir.GetUserInfo1_SizeInBlocks();
 	mBlocksInDirectories += dir.GetUserInfo1_SizeInBlocks();
+
+	return dir.GetUserInfo1_SizeInBlocks();
 }
-
-class BackupStoreDirectoryFixer
-{
-	private:
-	BackupStoreDirectory mDirectory;
-	BackupFileSystem& mrFileSystem;
-
-	public:
-	BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem, int64_t ID);
-	void InsertObject(int64_t ObjectID, bool IsDirectory, int32_t lostDirNameSerial);
-	~BackupStoreDirectoryFixer();
-};
 
 // --------------------------------------------------------------------------
 //
@@ -111,8 +100,6 @@ class BackupStoreDirectoryFixer
 // --------------------------------------------------------------------------
 void BackupStoreCheck::CheckUnattachedObjects()
 {
-	typedef std::map<int64_t, BackupStoreDirectoryFixer*> fixers_t;
-	typedef std::pair<int64_t, BackupStoreDirectoryFixer*> fixer_pair_t;
 	fixers_t fixers;
 
 	// Scan all objects, finding ones which have no container
@@ -127,122 +114,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 			if((flags & Flags_IsContained) == 0)
 			{
 				// Unattached object...
-				int64_t ObjectID = pblock->mID[e];
-				BOX_ERROR("Object " <<
-					BOX_FORMAT_OBJECTID(ObjectID) <<
-					" is unattached.");
-				++mNumberErrorsFound;
-
-				// What's to be done?
-				int64_t putIntoDirectoryID = 0;
-
-				if((flags & Flags_IsDir) == Flags_IsDir)
-				{
-					// Directory. Just put into lost and found.
-					// (It doesn't contain its filename, so we
-					// can't recreate the entry in the parent)
-					putIntoDirectoryID = GetLostAndFoundDirID();
-				}
-				else
-				{
-					// File. Only attempt to attach it somewhere if it isn't a patch
-					{
-						int64_t diffFromObjectID = 0;
-
-						// The easiest way to do this is to verify it again. Not such a bad penalty, because
-						// this really shouldn't be done very often.
-						{
-							std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
-							BackupStoreFile::VerifyEncodedFileFormat(*file, &diffFromObjectID);
-						}
-
-						// If not zero, then it depends on another file, which may or may not be available.
-						// Just delete it to be safe.
-						if(diffFromObjectID != 0)
-						{
-							BOX_WARNING("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, and is a patch. Deleting, cannot reliably recover.");
-
-							// Delete this object instead
-							if(mFixErrors)
-							{
-								mrFileSystem.DeleteFile(ObjectID);
-							}
-
-							mBlocksUsed -= pblock->mObjectSizeInBlocks[e];
-
-							// Move on to next item
-							continue;
-						}
-					}
-
-					// Files contain their original filename, so perhaps the orginal directory still exists,
-					// or we can infer the existance of a directory?
-					// Look for a matching entry in the mDirsWhichContainLostDirs map.
-					// Can't do this with a directory, because the name just wouldn't be known, which is
-					// pretty useless as bbackupd would just delete it. So better to put it in lost+found
-					// where the admin can do something about it.
-					int32_t dirindex;
-					IDBlock *pdirblock = LookupID(pblock->mContainer[e], dirindex);
-					if(pdirblock != 0)
-					{
-						// Something with that ID has been found. Is it a directory?
-						if(GetFlags(pdirblock, dirindex) & Flags_IsDir)
-						{
-							// Directory exists, add to that one
-							putIntoDirectoryID = pblock->mContainer[e];
-						}
-						else
-						{
-							// Not a directory. Use lost and found dir
-							putIntoDirectoryID = GetLostAndFoundDirID();
-						}
-					}
-					else if(mDirsAdded.find(pblock->mContainer[e]) != mDirsAdded.end()
-						|| TryToRecreateDirectory(pblock->mContainer[e]))
-					{
-						// The directory reappeared, or was created somehow elsewhere
-						putIntoDirectoryID = pblock->mContainer[e];
-					}
-					else
-					{
-						putIntoDirectoryID = GetLostAndFoundDirID();
-					}
-				}
-				ASSERT(putIntoDirectoryID != 0);
-
-				if (!mFixErrors)
-				{
-					continue;
-				}
-
-				BackupStoreDirectoryFixer* pFixer;
-				fixers_t::iterator fi = 
-					fixers.find(putIntoDirectoryID);
-				if (fi == fixers.end())
-				{
-					// no match, create a new one
-					pFixer = new BackupStoreDirectoryFixer(
-						mrFileSystem, putIntoDirectoryID);
-					fixers.insert(fixer_pair_t(
-						putIntoDirectoryID, pFixer));
-				}
-				else
-				{
-					pFixer = fi->second;
-				}
-
-				int32_t lostDirNameSerial = 0;
-
-				if(flags & Flags_IsDir)
-				{
-					lostDirNameSerial = mLostDirNameSerial++;
-				}
-
-				// Add it to the directory
-				pFixer->InsertObject(ObjectID,
-					((flags & Flags_IsDir) == Flags_IsDir),
-					lostDirNameSerial);
-				mpNewRefs->AddReference(ObjectID);
+				HandleUnattachedObject(pblock, e, fixers);
 			}
 		}
 	}
@@ -250,7 +122,7 @@ void BackupStoreCheck::CheckUnattachedObjects()
 	// clean up all the fixers. Deleting them commits them automatically.
 	for (fixers_t::iterator i = fixers.begin(); i != fixers.end(); i++)
 	{
-		BackupStoreDirectoryFixer* pFixer = i->second;
+		DirectoryFixer* pFixer = i->second;
 		delete pFixer;
 	}
 }
@@ -258,12 +130,172 @@ void BackupStoreCheck::CheckUnattachedObjects()
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupStoreCheck::HandleUnattachedObject(pblock, e)
+//		Purpose: Reattach or delete an unattached object.
+//		Created: 2018-05-19
+//
+// --------------------------------------------------------------------------
+void BackupStoreCheck::HandleUnattachedObject(IDBlock *pblock, int index,
+	fixers_t& fixers)
+{
+	uint8_t flags = GetFlags(pblock, index);
+	int64_t ObjectID = pblock->mID[index];
+
+	// What's to be done?
+	int64_t putIntoDirectoryID = 0;
+	bool adding_to_lost_and_found = false;
+
+	if((flags & Flags_IsDir) == Flags_IsDir)
+	{
+		// Directory. Just put into lost and found. (It doesn't contain its filename, so we
+		// can't recreate the entry in the parent)
+		putIntoDirectoryID = GetLostAndFoundDirID();
+		adding_to_lost_and_found = true;
+
+		BackupStoreDirectory dir;
+		mrFileSystem.GetDirectory(ObjectID, dir);
+		dir.SetContainerID(putIntoDirectoryID);
+		mrFileSystem.PutDirectory(dir);
+	}
+	else
+	{
+		// File. Only attempt to attach it somewhere if it isn't a patch
+		int64_t diffFromObjectID = 0;
+
+		// The easiest way to do this is to verify it again. Not such a bad penalty, because
+		// this really shouldn't be done very often.
+		{
+			std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
+			BackupStoreFile::VerifyEncodedFileFormat(*file, &diffFromObjectID);
+		}
+
+		// If not zero, then it depends on another file, which may or may not be available.
+		// Just delete it to be safe.
+		if(diffFromObjectID != 0)
+		{
+			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, "
+				"and is a patch. Deleting, cannot reliably recover.");
+			++mNumberErrorsFound;
+
+			// Delete this object instead
+			if(mFixErrors)
+			{
+				mrFileSystem.DeleteFile(ObjectID);
+			}
+
+			// It's not in a directory, so it has never been counted, so don't
+			// uncount it.
+
+			// Move on to next item
+			return;
+		}
+
+		// Files contain their original filename, so perhaps the orginal directory still
+		// exists, or we can infer the existance of a directory? Look for a matching entry
+		// in the mDirsWhichContainLostDirs map./ Can't do this with a directory, because
+		// the name just wouldn't be known, which is pretty useless as bbackupd would just
+		// delete it. So better to put it in lost+found where the admin can do something
+		// about it.
+		int32_t dirindex;
+		int64_t containing_dir_id = pblock->mContainer[index];
+		IDBlock *pdirblock = LookupID(containing_dir_id, dirindex);
+		if(pdirblock != 0)
+		{
+			// Something with that ID has been found. Is it a directory?
+			int container_flags = GetFlags(pdirblock, dirindex);
+			if(container_flags & Flags_IsDir)
+			{
+				// Directory exists, add to that one
+				putIntoDirectoryID = containing_dir_id;
+			}
+			else
+			{
+				// Not a directory. Use lost and found dir
+				putIntoDirectoryID = GetLostAndFoundDirID();
+				adding_to_lost_and_found = true;
+			}
+		}
+		else if(mDirsAdded.find(containing_dir_id) != mDirsAdded.end())
+		{
+			// The directory reappeared, or was created somehow elsewhere
+			putIntoDirectoryID = containing_dir_id;
+		}
+		else
+		{
+			int64_t size = TryToRecreateDirectory(containing_dir_id);
+			if(size >= 0)
+			{
+				// Success!
+				putIntoDirectoryID = containing_dir_id;
+			}
+			else
+			{
+				putIntoDirectoryID = GetLostAndFoundDirID();
+				adding_to_lost_and_found = true;
+			}
+		}
+	}
+	ASSERT(putIntoDirectoryID != 0);
+
+	// putIntoDirectoryID could be the lost and found directory, which if !mFixErrors
+	// would be the dummy value 1, so don't report it in that case:
+	std::ostringstream object_id;
+	if(mFixErrors || !adding_to_lost_and_found)
+	{
+		object_id << " " << BOX_FORMAT_OBJECTID(putIntoDirectoryID);
+	}
+	BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, " <<
+		(mFixErrors ? "reattaching" : "would reattach") << " in " <<
+		(adding_to_lost_and_found ? "lost and found" : "original") << " "
+		"directory" << object_id.str());
+	++mNumberErrorsFound;
+
+	// Now this object has (or will/would have) an entry, so count it:
+	int new_flags = (flags & Flags_IsDir)
+		? BackupStoreDirectory::Entry::Flags_Dir
+		: BackupStoreDirectory::Entry::Flags_File;
+	CountDirectoryEntry(ObjectID, new_flags, GetSize(pblock, index));
+
+	if (!mFixErrors)
+	{
+		return;
+	}
+
+	DirectoryFixer* pFixer;
+	fixers_t::iterator fi = fixers.find(putIntoDirectoryID);
+	if (fi == fixers.end())
+	{
+		// no match, create a new one
+		pFixer = new DirectoryFixer(mrFileSystem, putIntoDirectoryID);
+		fixers.insert(fixer_pair_t(putIntoDirectoryID, pFixer));
+	}
+	else
+	{
+		pFixer = fi->second;
+	}
+
+	int32_t lostDirNameSerial = 0;
+
+	if(flags & Flags_IsDir)
+	{
+		lostDirNameSerial = mLostDirNameSerial++;
+	}
+
+	// Add it to the directory
+	pFixer->InsertObject(ObjectID, ((flags & Flags_IsDir) == Flags_IsDir),
+		lostDirNameSerial);
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupStoreCheck::TryToRecreateDirectory(int64_t)
-//		Purpose: Recreate a missing directory
+//		Purpose: Recreate a missing directory. Returns size in blocks,
+//		         or -1 if it could not be recreated.
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
-bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
+int64_t BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 {
 	// During the directory checking phase, a map of "missing directory" to
 	// containing directory was built. If we can find it here, then it's
@@ -273,7 +305,7 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	if(missing == mDirsWhichContainLostDirs.end())
 	{
 		// Not a missing directory, can't recreate.
-		return false;
+		return -1;
 	}
 
 	// Can recreate this! Wooo!
@@ -283,18 +315,20 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 			BOX_FORMAT_OBJECTID(MissingDirectoryID) <<
 			" could be recreated.");
 		mDirsAdded.insert(MissingDirectoryID);
-		return true;
+		return 0;
 	}
 
 	BOX_WARNING("Recreating missing directory " << 
 		BOX_FORMAT_OBJECTID(MissingDirectoryID));
 
-	// Create a blank directory
-	BackupStoreDirectory dir(MissingDirectoryID, missing->second /* containing dir ID */);
-
-	// Note that this directory already contains a directory entry pointing to
-	// this dir, so it doesn't have to be added.
+	// Create a blank directory. We don't call CreateBlankDirectory here because that counts
+	// the newly created directory, but this one was already counted when its entry in its
+	// container was processed, so we don't want to count it again.
+	BackupStoreDirectory dir(MissingDirectoryID, missing->second); // containing dir ID
 	mrFileSystem.PutDirectory(dir);
+
+	// Only the caller knows whether a parent directory already contains a directory entry
+	// pointing to this directory, so they must add one if not.
 
 	// Record the fact we've done this
 	mDirsAdded.insert(MissingDirectoryID);
@@ -302,23 +336,23 @@ bool BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	// Remove the entry from the map, so this doesn't happen again
 	mDirsWhichContainLostDirs.erase(missing);
 
-	return true;
+	return dir.GetUserInfo1_SizeInBlocks();
 }
 
-BackupStoreDirectoryFixer::BackupStoreDirectoryFixer(BackupFileSystem& rFileSystem,
+BackupStoreCheck::DirectoryFixer::DirectoryFixer(BackupFileSystem& rFileSystem,
 	int64_t ID)
 : mrFileSystem(rFileSystem)
 {
 	mrFileSystem.GetDirectory(ID, mDirectory);
 }
 
-void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
-	int32_t lostDirNameSerial)
+BackupStoreDirectory::Entry* BackupStoreCheck::DirectoryFixer::InsertObject(int64_t ObjectID,
+	bool IsDirectory, int32_t lostDirNameSerial)
 {
 	// Data for the object
 	BackupStoreFilename objectStoreFilename;
 	int64_t modTime = 100;	// something which isn't zero or a special time
-	int32_t sizeInBlocks = 0; // suitable for directories
+	int32_t sizeInBlocks = mrFileSystem.GetFileSizeInBlocks(ObjectID);
 
 	if(IsDirectory)
 	{
@@ -329,10 +363,7 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	}
 	else
 	{
-		// Files require a little more work... Fill in size information.
-		sizeInBlocks = mrFileSystem.GetFileSizeInBlocks(ObjectID);
-
-		// Read in header
+		// Files require a little more work. Read in the header:
 		std::auto_ptr<IOStream> file = mrFileSystem.GetFile(ObjectID);
 		file_StreamFormat hdr;
 		if(file->Read(&hdr, sizeof(hdr)) != sizeof(hdr) ||
@@ -353,12 +384,12 @@ void BackupStoreDirectoryFixer::InsertObject(int64_t ObjectID, bool IsDirectory,
 	}
 
 	// Add a new entry in an appropriate place
-	mDirectory.AddUnattachedObject(objectStoreFilename, modTime,
+	return mDirectory.AddUnattachedObject(objectStoreFilename, modTime,
 		ObjectID, sizeInBlocks,
 		IsDirectory?(BackupStoreDirectory::Entry::Flags_Dir):(BackupStoreDirectory::Entry::Flags_File));
 }
 
-BackupStoreDirectoryFixer::~BackupStoreDirectoryFixer()
+BackupStoreCheck::DirectoryFixer::~DirectoryFixer()
 {
 	// Fix any flags which have been broken, which there's a good chance of doing
 	mDirectory.CheckAndFix();
@@ -416,17 +447,17 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	BOX_WARNING("Lost and found dir " << BOX_FORMAT_OBJECTID(id) << " has name " <<
 		lost_and_found_name);
 
-	// Create a blank directory
-	CreateBlankDirectory(id, BACKUPSTORE_ROOT_DIRECTORY_ID);
+	// Create a blank directory to become the new lost+found directory:
+	int64_t size = CreateBlankDirectory(id, BACKUPSTORE_ROOT_DIRECTORY_ID);
 
 	// Add an entry for it:
-	dir.AddEntry(lostAndFound, 0, id, 0, BackupStoreDirectory::Entry::Flags_Dir, 0);
+	dir.AddEntry(lostAndFound, 0, id, size, BackupStoreDirectory::Entry::Flags_Dir, 0);
 	mpNewRefs->AddReference(id);
 
-	// Write out root dir
+	// Write out root dir (parent of the newly added directory) with the entry that we just added:
 	mrFileSystem.PutDirectory(dir);
 
-	// Store
+	// Store the ID of the current lost+found directory:
 	mLostAndFoundDirectoryID = id;
 
 	// Tell caller
@@ -495,9 +526,15 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 		IDBlock *pblock = LookupID(i->second, index);
 		if(pblock == 0) continue;
 
-		// Load in
+		// Load the parent directory
 		BackupStoreDirectory dir;
 		mrFileSystem.GetDirectory(i->second, dir);
+
+		// Uncount this directory. It was counted earlier, but not replaced.
+		BackupStoreDirectory::Entry *en = dir.FindEntryByID(i->first);
+		ASSERT(en != NULL);
+		CountDirectoryEntry(i->first, en->GetFlags(), en->GetSizeInBlocks(),
+			true); // subtract from counts
 
 		// Delete the dodgy entry
 		dir.DeleteEntry(i->first);
@@ -841,8 +878,9 @@ bool BackupStoreDirectory::CheckAndFix()
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
-void BackupStoreDirectory::AddUnattachedObject(const BackupStoreFilename &rName,
-	box_time_t ModificationTime, int64_t ObjectID, int64_t SizeInBlocks, int16_t Flags)
+BackupStoreDirectory::Entry* BackupStoreDirectory::AddUnattachedObject(
+	const BackupStoreFilename &rName, box_time_t ModificationTime, int64_t ObjectID,
+	int64_t SizeInBlocks, int16_t Flags)
 {
 	Entry *pnew = new Entry(rName, ModificationTime, ObjectID, SizeInBlocks, Flags,
 			ModificationTime /* use as attr mod time too */);
@@ -873,6 +911,8 @@ void BackupStoreDirectory::AddUnattachedObject(const BackupStoreFilename &rName,
 		delete pnew;
 		throw;
 	}
+
+	return pnew;
 }
 
 

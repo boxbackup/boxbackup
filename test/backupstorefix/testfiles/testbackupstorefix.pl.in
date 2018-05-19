@@ -75,7 +75,7 @@ elsif($ARGV[0] eq 'check')
 
 	# modify expected lines to match the expected output
 	my $check_num = int($ARGV[1]);
-	for(my $n = 0; $n <= $check_num; $n++)
+	my $n = $check_num;
 	{
 		for(@{$check_add[$n]})
 		{
