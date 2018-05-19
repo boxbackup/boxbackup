@@ -305,7 +305,7 @@ bool check_reference_counts(BackupStoreRefCountDatabase& references)
 		counts_ok = false);
 
 	for (unsigned int i = BackupProtocolListDirectory::RootDirectory;
-		i < ExpectedRefCounts.size(); i++)
+		i < ExpectedRefCounts.size() && i <= references.GetLastObjectIDUsed(); i++)
 	{
 		TEST_EQUAL_LINE(ExpectedRefCounts[i],
 			references.GetRefCount(i),
