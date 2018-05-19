@@ -272,6 +272,12 @@ bool BackupClientInodeToIDMap::Lookup(InodeRefType InodeRef, int64_t &rObjectIDO
 
 	// Free data automatically when the guard goes out of scope.
 	MemoryBlockGuard<char *> guard(data);
+
+	// data was allocated by depot without using our debug malloc library, so to avoid a warning
+	// about an unknown block when MemoryBlockGuard tries to free it, we need to add an
+	// exception for it:
+	MEMLEAKFINDER_NOT_A_LEAK(data);
+
 	MemBlockStream stream(data, size);
 	Archive arc(stream, IOStream::TimeOutInfinite);
 
