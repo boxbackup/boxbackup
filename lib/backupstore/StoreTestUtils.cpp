@@ -56,6 +56,109 @@ bool delete_account()
 	return true;
 }
 
+bool create_test_account_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	if(spec_name == "s3")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<S3BackupAccountControl&>(control).
+			CreateAccount("test", 10000, 20000) == 0, FAIL);
+	}
+	else if(spec_name == "store")
+	{
+		TEST_THAT_OR(
+			dynamic_cast<BackupStoreAccountControl&>(control).
+			CreateAccount(0, 10000, 20000) == 0, FAIL);
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Don't know how to create accounts for store type: " <<
+			spec_name);
+	}
+
+	return true;
+}
+
+bool setup_test_unified()
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	TEST_THAT_OR(create_account(10000, 20000), FAIL);
+
+	return true;
+}
+
+
+bool setup_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control)
+{
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), FAIL);
+	}
+
+	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
+	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
+
+	TEST_THAT_OR(create_test_account_specialised(spec_name, control), FAIL);
+
+	return true;
+}
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_unified()
+{
+	bool status = true;
+
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), status = false);
+	}
+
+	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
+	{
+		TEST_THAT_OR(check_reference_counts(), status = false);
+		TEST_EQUAL_OR(0, check_account_and_fix_errors(), status = false);
+	}
+
+	return status;
+}
+
+//! Checks account for errors and shuts down daemons at end of every test.
+bool teardown_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control, bool check_for_errors)
+{
+	bool status = true;
+
+	if (ServerIsAlive(bbstored_pid))
+	{
+		TEST_THAT_OR(StopServer(), status = false);
+	}
+
+	BackupFileSystem& fs(control.GetFileSystem());
+	if(check_for_errors)
+	{
+		TEST_THAT_OR(check_reference_counts(
+			fs.GetPermanentRefCountDatabase(true)), // ReadOnly
+			status = false);
+		TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
+	}
+
+	// Release the lock (acquired by check_account_and_fix_errors if it wasn't already held)
+	// before the next test's setUp deletes all files in the store, including the lockfile:
+	fs.ReleaseLock();
+
+	return status;
+}
+
 std::vector<uint32_t> ExpectedRefCounts;
 int bbstored_pid = 0, bbackupd_pid = 0, s3simulator_pid = 0;
 

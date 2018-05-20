@@ -21,6 +21,65 @@ class BackupFileSystem;
 class SocketStreamTLS;
 class TLSContext;
 
+//! Creates the standard test account, for example after delete_account().
+bool create_account(int soft, int hard);
+
+//! Deletes the standard test account, for testing behaviour with no account.
+bool delete_account();
+
+//! Cleans up and prepares the test environment for a generic or unspecialised test
+bool setup_test_unified();
+
+//! Creates the standard test account for specialised tests (e.g. with S3 support)
+bool create_test_account_specialised(const std::string& spec_name,
+	BackupAccountControl& control);
+
+//! Cleans up and prepares the test environment for a specialised test (e.g. S3)
+bool setup_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control);
+
+//! Checks account for errors and shuts down daemons at end of every unified test.
+bool teardown_test_unified();
+
+//! Checks account for errors and shuts down daemons at end of every specialised test.
+bool teardown_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control, bool check_for_errors = true);
+
+//! Simplifies calling setUp() with the current function name in each test.
+#define SETUP_TEST_UNIFIED() \
+	SETUP(); \
+	TEST_THAT_OR(setup_test_unified(), FAIL);
+
+#define TEARDOWN_TEST_UNIFIED() \
+	TEST_THAT(teardown_test_unified()); \
+	TEARDOWN();
+
+#define SETUP_TEST_SPECIALISED(name, control) \
+	SETUP_SPECIALISED(name); \
+	TEST_THAT_OR(setup_test_specialised(name, control), FAIL); \
+	try \
+	{ // left open for TEARDOWN_TEST_SPECIALISED()
+
+#define _TEARDOWN_TEST_SPECIALISED(name, control, check_for_errors) \
+		TEST_THAT_OR(teardown_test_specialised(name, control, \
+			check_for_errors), FAIL); \
+	} \
+	catch (BoxException &e) \
+	{ \
+		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
+			name << ": " << e.what()); \
+		TEST_THAT_OR(teardown_test_specialised(name, control, \
+			check_for_errors), FAIL); \
+		throw; \
+	} \
+	TEARDOWN();
+
+#define TEARDOWN_TEST_SPECIALISED(name, control) \
+	_TEARDOWN_TEST_SPECIALISED(name, control, true)
+
+#define TEARDOWN_TEST_SPECIALISED_NO_CHECK(name, control) \
+	_TEARDOWN_TEST_SPECIALISED(name, control, false)
+
 //! Holds the expected reference counts of each object.
 extern std::vector<uint32_t> ExpectedRefCounts;
 
@@ -32,6 +91,11 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
 
 //! Initialises a TLSContext object using the standard certficate filenames.
 void init_context(TLSContext& rContext);
+
+#define CREATE_LOCAL_CONTEXT_AND_PROTOCOL(filesystem, context_name, protocol_name, read_only) \
+	BackupStoreContext context_name(filesystem, 0x01234567, NULL, \
+		"fake test connection"); \
+	BackupProtocolLocal2 protocol_name(context_name, 0x01234567, read_only);
 
 //! Opens a connection to the server (bbstored).
 std::auto_ptr<SocketStream> open_conn(const char *hostname,
@@ -111,12 +175,6 @@ bool StartSimulator();
 bool StopSimulator();
 
 bool kill_running_daemons();
-
-//! Creates the standard test account, for example after delete_account().
-bool create_account(int soft, int hard);
-
-//! Deletes the standard test account, for testing behaviour with no account.
-bool delete_account();
 
 // You might want to use TEST_COMMAND_RETURNS_ERROR instead of TEST_PROTOCOL_ERROR_OR for new code:
 #define TEST_PROTOCOL_ERROR_OR(protocol, error, or_statements) \

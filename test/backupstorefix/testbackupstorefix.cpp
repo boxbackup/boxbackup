@@ -76,15 +76,7 @@ delete root, copy a file to it instead (equivalent to deleting it too)
 
 bool setup_test_backupstorefix_unified()
 {
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), FAIL);
-	}
-
-	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
-	TEST_THAT_OR(create_account(10000, 20000), FAIL);
+	TEST_THAT_OR(setup_test_unified(), FAIL);
 
 	// Run the perl script to create the initial directories
 	TEST_THAT_OR(::system(PERL_EXECUTABLE
@@ -94,7 +86,7 @@ bool setup_test_backupstorefix_unified()
 }
 
 //! Simplifies calling setUp() with the current function name in each test.
-#define SETUP_TEST_UNIFIED() \
+#define SETUP_TEST_BACKUPSTOREFIX_UNIFIED() \
 	SETUP(); \
 	TEST_THAT(setup_test_backupstorefix_unified());
 
@@ -153,29 +145,9 @@ bool setup_test_backupstorefix_unified_with_bbstored()
 }
 
 //! Simplifies calling setUp() with the current function name in each test.
-#define SETUP_TEST_UNIFIED_WITH_BBSTORED() \
+#define SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED() \
 	SETUP(); \
 	TEST_THAT(setup_test_backupstorefix_unified_with_bbstored());
-
-//! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_backupstorefix_unified()
-{
-	bool status = true;
-
-	if (FileExists("testfiles/0_0/backup/01234567/info.rf"))
-	{
-		TEST_THAT_OR(check_reference_counts(), status = false);
-		TEST_EQUAL_OR(0, check_account_and_fix_errors(), status = false);
-	}
-
-	return status;
-}
-
-#define TEARDOWN_TEST_UNIFIED() \
-	if (ServerIsAlive(bbstored_pid)) \
-		StopServer(); \
-	TEST_THAT(teardown_test_backupstorefix_unified()); \
-	TEARDOWN();
 
 // TODO: delete this code once it's unused:
 std::string accountRootDir("backup/01234567/");
@@ -322,7 +294,7 @@ void check_dir_dep(BackupStoreDirectory &dir, checkdepinfoen *ck)
 
 bool test_dir_fixing()
 {
-	SETUP_TEST_UNIFIED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED();
 
 	// Test that entries pointing to nonexistent entries are removed
 	{
@@ -576,7 +548,7 @@ bool compare_store_contents_with_expected(int phase)
 
 bool test_entry_pointing_to_missing_object_is_deleted()
 {
-	SETUP_TEST_UNIFIED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED();
 
 	{
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
@@ -605,7 +577,7 @@ bool test_entry_pointing_to_missing_object_is_deleted()
 
 bool test_entry_depending_on_missing_object_is_deleted()
 {
-	SETUP_TEST_UNIFIED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED();
 
 	{
 		BackupProtocolLocal2 client(0x01234567, "test", accountRootDir,
@@ -655,7 +627,7 @@ bool test_entry_depending_on_missing_object_is_deleted()
 
 bool test_entry_pointing_to_crazy_object_id()
 {
-	SETUP_TEST_UNIFIED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED();
 
 	{
 		BackupStoreDirectory dir;
@@ -693,7 +665,7 @@ bool test_entry_pointing_to_crazy_object_id()
 
 bool test_store_info_repaired_and_random_files_removed()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	{
 		// Delete store info
@@ -727,7 +699,7 @@ bool test_store_info_repaired_and_random_files_removed()
 
 bool test_entry_for_corrupted_directory()
 {
-	SETUP_TEST_UNIFIED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED();
 
 	// Start the bbstored server. Enable logging to help debug if the store is unexpectedly
 	// locked when we try to check or query it (race conditions):
@@ -947,7 +919,7 @@ bool check_for_errors(int expected_error_count, int blocks_used, int blocks_in_c
 
 bool test_delete_directory_change_container_id_duplicate_entry_delete_objects()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	int64_t duplicatedID = 0;
 	int64_t notSpuriousFileSize = 0;
@@ -1043,7 +1015,7 @@ bool test_delete_directory_change_container_id_duplicate_entry_delete_objects()
 
 bool test_directory_bad_object_id_delete_empty_dir_add_reference()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	TEST_THAT(check_for_errors(0, 284, 228, 0, 0, 56, 114));
 
@@ -1107,7 +1079,7 @@ bool set_refcount_for_lost_and_found_dir()
 
 bool test_orphan_files_and_directories_unrecoverably()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	set_refcount(DeleteObject("Test1/dir1"), 0);
 	set_refcount(DeleteObject("Test1/dir1/dir2"), 0);
@@ -1127,7 +1099,7 @@ bool test_orphan_files_and_directories_unrecoverably()
 
 bool test_corrupt_file_and_dir()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	{
 		// Increase log level for locking errors to help debug random failures on AppVeyor
@@ -1155,7 +1127,7 @@ bool test_corrupt_file_and_dir()
 
 bool test_overwrite_root_directory_with_a_file()
 {
-	SETUP_TEST_UNIFIED_WITH_BBSTORED();
+	SETUP_TEST_BACKUPSTOREFIX_UNIFIED_WITH_BBSTORED();
 
 	{
 		std::auto_ptr<RaidFileRead> r(RaidFileRead::Open(discSetNum, getObjectName(getID("Test1/pass/shuted/brightinats/milamptimaskates"))));
