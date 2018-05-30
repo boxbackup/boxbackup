@@ -54,32 +54,6 @@ bool teardown_test_specialised(const std::string& spec_name,
 	TEST_THAT(teardown_test_unified()); \
 	TEARDOWN();
 
-#define SETUP_TEST_SPECIALISED(name, control) \
-	SETUP_SPECIALISED(name); \
-	TEST_THAT_OR(setup_test_specialised(name, control), FAIL); \
-	try \
-	{ // left open for TEARDOWN_TEST_SPECIALISED()
-
-#define _TEARDOWN_TEST_SPECIALISED(name, control, check_for_errors) \
-		TEST_THAT_OR(teardown_test_specialised(name, control, \
-			check_for_errors), FAIL); \
-	} \
-	catch (BoxException &e) \
-	{ \
-		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
-			name << ": " << e.what()); \
-		TEST_THAT_OR(teardown_test_specialised(name, control, \
-			check_for_errors), FAIL); \
-		throw; \
-	} \
-	TEARDOWN();
-
-#define TEARDOWN_TEST_SPECIALISED(name, control) \
-	_TEARDOWN_TEST_SPECIALISED(name, control, true)
-
-#define TEARDOWN_TEST_SPECIALISED_NO_CHECK(name, control) \
-	_TEARDOWN_TEST_SPECIALISED(name, control, false)
-
 //! Holds the expected reference counts of each object.
 extern std::vector<uint32_t> ExpectedRefCounts;
 

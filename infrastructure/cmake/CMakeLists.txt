@@ -790,6 +790,8 @@ target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl
 target_compile_features(lib_common PRIVATE cxx_auto_type)
 target_compile_features(lib_httpserver PRIVATE cxx_auto_type)
 target_compile_features(lib_backupstore PRIVATE cxx_auto_type)
+target_compile_features(lib_backupclient PUBLIC cxx_rvalue_references)
+target_compile_features(lib_backupclient PRIVATE cxx_auto_type)
 
 # Configure test timeouts:
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:

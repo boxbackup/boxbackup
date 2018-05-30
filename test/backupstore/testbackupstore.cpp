@@ -35,6 +35,7 @@
 #include "BackupStoreObjectMagic.h"
 #include "BackupStoreRefCountDatabase.h"
 #include "BoxPortsAndFiles.h"
+#include "ClientTestUtils.h"
 #include "CollectInBufferStream.h"
 #include "Configuration.h"
 #include "FileStream.h"
@@ -259,12 +260,12 @@ std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
 }
 
 int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
-	const std::string& SpecialisationName, BackupAccountControl& control)
+	RaidAndS3TestSpecs::Specialisation& spec)
 {
-	if(SpecialisationName == "s3")
+	if(spec.name() == "s3")
 	{
 		S3BackupFileSystem& fs
-			(dynamic_cast<S3BackupFileSystem&>(control.GetFileSystem()));
+			(dynamic_cast<S3BackupFileSystem&>(spec.control().GetFileSystem()));
 		std::string local_path = "testfiles/store" +
 			(IsDirectory ? fs.GetDirectoryURI(ObjectID) :
 			 fs.GetFileURI(ObjectID));
@@ -280,11 +281,12 @@ int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
 }
 
 std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
-	const std::string& SpecialisationName, BackupFileSystem& fs)
+	RaidAndS3TestSpecs::Specialisation& spec)
 {
-	if(SpecialisationName == "s3")
+	if(spec.name() == "s3")
 	{
-		S3BackupFileSystem& s3fs(dynamic_cast<S3BackupFileSystem&>(fs));
+		S3BackupFileSystem& s3fs(
+			dynamic_cast<S3BackupFileSystem&>(spec.control().GetFileSystem()));
 		std::string local_path = "testfiles/store" +
 			(IsDirectory ? s3fs.GetDirectoryURI(ObjectID) :
 			 s3fs.GetFileURI(ObjectID));
@@ -876,11 +878,10 @@ bool test_temporary_refcount_db_is_independent()
 	TEARDOWN_TEST_UNIFIED();
 }
 
-bool test_server_housekeeping(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// We need complete control over housekeeping, so use a local client instead of a network
 	// client + daemon. (Also that's a requirement for specialised tests anyway).
@@ -902,7 +903,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	}
 
 	int64_t root_dir_blocks = get_disc_usage_in_blocks(true, // IsDirectory
-		BACKUPSTORE_ROOT_DIRECTORY_ID, specialisation_name, control);
+		BACKUPSTORE_ROOT_DIRECTORY_ID, spec);
 	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks,
 		root_dir_blocks));
@@ -1029,14 +1030,14 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 			TEST_THAT(en->GetModificationTime() == 0x123456789abcdefLL);
 			TEST_THAT(en->GetAttributesHash() == 0x7362383249872dfLL);
 			TEST_THAT(en->GetObjectID() == store1objid);
-			int expected_size = (specialisation_name == "store") ? 6 : 1;
+			int expected_size = (spec.name() == "store") ? 6 : 1;
 			TEST_EQUAL(expected_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetFlags() == BackupStoreDirectory::Entry::Flags_File);
 		}
 	}
 
 	int file1_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
-		store1objid, specialisation_name, control);
+		store1objid, spec);
 	TEST_THAT(check_num_files(fs, 1, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, 0, 0, root_dir_blocks,
 		file1_blocks + root_dir_blocks));
@@ -1057,7 +1058,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch1_id is a complete file, not a diff.
 	int patch1_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
-		store1objid, specialisation_name, control);
+		store1objid, spec);
 
 	// It will take extra blocks, even though there are no changes, because
 	// the server code is not smart enough to realise that the file
@@ -1091,7 +1092,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// We need to check the old file's size, because it's been replaced
 	// by a reverse diff, and patch2_id is a complete file, not a diff.
 	int patch2_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
-		patch1_id, specialisation_name, control);
+		patch1_id, spec);
 
 	TEST_THAT(check_num_files(fs, 1, 2, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, file1_blocks, patch1_blocks + patch2_blocks, 0,
@@ -1127,7 +1128,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// How many blocks used by the new file? This time we need to check the new file, because
 	// it's not a patch, so the old file wasn't converted to a reverse diff.
 	int replaced_blocks = get_disc_usage_in_blocks(false, // !IsDirectory
-		replaced_id, specialisation_name, control);
+		replaced_id, spec);
 
 	TEST_THAT(check_num_files(fs, 1, 3, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, replaced_blocks, // current
@@ -1156,10 +1157,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	std::ostringstream new_limit;
 	new_limit << (replaced_blocks + file1_blocks + root_dir_blocks) << "B";
 	protocol.QueryFinished();
-	TEST_THAT(change_account_limits(
-		control,
-		new_limit.str().c_str(),
-		"2000B"));
+	TEST_THAT(change_account_limits(spec.control(), new_limit.str().c_str(), "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 
@@ -1192,7 +1190,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// Reduce limits again, check that removed files are subtracted from
 	// block counts.
 	protocol.QueryFinished();
-	TEST_THAT(change_account_limits(control, "0B", "2000B"));
+	TEST_THAT(change_account_limits(spec.control(), "0B", "2000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	set_refcount(store1objid, 0);
@@ -1209,7 +1207,7 @@ bool test_server_housekeeping(const std::string& specialisation_name,
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 int64_t create_directory(BackupProtocolCallable& protocol, int64_t parent_dir_id)
@@ -1285,12 +1283,11 @@ int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
 	return loginConf->GetClientStoreMarker();
 }
 
-bool test_multiple_uploads(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_multiple_uploads(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
-	BackupFileSystem& fs(control.GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, false); // !ReadOnly
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, roContext, protocol_read_only, true); // ReadOnly
 
@@ -1551,18 +1548,17 @@ bool test_multiple_uploads(const std::string& specialisation_name,
 	protocol.QueryFinished();
 	protocol_read_only.QueryFinished();
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-bool test_server_commands(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_server_commands(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// Write the test file for create_file to upload:
 	write_test_file(0);
 
-	BackupFileSystem& fs(control.GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, false); // !ReadOnly
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, roContext, protocol_read_only, true); // ReadOnly
 
@@ -1601,7 +1597,7 @@ bool test_server_commands(const std::string& specialisation_name,
 	// prevent this, and test that no file is stored instead of unlinking it here. Alternatively,
 	// the server could notice that the client closed the connection and didn't read the 200 OK
 	// response (but sent back an RST instead), and delete the file that it just created.
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/0x2.file"));
 	}
@@ -1681,7 +1677,7 @@ bool test_server_commands(const std::string& specialisation_name,
 			TEST_THAT(en->GetName() == dirname);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_Dir, en->GetFlags());
 			int64_t actual_size = get_disc_usage_in_blocks(true, // IsDirectory
-				subdirid, specialisation_name, control);
+				subdirid, spec);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_EQUAL(FAKE_MODIFICATION_TIME, en->GetModificationTime());
 		}
@@ -1709,7 +1705,7 @@ bool test_server_commands(const std::string& specialisation_name,
 			TEST_THAT(en->GetName() == uploads[0].name);
 			TEST_EQUAL(BackupProtocolListDirectory::Flags_File, en->GetFlags());
 			int64_t actual_size = get_disc_usage_in_blocks(false, // !IsDirectory
-				subdirfileid, specialisation_name, control);
+				subdirfileid, spec);
 			TEST_EQUAL(actual_size, en->GetSizeInBlocks());
 			TEST_THAT(en->GetModificationTime() != 0);
 
@@ -2121,7 +2117,7 @@ bool test_server_commands(const std::string& specialisation_name,
 		TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 	}
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
@@ -2139,10 +2135,10 @@ int get_object_size(BackupProtocolCallable& protocol, int64_t ObjectID,
 	return en->GetSizeInBlocks();
 }
 
-bool test_directory_parent_entry_tracks_directory_size(
-	const std::string& specialisation_name, BackupAccountControl& control)
+bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 #ifdef BOX_RELEASE_BUILD
 	BOX_NOTICE("skipping test: takes too long in release mode");
@@ -2150,7 +2146,6 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// Write the test file for create_file to upload:
 	write_test_file(0);
 
-	BackupFileSystem& fs(control.GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, false); // !ReadOnly
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, roContext, protocol_read_only, true); // ReadOnly
 
@@ -2161,8 +2156,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 
 	// Get the root directory cached in the read-only connection, and
 	// test that the initial size is correct.
-	int old_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-		control);
+	int old_size = get_disc_usage_in_blocks(true, subdirid, spec);
 	TEST_THAT(old_size > 0);
 	TEST_EQUAL(old_size, get_object_size(protocol_read_only, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2188,8 +2182,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 		// We need to flush the directory cache every time, because we want to catch the
 		// exact moment when the directory size goes over one block.
 		rwContext.FlushDirectoryCache();
-		new_size = get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-			control);
+		new_size = get_disc_usage_in_blocks(true, subdirid, spec);
 	}
 
 	// Check that the root directory entry has been updated
@@ -2204,14 +2197,13 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocol_read_only.QueryFinished();
-	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(change_account_limits(spec.control(), "0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 	set_refcount(last_added_file_id, 0);
 	protocol.Reopen();
 	protocol_read_only.Reopen();
 
-	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-		control));
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, spec));
 	// Check that the entry in the root directory was updated too
 	TEST_EQUAL(old_size, get_object_size(protocol_read_only, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
@@ -2219,7 +2211,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// Push the limits back up
 	protocol.QueryFinished();
 	protocol_read_only.QueryFinished();
-	TEST_THAT(change_account_limits(control, "1000B", "20000B"));
+	TEST_THAT(change_account_limits(spec.control(), "1000B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocol_read_only.Reopen();
@@ -2228,7 +2220,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	BackupStoreDirectory root(
 		*get_object_stream(true, // IsDirectory
 			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
-			specialisation_name, fs),
+			spec),
 		IOStream::TimeOutInfinite);
 	BackupStoreDirectory::Entry *en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en, return false);
@@ -2247,8 +2239,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
-	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-		control));
+	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, spec));
 	root.AddEntry(enCopy);
 	fs.PutDirectory(root);
 
@@ -2259,7 +2250,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	BackupStoreDirectory subdir(
 		*get_object_stream(true, // IsDirectory
 			subdirid, // ObjectID
-			specialisation_name, fs),
+			spec),
 		IOStream::TimeOutInfinite);
 
 	{
@@ -2275,8 +2266,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// This should have fixed the error, so we should be able to add the
 	// entry now. This should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
-	TEST_EQUAL(new_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-		control));
+	TEST_EQUAL(new_size, get_disc_usage_in_blocks(true, subdirid, spec));
 	TEST_EQUAL(new_size, get_object_size(protocol_read_only, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -2287,14 +2277,13 @@ bool test_directory_parent_entry_tracks_directory_size(
 	// Reduce the limits, to remove it permanently from the store
 	protocol.QueryFinished();
 	protocol_read_only.QueryFinished();
-	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(change_account_limits(spec.control(), "0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 	protocol.Reopen();
 	protocol_read_only.Reopen();
 
 	// Check that the entry in the root directory was updated
-	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, specialisation_name,
-		control));
+	TEST_EQUAL(old_size, get_disc_usage_in_blocks(true, subdirid, spec));
 	TEST_EQUAL(old_size, get_object_size(protocol_read_only, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
@@ -2305,7 +2294,7 @@ bool test_directory_parent_entry_tracks_directory_size(
 	root.ReadFromStream(
 		*get_object_stream(true, // IsDirectory
 			BACKUPSTORE_ROOT_DIRECTORY_ID, // ObjectID
-			specialisation_name, fs),
+			spec),
 		IOStream::TimeOutInfinite);
 	en = root.FindEntryByID(subdirid);
 	TEST_THAT_OR(en != 0, return false);
@@ -2332,21 +2321,19 @@ bool test_directory_parent_entry_tracks_directory_size(
 	protocol_read_only.QueryFinished();
 #endif // BOX_RELEASE_BUILD
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-bool test_cannot_open_multiple_writable_connections(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// We need another filesystem to be able to create conflicting locks:
 	std::auto_ptr<Configuration> ap_config_2;
 	std::auto_ptr<BackupAccountControl> ap_control_2;
 
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
 		ap_config_2 = load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE,
 			BackupDaemonConfigVerify);
@@ -2392,7 +2379,7 @@ bool test_cannot_open_multiple_writable_connections(const std::string& specialis
 	}
 
 	// Try network connections too (but only for store tests):
-	if(specialisation_name == "store")
+	if(spec.name() == "store")
 	{
 		TEST_THAT_OR(StartServer(), return false);
 
@@ -2405,7 +2392,7 @@ bool test_cannot_open_multiple_writable_connections(const std::string& specialis
 	}
 
 	protocol_writable.QueryFinished();
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 bool test_file_encoding()
@@ -2629,15 +2616,14 @@ bool test_symlinks()
 	TEARDOWN_TEST_UNIFIED();
 }
 
-bool test_store_info(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_store_info(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	{
 		BackupStoreInfo info(
-			specialisation_name == "s3" ?  S3_FAKE_ACCOUNT_ID : 0x01234567,
+			spec.name() == "s3" ? S3_FAKE_ACCOUNT_ID : 0x01234567,
 			3461231233455433LL, 2934852487LL);
 		fs.PutBackupStoreInfo(info);
 	}
@@ -2692,7 +2678,7 @@ bool test_store_info(const std::string& specialisation_name,
 		TEST_EQUAL(4, delfiles[1]);
 	}
 
-	TEARDOWN_TEST_SPECIALISED_NO_CHECK(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
 bool test_login_without_account()
@@ -2727,24 +2713,23 @@ bool test_login_without_account()
 	TEARDOWN_TEST_UNIFIED();
 }
 
-bool test_bbstoreaccounts_create(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_bbstoreaccounts_create(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// Delete the account, and create it again using bbstoreaccounts
-	control.DeleteAccount(false); // !AskForConfirmation
+	spec.control().DeleteAccount(false); // !AskForConfirmation
 
 	// Release the lock to discard the filesystem's cached BackupStoreInfo:
 	fs.ReleaseLock();
 
-	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "create", "",
+	TEST_THAT(run_bbstoreaccounts_specialised(spec.name(), "create", "",
 		"test 10000B 20000B", "0 10000B 20000B"));
 
 	// This code is almost exactly the same as tests3store.cpp:check_new_account_info()
 	std::auto_ptr<BackupStoreInfo> info = fs.GetBackupStoreInfoUncached();
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
 		TEST_EQUAL(S3_FAKE_ACCOUNT_ID, info->GetAccountID());
 		TEST_EQUAL(1, info->GetBlocksUsed());
@@ -2781,45 +2766,43 @@ bool test_bbstoreaccounts_create(const std::string& specialisation_name,
 	BackupStoreRefCountDatabase& refcount_db(fs.GetPermanentRefCountDatabase(true)); // ReadOnly
 	TEST_EQUAL(1, refcount_db.GetRefCount(BACKUPSTORE_ROOT_DIRECTORY_ID));
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-bool test_bbstoreaccounts_delete(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_bbstoreaccounts_delete(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// Release the lock so that we can run bbstoreaccounts:
 	fs.ReleaseLock();
 
-	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "delete", "yes"));
+	TEST_THAT(run_bbstoreaccounts_specialised(spec.name(), "delete", "yes"));
 
 	// Recreate the account so that teardown_test_backupstore() doesn't freak out
-	TEST_THAT(create_test_account_specialised(specialisation_name, control));
+	TEST_THAT(create_test_account_specialised(spec.name(), spec.control()));
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 // Test that login fails on a disabled account
-bool test_login_with_disabled_account(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_login_with_disabled_account(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// Release the lock so that we can run bbstoreaccounts:
 	fs.ReleaseLock();
 
 	// The account is already enabled, but doing it again shouldn't hurt:
-	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "yes"));
+	TEST_THAT(run_bbstoreaccounts_specialised(spec.name(), "enabled", "yes"));
 
 	// Check that we can log in
 	{
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 	}
 
-	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "no"));
+	TEST_THAT(run_bbstoreaccounts_specialised(spec.name(), "enabled", "no"));
 
 	// BLOCK
 	{
@@ -2837,20 +2820,19 @@ bool test_login_with_disabled_account(const std::string& specialisation_name,
 	}
 
 	// Re-enable the account, check that we can login again
-	TEST_THAT(run_bbstoreaccounts_specialised(specialisation_name, "enabled", "yes"));
+	TEST_THAT(run_bbstoreaccounts_specialised(spec.name(), "enabled", "yes"));
 
 	{
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 	}
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-bool test_login_with_no_refcount_db(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_login_with_no_refcount_db(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// Need to unlock the filesystem because it has an open file handle to the refcount DB, so
 	// it won't notice if we delete the file unless we force it to close and attempt to reopen
@@ -2858,7 +2840,7 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 	fs.ReleaseLock();
 
 	// Delete the refcount DB:
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/subdir/" S3_REFCOUNT_FILE_NAME));
 	}
@@ -2874,7 +2856,7 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 		BackupStoreException, CorruptReferenceCountDatabase);
 
 	// Run housekeeping or fix the store, and check that it fixes the refcount db:
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
 		TEST_EQUAL_LINE(1, check_account_and_fix_errors(fs),
 			"Check should report 1 error if the refcount db is missing");
@@ -2893,7 +2875,7 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 
 	// Test with a bbstored server, which doesn't make sense for S3 tests
-	if(specialisation_name == "store")
+	if(spec.name() == "store")
 	{
 		// Start a server and try again, remotely. This is difficult to debug
 		// because housekeeping may fix the refcount database while we're
@@ -2920,15 +2902,14 @@ bool test_login_with_no_refcount_db(const std::string& specialisation_name,
 		connect_and_login(tls_context)->QueryFinished();
 	}
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 // Test the deletion of objects by the housekeeping system
-bool test_housekeeping_deletes_files(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_housekeeping_deletes_files(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
 
@@ -2956,7 +2937,7 @@ bool test_housekeeping_deletes_files(const std::string& specialisation_name,
 	// Reduce the store limits, so housekeeping will remove all old files.
 	// Leave the hard limit high, so we know that housekeeping's target
 	// for freeing space is the soft limit.
-	TEST_THAT(change_account_limits(control, "0B", "20000B"));
+	TEST_THAT(change_account_limits(spec.control(), "0B", "20000B"));
 	TEST_THAT(run_housekeeping_and_check_account(fs));
 
 	// Count the objects again
@@ -2970,28 +2951,27 @@ bool test_housekeeping_deletes_files(const std::string& specialisation_name,
 	// teardown_test_backupstore() don't fail.
 	ExpectedRefCounts.resize(2);
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-bool test_account_limits_respected(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_account_limits_respected(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED(specialisation_name, control);
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
-	BackupFileSystem& fs(control.GetFileSystem());
 	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
 		"fake test connection"); // rConnectionDetails
 	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
 		"fake test connection"); // rConnectionDetails
 
 	// Set a really small hard limit
-	if(specialisation_name == "s3")
+	if(spec.name() == "s3")
 	{
-		control.SetLimit("1B", "1B");
+		spec.control().SetLimit("1B", "1B");
 	}
 	else
 	{
-		control.SetLimit("2B", "2B");
+		spec.control().SetLimit("2B", "2B");
 	}
 
 	// Try to upload a file and create a directory, both of which would exceed the
@@ -3031,7 +3011,7 @@ bool test_account_limits_respected(const std::string& specialisation_name,
 		apProtocol->QueryFinished();
 	}
 
-	TEARDOWN_TEST_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 bool test_open_files_with_limited_win32_permissions()
@@ -3465,7 +3445,7 @@ bool test_read_write_attr_streamformat()
 	TEARDOWN_TEST_UNIFIED();
 }
 
-bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3control)
+bool test_s3backupfilesystem(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	SETUP_TEST_UNIFIED();
 
@@ -3482,7 +3462,7 @@ bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3co
 		}
 	}
 
-	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	const Configuration s3config = spec.config().GetSubConfiguration("S3Store");
 	S3Client client(s3config);
 	HTTPResponse response = client.HeadObject("/subdir/0.file");
 	client.CheckResponse(response, "Failed to get file /subdir/0.file");
@@ -3490,7 +3470,7 @@ bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3co
 	std::string etag = response.GetHeaderValue("etag");
 	TEST_EQUAL("\"447baac70b0149224b4f48daedf5266f\"", etag);
 
-	S3BackupFileSystem fs(config, "/subdir/", DEFAULT_S3_CACHE_DIR, client);
+	S3BackupFileSystem fs(spec.config(), "/subdir/", DEFAULT_S3_CACHE_DIR, client);
 	int64_t revision_id = 0, expected_id = 0x447baac70b014922;
 	TEST_THAT(fs.ObjectExists(0, &revision_id));
 	TEST_EQUAL(expected_id, revision_id);
@@ -3499,11 +3479,11 @@ bool test_s3backupfilesystem(Configuration& config, S3BackupAccountControl& s3co
 }
 
 // Test that the S3 backend correctly locks and unlocks the store using SimpleDB.
-bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3control)
+bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	SETUP_TEST_UNIFIED();
 
-	const Configuration s3config = config.GetSubConfiguration("S3Store");
+	const Configuration s3config = spec.config().GetSubConfiguration("S3Store");
 	S3Client s3client(s3config);
 	SimpleDBClient client(s3config);
 
@@ -3516,7 +3496,7 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 
 	// Create a client in a scope, so it will be destroyed when the scope ends.
 	{
-		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
 
 		// Check that it hasn't acquired a lock yet.
 		TEST_CHECK_THROWS(
@@ -3557,7 +3537,7 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 		TEST_THAT(test_equal_maps(expected, attributes));
 
 		// Try to acquire another one, check that it fails.
-		S3BackupFileSystem fs2(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs2(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
 		TEST_CHECK_THROWS(
 			fs2.GetLock(),
 			BackupStoreException, CouldNotLockStoreAccount);
@@ -3576,7 +3556,7 @@ bool test_simpledb_locking(Configuration& config, S3BackupAccountControl& s3cont
 
 	// And that we can acquire it again:
 	{
-		S3BackupFileSystem fs(config, "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
 		fs.GetLock();
 
 		expected["locked"] = "true";
@@ -3647,29 +3627,12 @@ int test(int argc, const char *argv[])
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
 
-	std::auto_ptr<Configuration> s3config = load_config_file(
-		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
-	// Use an auto_ptr so we can release it, and thus the lock, before stopping the
-	// daemon on which locking relies:
-	std::auto_ptr<S3BackupAccountControl> ap_s3control(
-		new S3BackupAccountControl(*s3config));
-
-	std::auto_ptr<Configuration> storeconfig = load_config_file(
-		DEFAULT_BBSTORED_CONFIG_FILE, BackupConfigFileVerify);
-	BackupStoreAccountControl storecontrol(*storeconfig, 0x01234567);
+	std::auto_ptr<RaidAndS3TestSpecs> specs(new RaidAndS3TestSpecs());
 
 	TEST_THAT(kill_running_daemons());
 	TEST_THAT(StartSimulator());
-	TEST_THAT(test_s3backupfilesystem(*s3config, *ap_s3control));
-	TEST_THAT(test_simpledb_locking(*s3config, *ap_s3control));
-
-	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
-	test_specialisation specialisations;
-	specialisations["s3"] = ap_s3control.get();
-	specialisations["store"] = &storecontrol;
-
-#define RUN_SPECIALISED_TEST(name, pControl, function) \
-	TEST_THAT(function(name, *(pControl)));
+	TEST_THAT(test_s3backupfilesystem(specs->s3()));
+	TEST_THAT(test_simpledb_locking(specs->s3()));
 
 	TEST_THAT(test_filename_encoding());
 	TEST_THAT(test_temporary_refcount_db_is_independent());
@@ -3678,40 +3641,34 @@ int test(int argc, const char *argv[])
 	// Run all tests that take a BackupAccountControl argument twice, once with an
 	// S3BackupAccountControl and once with a BackupStoreAccountControl.
 
-	for(test_specialisation::iterator i = specialisations.begin();
-		i != specialisations.end(); i++)
+	for(auto i = specs->specs().begin(); i != specs->specs().end(); i++)
 	{
-		RUN_SPECIALISED_TEST(i->first, i->second,
-			test_bbstoreaccounts_create);
-		RUN_SPECIALISED_TEST(i->first, i->second,
-			test_bbstoreaccounts_delete);
-		RUN_SPECIALISED_TEST(i->first, i->second,
-			test_directory_parent_entry_tracks_directory_size);
-		RUN_SPECIALISED_TEST(i->first, i->second,
-			test_cannot_open_multiple_writable_connections);
+		TEST_THAT(test_bbstoreaccounts_create(*i));
+		TEST_THAT(test_bbstoreaccounts_delete(*i));
+		TEST_THAT(test_directory_parent_entry_tracks_directory_size(*i));
+		TEST_THAT(test_cannot_open_multiple_writable_connections(*i));
 	}
 
 	TEST_THAT(test_file_encoding());
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_login_without_account());
 
-	for(test_specialisation::iterator i = specialisations.begin();
-		i != specialisations.end(); i++)
+	for(auto i = specs->specs().begin(); i != specs->specs().end(); i++)
 	{
-		RUN_SPECIALISED_TEST(i->first, i->second, test_store_info);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_server_housekeeping);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_multiple_uploads);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_server_commands);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_account_limits_respected);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_disabled_account);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_login_with_no_refcount_db);
-		RUN_SPECIALISED_TEST(i->first, i->second, test_housekeeping_deletes_files);
+		TEST_THAT(test_store_info(*i));
+		TEST_THAT(test_server_housekeeping(*i));
+		TEST_THAT(test_multiple_uploads(*i));
+		TEST_THAT(test_server_commands(*i));
+		TEST_THAT(test_account_limits_respected(*i));
+		TEST_THAT(test_login_with_disabled_account(*i));
+		TEST_THAT(test_login_with_no_refcount_db(*i));
+		TEST_THAT(test_housekeeping_deletes_files(*i));
 	}
 
 	TEST_THAT(test_read_write_attr_streamformat());
 
 	// Release lock before shutting down the simulator:
-	ap_s3control.reset();
+	specs.reset();
 	TEST_THAT(StopSimulator());
 
 	return finish_test_suite();

@@ -96,23 +96,6 @@ bool setup_test_unified()
 	return true;
 }
 
-
-bool setup_test_specialised(const std::string& spec_name,
-	BackupAccountControl& control)
-{
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), FAIL);
-	}
-
-	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
-	TEST_THAT_OR(create_test_account_specialised(spec_name, control), FAIL);
-
-	return true;
-}
-
 //! Checks account for errors and shuts down daemons at end of every test.
 bool teardown_test_unified()
 {
@@ -128,33 +111,6 @@ bool teardown_test_unified()
 		TEST_THAT_OR(check_reference_counts(), status = false);
 		TEST_EQUAL_OR(0, check_account_and_fix_errors(), status = false);
 	}
-
-	return status;
-}
-
-//! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_specialised(const std::string& spec_name,
-	BackupAccountControl& control, bool check_for_errors)
-{
-	bool status = true;
-
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), status = false);
-	}
-
-	BackupFileSystem& fs(control.GetFileSystem());
-	if(check_for_errors)
-	{
-		TEST_THAT_OR(check_reference_counts(
-			fs.GetPermanentRefCountDatabase(true)), // ReadOnly
-			status = false);
-		TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
-	}
-
-	// Release the lock (acquired by check_account_and_fix_errors if it wasn't already held)
-	// before the next test's setUp deletes all files in the store, including the lockfile:
-	fs.ReleaseLock();
 
 	return status;
 }
