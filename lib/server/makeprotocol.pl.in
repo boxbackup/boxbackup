@@ -775,6 +775,12 @@ class $callable_base_class : public virtual $client_server_base_class,
 public:
 	virtual int GetTimeout() = 0;
 
+	// Duplicate of the Protocol logging API:
+	virtual bool GetLogToSysLog() = 0;
+	virtual FILE *GetLogToFile() = 0;
+	virtual void SetLogToSysLog(bool Log = false) = 0;
+	virtual void SetLogToFile(FILE *File = 0) = 0;
+
 protected:
 	void CheckReply(const std::string& requestCommandName,
 		const $message_base_class &rCommand, 
@@ -906,6 +912,8 @@ __E
 private:
 	$context_class &mrContext;
 	std::auto_ptr<$message_base_class> mapLastReply;
+	bool mLogToSysLog;
+	FILE *mLogToFile;
 
 protected:
 	$context_class& GetContext()
@@ -927,12 +935,25 @@ public:
 		mStreamsToSend.pop_front();
 		return apStream;
 	}
+
+	// Implement the abstract protocol logging API in $callable_base_class:
+	bool GetLogToSysLog() { return mLogToSysLog; }
+	FILE *GetLogToFile() { return mLogToFile; }
+	void SetLogToSysLog(bool Log = false) { mLogToSysLog = Log; }
+	void SetLogToFile(FILE *File = 0) { mLogToFile = File; }
 __E
 	}
 	else
 	{
 		print H <<__E;
 	virtual std::auto_ptr<IOStream> ReceiveStream();
+
+	// Implement the abstract protocol logging API in $callable_base_class:
+	bool GetLogToSysLog() { return Protocol::GetLogToSysLog(); }
+	FILE *GetLogToFile() { return Protocol::GetLogToFile(); }
+	void SetLogToSysLog(bool Log = false) { Protocol::SetLogToSysLog(Log); }
+	void SetLogToFile(FILE *File = 0) { Protocol::SetLogToFile(File); }
+
 __E
 
 		print CPP <<__E;
@@ -994,7 +1015,9 @@ __E
 	{
 		print CPP <<__E;
 $server_or_client_class\::$server_or_client_class($context_class &rContext)
-: mrContext(rContext)
+: mrContext(rContext),
+  mLogToSysLog(false),
+  mLogToFile(NULL)
 { }
 __E
 	}
@@ -1023,7 +1046,27 @@ std::auto_ptr<$message_base_class> $server_or_client_class\::Receive()
 }
 void $server_or_client_class\::Send(const $message_base_class &rObject)
 {
+	if(GetLogToSysLog())
+	{
+		rObject.LogSysLog("Execute");
+	}
+
+	if(GetLogToFile() != 0)
+	{
+		rObject.LogFile("Execute", GetLogToFile());
+	}
+
 	mapLastReply = rObject.DoCommand(*this, mrContext);
+
+	if(GetLogToSysLog())
+	{
+		mapLastReply->LogSysLog("Returned");
+	}
+
+	if(GetLogToFile() != 0)
+	{
+		mapLastReply->LogFile("Returned", GetLogToFile());
+	}
 }
 __E
 	}

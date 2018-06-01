@@ -20,7 +20,6 @@
 #include "Timer.h"
 
 class TLSContext;
-class BackupProtocolClient;
 class SocketStreamTLS;
 class BackupClientInodeToIDMap;
 class BackupDaemon;

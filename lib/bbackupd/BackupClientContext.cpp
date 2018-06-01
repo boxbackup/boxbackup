@@ -157,7 +157,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 		mapConnection.reset(pClient);
 
 		// Set logging option
-		pClient->SetLogToSysLog(mExtendedLogging);
+		mapConnection->SetLogToSysLog(mExtendedLogging);
 
 		if (mExtendedLogToFile)
 		{
@@ -173,7 +173,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 			}
 			else
 			{
-				pClient->SetLogToFile(mpExtendedLogFileHandle);
+				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
 			}
 		}
 
