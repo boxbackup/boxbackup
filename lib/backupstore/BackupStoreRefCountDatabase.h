@@ -21,26 +21,6 @@
 class BackupStoreCheck;
 class BackupStoreContext;
 
-// set packing to one byte
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "BeginStructPackForWire.h"
-#else
-BEGIN_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
-typedef struct
-{
-	uint32_t mMagicValue;	// also the version number
-	uint32_t mAccountID;
-} refcount_StreamFormat;
-
-// Use default packing
-#ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
-#include "EndStructPackForWire.h"
-#else
-END_STRUCTURE_PACKING_FOR_WIRE
-#endif
-
 // --------------------------------------------------------------------------
 //
 // Class
