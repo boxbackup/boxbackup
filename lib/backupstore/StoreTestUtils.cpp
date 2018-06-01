@@ -346,12 +346,8 @@ bool check_reference_counts()
 		BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 	BackupStoreAccountDatabase::Entry account =
 		apAccounts->GetEntry(0x1234567);
-
 	std::auto_ptr<BackupStoreRefCountDatabase> apReferences =
 		BackupStoreRefCountDatabase::Load(account, true);
-	TEST_EQUAL(ExpectedRefCounts.size(),
-		apReferences->GetLastObjectIDUsed() + 1);
-
 	return check_reference_counts(*apReferences);
 }
 
