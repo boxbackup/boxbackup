@@ -2326,6 +2326,10 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 
 bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Specialisation& spec)
 {
+	// Temporarily increase logging level to trace, to show stack traces on exceptions, to help
+	// debug random failures of this test on AppVeyor.
+	Logger::LevelGuard guard(Logging::GetConsole(), Log::TRACE);
+
 	SETUP_TEST_SPECIALISED(spec);
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 
