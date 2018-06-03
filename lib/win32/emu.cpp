@@ -1866,7 +1866,9 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 		return -1;
 	}
 
-	BOOL result = MoveFileW(pOldBuffer, pNewBuffer);
+	// UNIX semantics allow renaming over an existing file, so we emulate that here rather than
+	// requiring callers to implement it themselves:
+	BOOL result = MoveFileExW(pOldBuffer, pNewBuffer, MOVEFILE_REPLACE_EXISTING);
 	winerrno = GetLastError();
 	delete [] pOldBuffer;
 	delete [] pNewBuffer;

@@ -193,15 +193,6 @@ void BackupStoreRefCountDatabaseImpl::Commit()
 	mapDatabaseFile->Close();
 	mapDatabaseFile.reset();
 
-	#ifdef WIN32
-	if(FileExists(mFinalFilename) && EMU_UNLINK(mFinalFilename.c_str()) != 0)
-	{
-		THROW_EMU_FILE_ERROR("Failed to delete old permanent refcount "
-			"database file", mFinalFilename, CommonException,
-			OSFileError);
-	}
-	#endif
-
 	if(rename(mFilename.c_str(), mFinalFilename.c_str()) != 0)
 	{
 		THROW_EMU_ERROR("Failed to rename temporary refcount database "
