@@ -307,7 +307,7 @@ private:
 class S3BackupFileSystem : public BackupFileSystem
 {
 private:
-	const Configuration& mrConfig;
+	const Configuration& mrS3Config;
 	std::string mBasePath, mCacheDirectory;
 	NamedLock mCacheLock;
 	S3Client& mrClient;
@@ -327,8 +327,7 @@ private:
 	void GetCacheLock();
 
 public:
-	S3BackupFileSystem(const Configuration& config, const std::string& BasePath,
-		const std::string& CacheDirectory, S3Client& rClient);
+	S3BackupFileSystem(const Configuration& s3_config, S3Client& rClient);
 	virtual ~S3BackupFileSystem();
 
 	virtual void ReleaseLock();

@@ -20,7 +20,6 @@
 class BackupStoreDirectory;
 class BackupStoreInfo;
 class Configuration;
-class NamedLock;
 class UnixUser;
 
 class BackupAccountControl
@@ -107,6 +106,7 @@ public:
 class S3BackupAccountControl : public BackupAccountControl
 {
 private:
+	std::auto_ptr<Configuration> mapS3Config;
 	std::auto_ptr<S3Client> mapS3Client;
 	// mapFileSystem is inherited from BackupAccountControl
 

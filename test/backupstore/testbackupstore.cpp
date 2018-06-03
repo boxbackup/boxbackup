@@ -3474,7 +3474,7 @@ bool test_s3backupfilesystem(RaidAndS3TestSpecs::Specialisation& spec)
 	std::string etag = response.GetHeaderValue("etag");
 	TEST_EQUAL("\"447baac70b0149224b4f48daedf5266f\"", etag);
 
-	S3BackupFileSystem fs(spec.config(), "/subdir/", DEFAULT_S3_CACHE_DIR, client);
+	S3BackupFileSystem fs(s3config, client);
 	int64_t revision_id = 0, expected_id = 0x447baac70b014922;
 	TEST_THAT(fs.ObjectExists(0, &revision_id));
 	TEST_EQUAL(expected_id, revision_id);
@@ -3500,7 +3500,7 @@ bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 
 	// Create a client in a scope, so it will be destroyed when the scope ends.
 	{
-		S3BackupFileSystem fs(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs(s3config, s3client);
 
 		// Check that it hasn't acquired a lock yet.
 		TEST_CHECK_THROWS(
@@ -3541,7 +3541,7 @@ bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 		TEST_THAT(test_equal_maps(expected, attributes));
 
 		// Try to acquire another one, check that it fails.
-		S3BackupFileSystem fs2(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs2(s3config, s3client);
 		TEST_CHECK_THROWS(
 			fs2.GetLock(),
 			BackupStoreException, CouldNotLockStoreAccount);
@@ -3560,7 +3560,7 @@ bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 
 	// And that we can acquire it again:
 	{
-		S3BackupFileSystem fs(spec.config(), "/foo/", DEFAULT_S3_CACHE_DIR, s3client);
+		S3BackupFileSystem fs(s3config, s3client);
 		fs.GetLock();
 
 		expected["locked"] = "true";

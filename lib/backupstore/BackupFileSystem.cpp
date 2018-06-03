@@ -1301,30 +1301,34 @@ void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_er
 }
 
 
-S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
-	const std::string& BasePath, const std::string& CacheDirectory, S3Client& rClient)
-: mrConfig(config),
-  mBasePath(BasePath),
-  mCacheDirectory(CacheDirectory),
+S3BackupFileSystem::S3BackupFileSystem(const Configuration& s3_config, S3Client& rClient)
+: mrS3Config(s3_config),
   mrClient(rClient),
   mHaveLock(false)
 {
-	if(mBasePath.size() == 0 || mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
+	mBasePath = s3_config.GetKeyValue("BasePath");
+
+	if(mBasePath.size() == 0)
+	{
+		mBasePath = "/";
+	}
+	else if(mBasePath[0] != '/' || mBasePath[mBasePath.size() - 1] != '/')
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, BadConfiguration,
-			"mBasePath is invalid: must start and end with a slash (/)");
+			"If S3Store.BasePath is not empty then it must start and end with a slash, "
+			"e.g. '/subdir/', but it currently does not: " << mBasePath);
 	}
 
-	const Configuration s3config = config.GetSubConfiguration("S3Store");
-	const std::string& s3_hostname(s3config.GetKeyValue("HostName"));
-	const std::string& s3_base_path(s3config.GetKeyValue("BasePath"));
-	mSimpleDBDomain = s3config.GetKeyValue("SimpleDBDomain");
+	mCacheDirectory = s3_config.GetKeyValue("CacheDirectory");
+
+	const std::string& s3_hostname(s3_config.GetKeyValue("HostName"));
+	const std::string& s3_base_path(s3_config.GetKeyValue("BasePath"));
+	mSimpleDBDomain = s3_config.GetKeyValue("SimpleDBDomain");
 
 	// The lock name should be the same for all hosts/files/daemons potentially
 	// writing to the same region of the S3 store. The default is the Amazon S3 bucket
 	// name and path, concatenated.
-	mLockName = s3config.GetKeyValueDefault("SimpleDBLockName",
-		s3_hostname + s3_base_path);
+	mLockName = s3_config.GetKeyValueDefault("SimpleDBLockName", s3_hostname + s3_base_path);
 
 	// The lock value should be unique for each host potentially accessing the same
 	// region of the store, and should help you to identify which one is currently
@@ -1353,7 +1357,7 @@ S3BackupFileSystem::S3BackupFileSystem(const Configuration& config,
 	std::ostringstream lock_value_buf;
 	lock_value_buf << mCurrentUserName << "@" << hostname_buf << "(" << getpid() <<
 		")";
-	mLockValue = s3config.GetKeyValueDefault("SimpleDBLockValue",
+	mLockValue = s3_config.GetKeyValueDefault("SimpleDBLockValue",
 		lock_value_buf.str());
 }
 
@@ -1394,9 +1398,8 @@ std::string S3BackupFileSystem::GetAccountIdentifier()
 
 std::string S3BackupFileSystem::GetObjectURL(const std::string& ObjectPath) const
 {
-	const Configuration s3config = mrConfig.GetSubConfiguration("S3Store");
-	return std::string("http://") + s3config.GetKeyValue("HostName") + ":" +
-		s3config.GetKeyValue("Port") + ObjectPath;
+	return std::string("http://") + mrS3Config.GetKeyValue("HostName") + ":" +
+		mrS3Config.GetKeyValue("Port") + ObjectPath;
 }
 
 
@@ -2058,11 +2061,9 @@ void S3BackupFileSystem::TryGetLock()
 		return;
 	}
 
-	const Configuration s3config = mrConfig.GetSubConfiguration("S3Store");
-
 	if(!mapSimpleDBClient.get())
 	{
-		mapSimpleDBClient.reset(new SimpleDBClient(s3config));
+		mapSimpleDBClient.reset(new SimpleDBClient(mrS3Config));
 		// timeout left at the default 300 seconds.
 	}
 

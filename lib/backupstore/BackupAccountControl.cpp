@@ -535,28 +535,12 @@ S3BackupAccountControl::S3BackupAccountControl(const Configuration& config,
 			"The S3Store configuration subsection is required "
 			"when S3Store mode is enabled");
 	}
-	const Configuration s3config = mConfig.GetSubConfiguration("S3Store");
 
-	std::string base_path = s3config.GetKeyValue("BasePath");
-	if(base_path.size() == 0)
-	{
-		base_path = "/";
-	}
-	else
-	{
-		if(base_path[0] != '/' || base_path[base_path.size() - 1] != '/')
-		{
-			THROW_EXCEPTION_MESSAGE(CommonException,
-				InvalidConfiguration,
-				"If S3Store.BasePath is not empty then it must start and "
-				"end with a slash, e.g. '/subdir/', but it currently does not.");
-		}
-	}
-
-	std::string cache_dir = s3config.GetKeyValue("CacheDirectory");
-	mapS3Client.reset(new S3Client(s3config));
-	mapFileSystem.reset(new S3BackupFileSystem(mConfig, base_path, cache_dir,
-		*mapS3Client));
+	// S3BackupFileSystem keeps a reference to this Configuration, so we nned to keep it
+	// alive as long as we are:
+	mapS3Config.reset(new Configuration(mConfig.GetSubConfiguration("S3Store")));
+	mapS3Client.reset(new S3Client(*mapS3Config));
+	mapFileSystem.reset(new S3BackupFileSystem(*mapS3Config, *mapS3Client));
 }
 
 
