@@ -1261,28 +1261,6 @@ int64_t create_file(BackupProtocolCallable& protocol, int64_t subdirid,
 	return subdirfileid;
 }
 
-bool assert_writable_connection_fails(BackupProtocolCallable& protocol)
-{
-	std::auto_ptr<BackupProtocolVersion> serverVersion
-		(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-	TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-	TEST_COMMAND_RETURNS_ERROR_OR(protocol, QueryLogin(0x01234567, 0),
-		Err_CannotLockStoreForWriting, return false);
-	protocol.QueryFinished();
-	return true;
-}
-
-int64_t assert_readonly_connection_succeeds(BackupProtocolCallable& protocol)
-{
-	// TODO FIXME share code with test_server_login
-	std::auto_ptr<BackupProtocolVersion> serverVersion
-		(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
-	TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
-	std::auto_ptr<BackupProtocolLoginConfirmed> loginConf
-		(protocol.QueryLogin(0x01234567, BackupProtocolLogin::Flags_ReadOnly));
-	return loginConf->GetClientStoreMarker();
-}
-
 bool test_multiple_uploads(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	SETUP_TEST_SPECIALISED(spec);
@@ -2356,7 +2334,8 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 
 	BackupFileSystem& fs_2(ap_control_2->GetFileSystem());
 
-	// First try a local protocol (makes debugging easier, and also works for s3):
+	// First try a local protocol (makes debugging easier, and also works for s3).
+	// This will create a write lock on fs, which we can probe using fs_2:
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, bs_context, protocol_writable, false); // !ReadOnly
 
 	// Set the client store marker
@@ -2364,6 +2343,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 
 	// This works on platforms that have non-reentrant file locks (all but F_SETLK)
 #ifndef BOX_LOCK_TYPE_F_SETLK
+	BOX_TRACE("Opening read-write local protocol (expected to fail to get a write lock)");
 	{
 		BackupStoreContext context_2(fs_2, 0x01234567, NULL,
 			"fake test connection");
@@ -2376,6 +2356,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 #endif
 
 	// But a read-only context should work:
+	BOX_TRACE("Opening read-only local protocol (expected to succeed)");
 	{
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs_2, context_2, protocol_read_only,
 			true); // ReadOnly
@@ -2387,12 +2368,28 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 	{
 		TEST_THAT_OR(StartServer(), return false);
 
+		BOX_TRACE("Opening read-write connection (expected to fail to get a write lock)");
 		BackupProtocolClient protocol_writable_3(open_conn("localhost", tls_context));
-		TEST_THAT(assert_writable_connection_fails(protocol_writable_3));
+		{
+			std::auto_ptr<BackupProtocolVersion> serverVersion
+				(protocol_writable_3.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+			TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+			TEST_COMMAND_RETURNS_ERROR(protocol_writable_3, QueryLogin(0x01234567, 0),
+				Err_CannotLockStoreForWriting);
+			protocol_writable_3.QueryFinished();
+		}
 
+		BOX_TRACE("Opening read-only connection (expected to succeed)");
 		BackupProtocolClient protocol_read_only_2(open_conn("localhost", tls_context));
-		TEST_EQUAL(0x8732523ab23aLL,
-			assert_readonly_connection_succeeds(protocol_read_only_2));
+		{
+			std::auto_ptr<BackupProtocolVersion> serverVersion
+				(protocol_read_only_2.QueryVersion(BACKUP_STORE_SERVER_VERSION));
+			TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
+			std::auto_ptr<BackupProtocolLoginConfirmed> loginConf
+				(protocol_read_only_2.QueryLogin(0x01234567,
+					BackupProtocolLogin::Flags_ReadOnly));
+			TEST_EQUAL(0x8732523ab23aLL, loginConf->GetClientStoreMarker());
+		}
 	}
 
 	protocol_writable.QueryFinished();
