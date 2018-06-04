@@ -56,6 +56,8 @@ public:
 	int CreateAccount(int32_t AccountID, int32_t SoftLimit, int32_t HardLimit,
 		const std::string& AccountName);
 	virtual int DeleteAccount(bool AskForConfirmation) = 0;
+	virtual int CheckAccount(bool FixErrors, bool Quiet, bool ReturnNumErrorsFound = false);
+	virtual int HousekeepAccountNow();
 };
 
 
@@ -84,11 +86,8 @@ public:
 		return BlockSizeOfDiscSet(mDiscSetNum);
 	}
 	int BlockSizeOfDiscSet(int discSetNum);
-	int DeleteAccount(bool AskForConfirmation);
-	int CheckAccount(bool FixErrors, bool Quiet,
-		bool ReturnNumErrorsFound = false);
 	int CreateAccount(int32_t DiscNumber, int32_t SoftLimit, int32_t HardLimit);
-	int HousekeepAccountNow();
+	int DeleteAccount(bool AskForConfirmation);
 	virtual BackupFileSystem& GetFileSystem()
 	{
 		if(mapFileSystem.get())

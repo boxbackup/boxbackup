@@ -424,7 +424,7 @@ void BackupStoreAccountControl::OpenAccount(bool readWrite)
 }
 
 
-int BackupStoreAccountControl::CheckAccount(bool FixErrors, bool Quiet,
+int BackupAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	bool ReturnNumErrorsFound)
 {
 	// Don't need a write lock if not making changes.
@@ -500,7 +500,7 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 }
 
 
-int BackupStoreAccountControl::HousekeepAccountNow()
+int BackupAccountControl::HousekeepAccountNow()
 {
 	// Housekeeping locks the account itself, so we can't.
 	OpenAccount(false); // readWrite
@@ -510,15 +510,14 @@ int BackupStoreAccountControl::HousekeepAccountNow()
 
 	if(!success)
 	{
-		BOX_ERROR("Failed to lock account " << BOX_FORMAT_ACCOUNT(mAccountID)
-			<< " for housekeeping: perhaps a client is "
-			"still connected?");
+		BOX_ERROR("Failed to lock account " << mapFileSystem->GetAccountIdentifier() << " "
+			"for housekeeping: perhaps a client is still connected?");
 		return 1;
 	}
 	else
 	{
 		BOX_TRACE("Finished housekeeping on account " <<
-			BOX_FORMAT_ACCOUNT(mAccountID));
+			mapFileSystem->GetAccountIdentifier());
 		return 0;
 	}
 }

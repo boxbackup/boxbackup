@@ -343,8 +343,6 @@ int main(int argc, const char *argv[])
 		}
 		else if(command == "check")
 		{
-			STORE_ONLY;
-
 			bool fixErrors = false;
 			bool quiet = false;
 
@@ -367,12 +365,11 @@ int main(int argc, const char *argv[])
 			}
 
 			// Check the account
-			return apStoreControl->CheckAccount(fixErrors, quiet);
+			return pControl->CheckAccount(fixErrors, quiet);
 		}
 		else if(command == "housekeep")
 		{
-			STORE_ONLY;
-			return apStoreControl->HousekeepAccountNow();
+			return pControl->HousekeepAccountNow();
 		}
 		else
 		{
