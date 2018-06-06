@@ -106,6 +106,11 @@ public:
 		mClientHasAccount = true;
 	}
 	bool GetClientHasAccount() const {return mClientHasAccount;}
+	std::auto_ptr<BackupProtocolMessage> DoCommandHook(BackupProtocolMessage& command,
+		BackupProtocolReplyable& protocol, IOStream* data_stream = NULL)
+	{
+		return std::auto_ptr<BackupProtocolMessage>();
+	}
 
 	// Store info
 	void LoadStoreInfo();
