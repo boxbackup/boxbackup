@@ -1178,15 +1178,6 @@ int test(int argc, const char *argv[])
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
 
-	/*
-	std::auto_ptr<Configuration> s3config = load_config_file(
-		DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
-	// Use an auto_ptr so we can release it, and thus the lock, before stopping the
-	// daemon on which locking relies:
-	std::auto_ptr<S3BackupAccountControl> ap_s3control(
-		new S3BackupAccountControl(*s3config));
-	*/
-
 	std::auto_ptr<Configuration> storeconfig = load_config_file(
 		DEFAULT_BBSTORED_CONFIG_FILE, BackupConfigFileVerify);
 	BackupStoreAccountControl storecontrol(*storeconfig, 0x01234567);
@@ -1204,31 +1195,6 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_orphan_files_and_directories_unrecoverably())
 	TEST_THAT(test_corrupt_file_and_dir())
 	TEST_THAT(test_overwrite_root_directory_with_a_file())
-
-	/*
-	TEST_THAT(StartSimulator());
-
-	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
-	test_specialisation specialisations;
-	specialisations["s3"] = ap_s3control.get();
-	specialisations["store"] = &storecontrol;
-
-#define RUN_SPECIALISED_TEST(name, pControl, function) \
-	TEST_THAT(function(name, *(pControl)));
-
-	// Run all tests that take a BackupAccountControl argument twice, once with an
-	// S3BackupAccountControl and once with a BackupStoreAccountControl.
-
-	for(test_specialisation::iterator i = specialisations.begin();
-		i != specialisations.end(); i++)
-	{
-		// RUN_SPECIALISED_TEST(i->first, i->second, test_bbstoreaccounts_create);
-	}
-
-	// Release lock before shutting down the simulator:
-	ap_s3control.reset();
-	TEST_THAT(StopSimulator());
-	*/
 
 	return finish_test_suite();
 }
