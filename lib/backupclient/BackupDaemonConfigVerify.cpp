@@ -94,6 +94,7 @@ static const ConfigurationVerify verifyserver[] =
 
 static const ConfigurationVerifyKey verifyrootkeys[] =
 {
+	ConfigurationVerifyKey("StorageBackend", 0, "bbstored"),
 	ConfigurationVerifyKey("UpdateStoreInterval",
 		ConfigTest_Exists | ConfigTest_IsInt),
 	ConfigurationVerifyKey("BackupErrorDelay",
@@ -153,14 +154,12 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("DataDirectory", ConfigTest_Exists),
 
 	// These values are only required for bbstored stores:
-	ConfigurationVerifyKey("StoreHostname", 0),
-	ConfigurationVerifyKey("StorePort", ConfigTest_IsInt,
-		BOX_PORT_BBSTORED),
-	ConfigurationVerifyKey("AccountNumber",
-		ConfigTest_IsUint32),
-	ConfigurationVerifyKey("CertificateFile", 0),
-	ConfigurationVerifyKey("PrivateKeyFile", 0),
-	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_LastEntry),
+	ConfigurationVerifyKey("StoreHostname", 0, ""),
+	ConfigurationVerifyKey("StorePort", ConfigTest_IsInt, BOX_PORT_BBSTORED),
+	ConfigurationVerifyKey("AccountNumber", ConfigTest_IsUint32, 0),
+	ConfigurationVerifyKey("CertificateFile", 0, ""),
+	ConfigurationVerifyKey("PrivateKeyFile", 0, ""),
+	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_LastEntry, ""),
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =
