@@ -99,6 +99,9 @@ static std::auto_ptr<BackupQueries::ParsedCommand> sapCmd;
 
 char * completion_generator(const char *text, int state)
 {
+	// When asked for the first completion (state == 0), generate all of them and populate the
+	// vector of completions. In this and each subsequent "state", return the element from
+	// completions with the same index (0, 1, 2, etc.) until exhausted.
 	if(state == 0)
 	{
 		completions.clear();
@@ -457,6 +460,8 @@ int main(int argc, const char *argv[])
 			}
 
 			cmd_str = cmd_ptr;
+			// readline allocated cmd_ptr using malloc(), this is not a leak:
+			MEMLEAKFINDER_NOT_A_LEAK(cmd_ptr);
 			free(cmd_ptr);
 		}
 		else

@@ -312,9 +312,8 @@ void memleakfinder_free(void *ptr)
 		}
 		else
 		{
-			BOX_WARNING("Block " << ptr << " freed, but not "
-				"known. Error? Or allocated in startup "
-				"static allocation?");
+			BOX_WARNING("Block " << ptr << " freed, but not known. Error? Or allocated "
+				"in startup static allocation?");
 		}
 
 		if(sTrackMallocInSection)
