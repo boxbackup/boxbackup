@@ -103,7 +103,7 @@ ConfigurationVerifyKey::ConfigurationVerifyKey
   mFlags(flags),
   mTestFunction(testFunction)
 {
-	ASSERT(flags & ConfigTest_IsInt);
+	ASSERT(flags & (ConfigTest_IsInt | ConfigTest_IsUint32));
 	std::ostringstream val;
 	val << defaultValue;
 	mDefaultValue = val.str();
