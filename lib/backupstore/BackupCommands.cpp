@@ -137,24 +137,6 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 {
 	CHECK_PHASE(Phase_Login)
 
-	// Check given client ID against the ID in the certificate certificate
-	// and that the client actually has an account on this machine
-	if(mClientID != rContext.GetClientID())
-	{
-		BOX_WARNING("Failed login from client ID " <<
-			BOX_FORMAT_ACCOUNT(mClientID) << ": "
-			"wrong certificate for this account");
-		return PROTOCOL_ERROR(Err_BadLogin);
-	}
-
-	if(!rContext.GetClientHasAccount())
-	{
-		BOX_WARNING("Failed login from client ID " <<
-			BOX_FORMAT_ACCOUNT(mClientID) << ": "
-			"no such account on this server");
-		return PROTOCOL_ERROR(Err_BadLogin);
-	}
-
 	// If we need to write, check that nothing else has got a write lock
 	if((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
 	{

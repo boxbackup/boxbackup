@@ -380,7 +380,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 	int discSet = 0;
 
 	// Open a connection to the server
-	BackupStoreContext context(fs, 0x01234567, NULL, // mpHousekeeping
+	BackupStoreContext context(fs, NULL, // mpHousekeeping
 		"fake test connection"); // rConnectionDetails
 	std::auto_ptr<BackupProtocolLocal2> ap_protocol(
 		new BackupProtocolLocal2(context, 0x01234567, false)); // !ReadOnly

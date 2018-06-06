@@ -52,6 +52,7 @@
 BackupStoreContext::BackupStoreContext(int32_t ClientID,
 	HousekeepingInterface* pHousekeeping, const std::string& rConnectionDetails)
 : mConnectionDetails(rConnectionDetails),
+  mCheckClientID(true), // in this case we DO want to check the ClientID
   mClientID(ClientID),
   mpHousekeeping(pHousekeeping),
   mProtocolPhase(Phase_START),
@@ -74,10 +75,13 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
 //		Created: 2015/11/02
 //
 // --------------------------------------------------------------------------
-BackupStoreContext::BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
+BackupStoreContext::BackupStoreContext(BackupFileSystem& rFileSystem,
 	HousekeepingInterface* pHousekeeping, const std::string& rConnectionDetails)
 : mConnectionDetails(rConnectionDetails),
-  mClientID(ClientID),
+  mCheckClientID(false), // in this case we DO NOT want to check the ClientID
+  // mClientID is only used by SetClientHasAccount(...) which cannot be used with supplied
+  // rFileSystem, so set it to a dummy value here.
+  mClientID(0),
   mpHousekeeping(pHousekeeping),
   mProtocolPhase(Phase_START),
   mClientHasAccount(false),
@@ -112,6 +116,39 @@ BackupStoreContext::~BackupStoreContext()
 	}
 }
 
+std::auto_ptr<BackupProtocolMessage> BackupStoreContext::DoCommandHook(
+	BackupProtocolMessage& command, BackupProtocolReplyable& protocol,
+	IOStream* data_stream)
+{
+	if(command.GetType() == BackupProtocolLogin::TypeID)
+	{
+		BackupProtocolLogin& login_command = dynamic_cast<BackupProtocolLogin &>(command);
+		// BackupProtocolLogin::DoCommand will check the phase later.
+
+		// Iff we have been initialised with a ClientID (which comes from the common name in
+		// the client's SSL certificate) then check that it matches the ID that the client
+		// is trying to login as.
+		if(mCheckClientID && login_command.GetClientID() != mClientID)
+		{
+			BOX_WARNING("Failed login from client ID " <<
+				BOX_FORMAT_ACCOUNT(login_command.GetClientID()) << ": "
+				"wrong certificate for this account: " <<
+				BOX_FORMAT_ACCOUNT(mClientID));
+			return PROTOCOL_ERROR(Err_BadLogin);
+		}
+
+		if(!mClientHasAccount)
+		{
+			BOX_WARNING("Failed login from client ID " <<
+				BOX_FORMAT_ACCOUNT(mClientID) << ": "
+				"no such account on this server");
+			return PROTOCOL_ERROR(Err_BadLogin);
+		}
+	}
+
+	// Return no message to call BackupProtocolLogin::DoCommand() normally:
+	return std::auto_ptr<BackupProtocolMessage>();
+}
 
 void BackupStoreContext::FlushDirectoryCache()
 {
@@ -1668,7 +1705,8 @@ std::string BackupStoreContext::GetAccountIdentifier()
 	{
 		// This can happen if this BackupStoreContext was constructed without a
 		// BackupFileSystem, in which case mClientID is the account number from the SSL
-		// certificate.
+		// certificate, and mCheckClientID is true.
+		ASSERT(mCheckClientID);
 		std::ostringstream oss;
 		oss << "unknown (" << BOX_FORMAT_ACCOUNT(mClientID) << ")";
 		return oss.str();

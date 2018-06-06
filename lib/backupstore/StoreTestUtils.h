@@ -67,8 +67,7 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);
 void init_context(TLSContext& rContext);
 
 #define CREATE_LOCAL_CONTEXT_AND_PROTOCOL(filesystem, context_name, protocol_name, read_only) \
-	BackupStoreContext context_name(filesystem, 0x01234567, NULL, \
-		"fake test connection"); \
+	BackupStoreContext context_name(filesystem, NULL, "fake test connection"); \
 	BackupProtocolLocal2 protocol_name(context_name, 0x01234567, read_only);
 
 //! Opens a connection to the server (bbstored).

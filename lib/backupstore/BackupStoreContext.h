@@ -49,7 +49,7 @@ public:
 	BackupStoreContext(int32_t ClientID,
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
-	BackupStoreContext(BackupFileSystem& rFileSystem, int32_t ClientID,
+	BackupStoreContext(BackupFileSystem& rFileSystem,
 		HousekeepingInterface* mpHousekeeping,
 		const std::string& rConnectionDetails);
 	virtual ~BackupStoreContext();
@@ -59,7 +59,6 @@ private:
 
 public:
 	void CleanUp();
-	int32_t GetClientID() {return mClientID;}
 
 	typedef enum
 	{
@@ -99,18 +98,15 @@ public:
 	}
 
 	// TODO: stop using this version, which has the side-effect of creating a
-	// BackupStoreFileSystem:
+	// BackupStoreFileSystem. But BackupStoreDaemon currently uses it, because it creates a
+	// BackupStoreContext even for client connections with no valid account.
 	void SetClientHasAccount(const std::string &rStoreRoot, int StoreDiscSet);
 	void SetClientHasAccount()
 	{
 		mClientHasAccount = true;
 	}
-	bool GetClientHasAccount() const {return mClientHasAccount;}
 	std::auto_ptr<BackupProtocolMessage> DoCommandHook(BackupProtocolMessage& command,
-		BackupProtocolReplyable& protocol, IOStream* data_stream = NULL)
-	{
-		return std::auto_ptr<BackupProtocolMessage>();
-	}
+		BackupProtocolReplyable& protocol, IOStream* data_stream = NULL);
 
 	// Store info
 	void LoadStoreInfo();
@@ -200,6 +196,11 @@ public:
 	std::auto_ptr<IOStream> GetBlockIndexReconstructed(int64_t ObjectID, int64_t InDirectory);
 
 	// Info
+	// GetClientID() is only used by BackupProtocolLogin::DoCommand to check that the supplied
+	// ID matches the one in the certificate, which BackupStoreDaemon supplies when it
+	// constructs the BackupStoreContext. Thus it is only used, and only initialised, when
+	// constructed by the non-BackupFileSystem constructor, which only BackupStoreDaemon
+	// should use.
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 	std::string GetAccountIdentifier();
@@ -221,6 +222,7 @@ private:
 	std::vector<int64_t> GetPatchChain(int64_t ObjectID, int64_t InDirectory);
 
 	std::string mConnectionDetails;
+	bool mCheckClientID;
 	int32_t mClientID;
 	HousekeepingInterface *mpHousekeeping;
 	ProtocolPhase mProtocolPhase;

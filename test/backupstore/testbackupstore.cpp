@@ -2345,8 +2345,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 #ifndef BOX_LOCK_TYPE_F_SETLK
 	BOX_TRACE("Opening read-write local protocol (expected to fail to get a write lock)");
 	{
-		BackupStoreContext context_2(fs_2, 0x01234567, NULL,
-			"fake test connection");
+		BackupStoreContext context_2(fs_2, NULL, "fake test connection");
 		context_2.SetClientHasAccount();
 		BackupProtocolLocal protocol_writable_2(context_2); // !ReadOnly
 		protocol_writable_2.QueryVersion(BACKUP_STORE_SERVER_VERSION);
@@ -2808,7 +2807,7 @@ bool test_login_with_disabled_account(RaidAndS3TestSpecs::Specialisation& spec)
 	// BLOCK
 	{
 		// Open a local (virtual) connection to the server
-		BackupStoreContext context(fs, 0x01234567, NULL, "fake test connection");
+		BackupStoreContext context(fs, NULL, "fake test connection");
 		BackupProtocolLocal2 protocol(context, 0x01234567, false, // !read_only
 			false); // !login
 
@@ -2960,9 +2959,9 @@ bool test_account_limits_respected(RaidAndS3TestSpecs::Specialisation& spec)
 	SETUP_TEST_SPECIALISED(spec);
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 
-	BackupStoreContext rwContext(fs, 0x01234567, NULL, // mpHousekeeping
+	BackupStoreContext rwContext(fs, NULL, // mpHousekeeping
 		"fake test connection"); // rConnectionDetails
-	BackupStoreContext roContext(fs, 0x01234567, NULL, // mpHousekeeping
+	BackupStoreContext roContext(fs, NULL, // mpHousekeeping
 		"fake test connection"); // rConnectionDetails
 
 	// Set a really small hard limit
