@@ -26,11 +26,6 @@
 
 #include "MemLeakFindOn.h"
 
-#define PROTOCOL_ERROR(code) \
-	std::auto_ptr<BackupProtocolMessage>(new BackupProtocolError( \
-		BackupProtocolError::ErrorType, \
-		BackupProtocolError::code));
-
 #define CHECK_PHASE(phase) \
 	if(rContext.GetPhase() != BackupStoreContext::phase) \
 	{ \

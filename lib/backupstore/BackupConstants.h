@@ -21,5 +21,10 @@
 
 #define WRITE_LOCK_FILENAME "write.lock"
 
+#define PROTOCOL_ERROR(code) \
+	std::auto_ptr<BackupProtocolMessage>(new BackupProtocolError( \
+		BackupProtocolError::ErrorType, \
+		BackupProtocolError::code));
+
 #endif // BACKUPCONSTANTS__H
 
