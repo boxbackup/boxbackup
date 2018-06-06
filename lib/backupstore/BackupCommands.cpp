@@ -161,8 +161,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 		// See if the context will get the lock
 		if(!rContext.AttemptToGetWriteLock())
 		{
-			BOX_WARNING("Failed to get write lock for Client ID " <<
-				BOX_FORMAT_ACCOUNT(mClientID));
+			BOX_WARNING("Failed to get write lock for account " <<
+				rContext.GetAccountIdentifier());
 			return PROTOCOL_ERROR(Err_CannotLockStoreForWriting);
 		}
 
@@ -175,8 +175,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 
 	if(!rContext.GetBackupStoreInfo().IsAccountEnabled())
 	{
-		BOX_WARNING("Refused login from disabled client ID " <<
-			BOX_FORMAT_ACCOUNT(mClientID));
+		BOX_WARNING("Refused login from disabled account " <<
+			rContext.GetAccountIdentifier());
 		return PROTOCOL_ERROR(Err_DisabledAccount);
 	}
 
@@ -187,11 +187,8 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 	rContext.SetPhase(BackupStoreContext::Phase_Commands);
 
 	// Log login
-	BOX_NOTICE("Login from Client ID " <<
-		BOX_FORMAT_ACCOUNT(mClientID) << " "
-		"(name=" << rContext.GetAccountName() << "): " <<
-		(((mFlags & Flags_ReadOnly) != Flags_ReadOnly)
-			?"Read/Write":"Read-only") << " from " <<
+	BOX_NOTICE("Login for account " << rContext.GetAccountIdentifier() << ": " <<
+		(rContext.SessionIsReadOnly() ? "read-only" : "read-write") << " from " <<
 		rContext.GetConnectionDetails());
 
 	// Get the usage info for reporting to the client
@@ -214,9 +211,9 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 {
 	// can be called in any phase
 
-	BOX_NOTICE("Session finished for Client ID " <<
-		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
-		"(name=" << rContext.GetAccountName() << ")");
+	BOX_NOTICE("Session finished for account " << rContext.GetAccountIdentifier() << ": " <<
+		(rContext.SessionIsReadOnly() ? "read-only" : "read-write") << " from " <<
+		rContext.GetConnectionDetails());
 
 	// Let the context know about it
 	rContext.CleanUp();

@@ -202,6 +202,7 @@ public:
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
+	std::string GetAccountIdentifier();
 	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
 
 	// This is not an API, but it's useful in tests with multiple contexts, to allow

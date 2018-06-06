@@ -315,7 +315,7 @@ void BackupStoreContext::LoadStoreInfo()
 		// backup data.
 		THROW_EXCEPTION_MESSAGE(BackupStoreException,
 			CorruptReferenceCountDatabase, "Account " <<
-			BOX_FORMAT_ACCOUNT(mClientID) << " reference count database is "
+			mpFileSystem->GetAccountIdentifier() << " reference count database is "
 			"missing or corrupted, cannot safely open account. Housekeeping "
 			"will fix this automatically when it next runs.");
 	}
@@ -1566,7 +1566,7 @@ std::vector<int64_t> BackupStoreContext::GetPatchChain(int64_t ObjectID, int64_t
 					PatchChainInfoBadInDirectory,
 					"Object " << BOX_FORMAT_OBJECTID(ObjectID) <<
 					" in dir " << BOX_FORMAT_OBJECTID(InDirectory) <<
-					" for account " << BOX_FORMAT_ACCOUNT(mClientID) <<
+					" for account " << mpFileSystem->GetAccountIdentifier() <<
 					" references object " << BOX_FORMAT_OBJECTID(id) <<
 					" which does not exist in dir");
 			}
@@ -1655,6 +1655,23 @@ std::auto_ptr<IOStream> BackupStoreContext::GetBlockIndexReconstructed(int64_t O
 	else
 	{
 		return mpFileSystem->GetBlockIndexReconstructed(ObjectID, patch_chain);
+	}
+}
+
+std::string BackupStoreContext::GetAccountIdentifier()
+{
+	if(mpFileSystem != NULL)
+	{
+		return mpFileSystem->GetAccountIdentifier();
+	}
+	else
+	{
+		// This can happen if this BackupStoreContext was constructed without a
+		// BackupFileSystem, in which case mClientID is the account number from the SSL
+		// certificate.
+		std::ostringstream oss;
+		oss << "unknown (" << BOX_FORMAT_ACCOUNT(mClientID) << ")";
+		return oss.str();
 	}
 }
 
