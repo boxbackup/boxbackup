@@ -40,7 +40,7 @@ else
 	./bootstrap
 	./configure CC="ccache $CC" CXX="ccache $CXX" $EXTRA_ARGS "$@"
 	grep CXX config.status
-	make V=1 $EXTRA_MAKE_ARGS
+	make $EXTRA_MAKE_ARGS
 
 	[ "$TEST" = "n" ] || ./runtest.pl ALL $TEST_TARGET
 
