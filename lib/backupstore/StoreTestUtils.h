@@ -22,7 +22,7 @@ class SocketStreamTLS;
 class TLSContext;
 
 //! Creates the standard test account, for example after delete_account().
-bool create_account(int soft, int hard);
+bool create_account(int soft, int hard, int account_id = 0x01234567);
 
 //! Deletes the standard test account, for testing behaviour with no account.
 bool delete_account();

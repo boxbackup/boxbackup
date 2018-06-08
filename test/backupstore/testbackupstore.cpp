@@ -2691,8 +2691,12 @@ bool test_login_without_account()
 	// normally use/ a local protocol, which bypasses BackupStoreDaemon.
 	SETUP_TEST_UNIFIED();
 
-	// Try logging in with a nonexistent (deleted) account, which should fail:
+	// Delete the account created by the test harness (0x01234567):
 	delete_account();
+
+	// Create another account, which doesn't match the SSL certificate:
+	create_account(1000, 2000, 0x01234568);
+
 	TEST_THAT_OR(StartServer(), FAIL);
 
 	// BLOCK
@@ -2704,8 +2708,12 @@ bool test_login_without_account()
 		std::auto_ptr<BackupProtocolVersion> serverVersion(protocol.QueryVersion(BACKUP_STORE_SERVER_VERSION));
 		TEST_THAT(serverVersion->GetVersion() == BACKUP_STORE_SERVER_VERSION);
 
-		// Login
+		// Try logging in with a nonexistent (deleted) account, which should fail:
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
+			Err_BadLogin);
+
+		// Try to login as an account that doesn't match the SSL certificate CommonName
+		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234568, 0),
 			Err_BadLogin);
 
 		// Finish the connection

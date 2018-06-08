@@ -30,13 +30,13 @@
 #include "TLSContext.h"
 #include "Test.h"
 
-bool create_account(int soft, int hard)
+bool create_account(int soft, int hard, int account_id)
 {
 	std::string errs;
 	std::auto_ptr<Configuration> config(
 		Configuration::LoadAndVerify
 			("testfiles/bbstored.conf", &BackupConfigFileVerify, errs));
-	BackupStoreAccountControl control(*config, 0x01234567);
+	BackupStoreAccountControl control(*config, account_id);
 	
 	Logger::LevelGuard guard(Logging::GetConsole(), Log::WARNING);
 	int result = control.CreateAccount(0, soft, hard);
