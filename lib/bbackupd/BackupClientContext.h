@@ -11,16 +11,15 @@
 #define BACKUPCLIENTCONTEXT__H
 
 #include "BoxTime.h"
+#include "ConfiguredBackupClient.h"
 #include "BackupClientDeleteList.h"
 #include "BackupClientDirectoryRecord.h"
 #include "BackupDaemonInterface.h"
 #include "BackupStoreFile.h"
 #include "ExcludeList.h"
-#include "TcpNice.h"
 #include "Timer.h"
 
-class TLSContext;
-class SocketStreamTLS;
+class Configuration;
 class BackupClientInodeToIDMap;
 class BackupDaemon;
 class BackupStoreFilenameClear;
@@ -41,16 +40,9 @@ class BackupClientContext : public DiffTimer
 public:
 	BackupClientContext
 	(
+		const Configuration& rConfig,
 		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode
+		ProgressNotifier &rProgressNotifier
 	);
 	virtual ~BackupClientContext();
 
@@ -213,27 +205,18 @@ public:
 	
 	void SetNiceMode(bool enabled)
 	{
-		if(mTcpNiceMode)
-		{
-#ifdef ENABLE_TCP_NICE
-			mpNice->SetEnabled(enabled);
-#endif
-		}
+		mapConnection->SetNiceMode(enabled);
 	}
 
-	bool mExperimentalSnapshotMode;
-
 private:
+	// Initialisation state:
+	const Configuration &mrConfig;
 	LocationResolver &mrResolver;
-	TLSContext &mrTLSContext;
-	std::string mHostname;
-	int mPort;
-	uint32_t mAccountNumber;
-	std::auto_ptr<BackupProtocolCallable> mapConnection;
-	bool mExtendedLogging;
-	bool mExtendedLogToFile;
-	std::string mExtendedLogFile;
-	FILE* mpExtendedLogFileHandle;
+	ProgressNotifier &mrProgressNotifier;
+	bool mTcpNiceMode;
+
+	// Working state:
+	std::auto_ptr<ConfiguredBackupClient> mapConnection;
 	int64_t mClientStoreMarker;
 	BackupClientDeleteList *mpDeleteList;
 	const BackupClientInodeToIDMap *mpCurrentIDMap;
@@ -245,11 +228,6 @@ private:
 	bool mbIsManaged;
 	int mKeepAliveTime;
 	int mMaximumDiffingTime;
-	ProgressNotifier &mrProgressNotifier;
-	bool mTcpNiceMode;
-#ifdef ENABLE_TCP_NICE
-	NiceSocketStream *mpNice;
-#endif
 };
 
 #endif // BACKUPCLIENTCONTEXT__H

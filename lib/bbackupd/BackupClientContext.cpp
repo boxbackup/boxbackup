@@ -20,6 +20,7 @@
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
 #include "BackupClientContext.h"
+#include "ConfiguredBackupClient.h"
 #include "SocketStreamTLS.h"
 #include "Socket.h"
 #include "BackupStoreConstants.h"
@@ -28,7 +29,6 @@
 #include "autogen_BackupProtocol.h"
 #include "BackupStoreFile.h"
 #include "Logging.h"
-#include "TcpNice.h"
 
 #include "MemLeakFindOn.h"
 
@@ -42,43 +42,25 @@
 // --------------------------------------------------------------------------
 BackupClientContext::BackupClientContext
 (
+	const Configuration& rConfig,
 	LocationResolver &rResolver,
-	TLSContext &rTLSContext,
-	const std::string &rHostname,
-	int Port,
-	uint32_t AccountNumber,
-	bool ExtendedLogging,
-	bool ExtendedLogToFile,
-	std::string ExtendedLogFile,
-	ProgressNotifier& rProgressNotifier,
-	bool TcpNiceMode
+	ProgressNotifier& rProgressNotifier
 )
-: mExperimentalSnapshotMode(false),
+: mrConfig(rConfig),
   mrResolver(rResolver),
-  mrTLSContext(rTLSContext),
-  mHostname(rHostname),
-  mPort(Port),
-  mAccountNumber(AccountNumber),
-  mExtendedLogging(ExtendedLogging),
-  mExtendedLogToFile(ExtendedLogToFile),
-  mExtendedLogFile(ExtendedLogFile),
-  mpExtendedLogFileHandle(NULL),
+  mrProgressNotifier(rProgressNotifier),
   mClientStoreMarker(ClientStoreMarker_NotKnown),
-  mpDeleteList(0),
-  mpCurrentIDMap(0),
-  mpNewIDMap(0),
+  mpDeleteList(NULL),
+  mpCurrentIDMap(NULL),
+  mpNewIDMap(NULL),
   mStorageLimitExceeded(false),
-  mpExcludeFiles(0),
-  mpExcludeDirs(0),
+  mpExcludeFiles(NULL),
+  mpExcludeDirs(NULL),
   mKeepAliveTimer(0, "KeepAliveTime"),
   mbIsManaged(false),
-  mrProgressNotifier(rProgressNotifier),
-  mTcpNiceMode(TcpNiceMode)
-#ifdef ENABLE_TCP_NICE
-  , mpNice(NULL)
-#endif
-{
-}
+  mKeepAliveTime(0),
+  mMaximumDiffingTime(0)
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -120,84 +102,17 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 	// Defensive. Must close connection before releasing any old socket.
 	mapConnection.reset();
 
-	std::auto_ptr<SocketStream> apSocket(new SocketStreamTLS);
-
 	try
 	{
-		// Defensive.
-		mapConnection.reset();
-
-		// Log intention
-		BOX_INFO("Opening connection to server '" << mHostname <<
-			"'...");
-
-		// Connect!
-		((SocketStreamTLS *)(apSocket.get()))->Open(mrTLSContext,
-			Socket::TypeINET, mHostname, mPort);
-
-		if(mTcpNiceMode)
-		{
-#ifdef ENABLE_TCP_NICE
-			// Pass control of apSocket to NiceSocketStream,
-			// which will take care of destroying it for us.
-			// But we need to hang onto a pointer to the nice
-			// socket, so we can enable and disable nice mode.
-			// This is scary, it could be deallocated under us.
-			mpNice = new NiceSocketStream(apSocket);
-			apSocket.reset(mpNice);
-#else
-			BOX_WARNING("TcpNice option is enabled but not supported on this system");
-#endif
-		}
-
-		// We need to call some methods that aren't defined in
-		// BackupProtocolCallable, so we need to hang onto a more
-		// strongly typed pointer (to avoid far too many casts).
-		BackupProtocolClient *pClient = new BackupProtocolClient(apSocket);
-		mapConnection.reset(pClient);
-
-		// Set logging option
-		mapConnection->SetLogToSysLog(mExtendedLogging);
-
-		if (mExtendedLogToFile)
-		{
-			ASSERT(mpExtendedLogFileHandle == NULL);
-
-			mpExtendedLogFileHandle = fopen(
-				mExtendedLogFile.c_str(), "a+");
-
-			if (!mpExtendedLogFileHandle)
-			{
-				BOX_LOG_SYS_ERROR("Failed to open extended "
-					"log file: " << mExtendedLogFile);
-			}
-			else
-			{
-				mapConnection->SetLogToFile(mpExtendedLogFileHandle);
-			}
-		}
-
-		// Handshake
-		pClient->Handshake();
-
-		// Check the version of the server
-		{
-			std::auto_ptr<BackupProtocolVersion> serverVersion(
-				mapConnection->QueryVersion(BACKUP_STORE_SERVER_VERSION));
-			if(serverVersion->GetVersion() != BACKUP_STORE_SERVER_VERSION)
-			{
-				THROW_EXCEPTION(BackupStoreException, WrongServerVersion)
-			}
-		}
+		mapConnection = GetConfiguredBackupClient(mrConfig, false); // !read_only
 
 		// Login -- if this fails, the Protocol will exception
-		std::auto_ptr<BackupProtocolLoginConfirmed> loginConf(
-			mapConnection->QueryLogin(mAccountNumber, 0 /* read/write */));
+		BackupProtocolLoginConfirmed& login_conf(mapConnection->GetLoginConfirmed());
 
-		// Check that the client store marker is the one we expect
+		// If reconnecting, check that the client store marker is the one we expect:
 		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
 		{
-			if(loginConf->GetClientStoreMarker() != mClientStoreMarker)
+			if(login_conf.GetClientStoreMarker() != mClientStoreMarker)
 			{
 				// Not good... finish the connection, abort, etc, ignoring errors
 				try
@@ -213,7 +128,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 				THROW_EXCEPTION_MESSAGE(BackupStoreException,
 					ClientMarkerNotAsExpected,
 					"Expected " << mClientStoreMarker <<
-					" but found " << loginConf->GetClientStoreMarker() <<
+					" but found " << login_conf.GetClientStoreMarker() <<
 					": is someone else writing to the "
 					"same account?");
 			}
@@ -234,11 +149,10 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 		BOX_INFO("Connection made, login successful");
 
 		// Check to see if there is any space available on the server
-		if(loginConf->GetBlocksUsed() >= loginConf->GetBlocksHardLimit())
+		if(login_conf.GetBlocksUsed() >= login_conf.GetBlocksHardLimit())
 		{
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
-			// Log
 			BOX_WARNING("Exceeded storage hard-limit on server, "
 				"not uploading changes to files");
 		}
@@ -291,14 +205,7 @@ void BackupClientContext::CloseAnyOpenConnection()
 		delete mpDeleteList;
 		mpDeleteList = 0;
 	}
-
-	if (mpExtendedLogFileHandle != NULL)
-	{
-		fclose(mpExtendedLogFileHandle);
-		mpExtendedLogFileHandle = NULL;
-	}
 }
-
 
 
 // --------------------------------------------------------------------------

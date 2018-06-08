@@ -19,10 +19,8 @@
 #include "BoxTime.h"
 #include "Daemon.h"
 #include "Logging.h"
-#include "Socket.h"
 #include "SocketListen.h"
 #include "SocketStream.h"
-#include "TLSContext.h"
 
 #include "autogen_BackupProtocol.h"
 #include "autogen_BackupStoreException.h"
@@ -150,15 +148,7 @@ protected:
 	virtual std::auto_ptr<BackupClientContext> GetNewContext
 	(
 		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode
+		ProgressNotifier &rProgressNotifier
 	);
 
 private:
@@ -245,7 +235,6 @@ private:
 	box_time_t mLastSyncTime, mNextSyncTime;
 	box_time_t mCurrentSyncStartTime, mUpdateStoreInterval,
 		  mBackupErrorDelay;
-	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
 	int64_t mNumFilesUploaded, mNumDirsCreated;

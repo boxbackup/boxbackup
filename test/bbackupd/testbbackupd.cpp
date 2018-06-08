@@ -967,22 +967,12 @@ public:
 
 	MockClientContext
 	(
+		const Configuration& rConfig,
 		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
 		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode,
 		BackupProtocolCallable& rClient
 	)
-	: BackupClientContext(rResolver, rTLSContext,
-		rHostname, Port, AccountNumber, ExtendedLogging,
-		ExtendedLogToFile, ExtendedLogFile,
-		rProgressNotifier, TcpNiceMode),
+	: BackupClientContext(rConfig, rResolver, rProgressNotifier),
 	  mrClient(rClient),
 	  mNumKeepAlivesPolled(0),
 	  mKeepAliveTime(-1)
@@ -1023,23 +1013,12 @@ public:
 	std::auto_ptr<BackupClientContext> GetNewContext
 	(
 		LocationResolver &rResolver,
-		TLSContext &rTLSContext,
-		const std::string &rHostname,
-		int32_t Port,
-		uint32_t AccountNumber,
-		bool ExtendedLogging,
-		bool ExtendedLogToFile,
-		std::string ExtendedLogFile,
-		ProgressNotifier &rProgressNotifier,
-		bool TcpNiceMode
+		ProgressNotifier &rProgressNotifier
 	)
 	{
 		std::auto_ptr<BackupClientContext> context(
-			new MockClientContext(rResolver,
-				rTLSContext, rHostname, Port,
-				AccountNumber, ExtendedLogging,
-				ExtendedLogToFile, ExtendedLogFile,
-				rProgressNotifier, TcpNiceMode, mrClient));
+			new MockClientContext(GetConfiguration(), rResolver, rProgressNotifier,
+				mrClient));
 		return context;
 	}
 };
@@ -1211,16 +1190,9 @@ bool test_backup_disappearing_directory()
 
 	BackupClientContext clientContext
 	(
+		bbackupd.GetConfiguration(),
 		bbackupd, // rLocationResolver
-		sTlsContext,
-		"localhost",
-		BOX_PORT_BBSTORED_TEST,
-		0x01234567,
-		false, // ExtendedLogging
-		false, // ExtendedLogFile
-		"", // extendedLogFile
-		bbackupd, // rProgressNotifier
-		false // TcpNice
+		bbackupd // rProgressNotifier
 	);
 
 	BackupClientInodeToIDMap oldMap, newMap;
@@ -1332,16 +1304,9 @@ bool test_ssl_keepalives()
 	// but doesn't send anything at the beginning:
 	{
 		MockClientContext context(
-			bbackupd, // rResolver
-			sTlsContext, // rTLSContext
-			"localhost", // rHostname
-			BOX_PORT_BBSTORED_TEST,
-			0x01234567, // AccountNumber
-			false, // ExtendedLogging
-			false, // ExtendedLogToFile
-			"", // ExtendedLogFile
+			bbackupd.GetConfiguration(),
+			bbackupd, // rLocationResolver
 			bbackupd, // rProgressNotifier
-			false, // TcpNiceMode
 			connection); // rClient
 
 		// Set the timeout to 1 second

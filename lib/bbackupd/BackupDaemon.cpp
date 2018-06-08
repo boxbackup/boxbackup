@@ -576,11 +576,6 @@ void BackupDaemon::InitCrypto()
 {
 	// Read in the certificates creating a TLS context
 	const Configuration &conf(GetConfiguration());
-	std::string certFile(conf.GetKeyValue("CertificateFile"));
-	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
-	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
-	mTlsContext.Initialise(false /* as client */, certFile.c_str(),
-		keyFile.c_str(), caFile.c_str());
 	
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile"));
@@ -899,21 +894,11 @@ void BackupDaemon::ResetCachedState()
 std::auto_ptr<BackupClientContext> BackupDaemon::GetNewContext
 (
 	LocationResolver &rResolver,
-	TLSContext &rTLSContext,
-	const std::string &rHostname,
-	int32_t Port,
-	uint32_t AccountNumber,
-	bool ExtendedLogging,
-	bool ExtendedLogToFile,
-	std::string ExtendedLogFile,
-	ProgressNotifier &rProgressNotifier,
-	bool TcpNiceMode
+	ProgressNotifier &rProgressNotifier
 )
 {
 	std::auto_ptr<BackupClientContext> context(new BackupClientContext(
-		rResolver, rTLSContext, rHostname, Port, AccountNumber,
-		ExtendedLogging, ExtendedLogToFile, ExtendedLogFile,
-		rProgressNotifier, TcpNiceMode));
+		GetConfiguration(), rResolver, rProgressNotifier));
 	return context;
 }
 
@@ -961,12 +946,6 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 			level, !overwrite));
 	}
 
-	std::string extendedLogFile;
-	if (conf.KeyExists("ExtendedLogFile"))
-	{
-		extendedLogFile = conf.GetKeyValue("ExtendedLogFile");
-	}
-
 	if (conf.KeyExists("LogAllFileAccess"))
 	{
 		mLogAllFileAccess = conf.GetKeyValueBool("LogAllFileAccess");
@@ -976,15 +955,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 	// just connect, as this may be unnecessary)
 	mapClientContext = GetNewContext(
 		*mpLocationResolver,
-		mTlsContext,
-		conf.GetKeyValue("StoreHostname"),
-		conf.GetKeyValueInt("StorePort"),
-		conf.GetKeyValueUint32("AccountNumber"),
-		conf.GetKeyValueBool("ExtendedLogging"),
-		conf.KeyExists("ExtendedLogFile"),
-		extendedLogFile,
-		*mpProgressNotifier,
-		conf.GetKeyValueBool("TcpNice")
+		*mpProgressNotifier
 	);
 
 	// The minimum age a file needs to be before it will be
