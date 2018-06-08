@@ -196,12 +196,6 @@ public:
 	std::auto_ptr<IOStream> GetBlockIndexReconstructed(int64_t ObjectID, int64_t InDirectory);
 
 	// Info
-	// GetClientID() is only used by BackupProtocolLogin::DoCommand to check that the supplied
-	// ID matches the one in the certificate, which BackupStoreDaemon supplies when it
-	// constructs the BackupStoreContext. Thus it is only used, and only initialised, when
-	// constructed by the non-BackupFileSystem constructor, which only BackupStoreDaemon
-	// should use.
-	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 	std::string GetAccountIdentifier();
 	virtual int GetBlockSize() { return mpFileSystem->GetBlockSize(); }
