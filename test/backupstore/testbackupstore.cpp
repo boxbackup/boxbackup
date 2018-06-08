@@ -2365,7 +2365,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 	// Try network connections too (but only for store tests):
 	if(spec.name() == "store")
 	{
-		TEST_THAT_OR(StartServer(), return false);
+		TEST_THAT(StartServer());
 
 		BOX_TRACE("Opening read-write connection (expected to fail to get a write lock)");
 		BackupProtocolClient protocol_writable_3(open_conn("localhost", tls_context));
@@ -2389,6 +2389,8 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 					BackupProtocolLogin::Flags_ReadOnly));
 			TEST_EQUAL(0x8732523ab23aLL, loginConf->GetClientStoreMarker());
 		}
+
+		TEST_THAT(StopServer());
 	}
 
 	protocol_writable.QueryFinished();
