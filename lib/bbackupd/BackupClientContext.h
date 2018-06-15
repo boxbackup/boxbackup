@@ -203,8 +203,10 @@ public:
 		return mrProgressNotifier;
 	}
 	
-	void SetNiceMode(bool enabled)
+	virtual void SetNiceMode(bool enabled)
 	{
+		// If subclasses override GetConnection() and do not initialise mapConnection, then
+		// they must override this method too.
 		mapConnection->SetNiceMode(enabled);
 	}
 
@@ -216,6 +218,8 @@ private:
 	bool mTcpNiceMode;
 
 	// Working state:
+	// Do not use mapConnection outside of GetConnection(), so that subclasses can just override
+	// that method.
 	std::auto_ptr<ConfiguredBackupClient> mapConnection;
 	int64_t mClientStoreMarker;
 	BackupClientDeleteList *mpDeleteList;

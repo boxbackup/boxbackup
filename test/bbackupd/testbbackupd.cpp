@@ -978,6 +978,10 @@ public:
 	  mKeepAliveTime(-1)
 	{ }
 
+	// Because we don't set mapConnection, we need to override SetNiceMode too:
+	virtual void SetNiceMode(bool enabled)
+	{ }
+
 	BackupProtocolCallable &GetConnection()
 	{
 		return mrClient;
