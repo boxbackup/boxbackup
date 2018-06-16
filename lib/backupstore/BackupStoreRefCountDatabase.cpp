@@ -195,9 +195,8 @@ void BackupStoreRefCountDatabaseImpl::Commit()
 
 	if(rename(mFilename.c_str(), mFinalFilename.c_str()) != 0)
 	{
-		THROW_EMU_ERROR("Failed to rename temporary refcount database "
-			"file from " << mFilename << " to " <<
-			mFinalFilename, CommonException, OSFileError);
+		THROW_EMU_ERROR("Failed to rename temporary refcount database file from " <<
+			mFilename << " to " << mFinalFilename, CommonException, OSFileError);
 	}
 
 	mFilename = mFinalFilename;

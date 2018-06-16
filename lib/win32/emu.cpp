@@ -1870,6 +1870,34 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 	// requiring callers to implement it themselves:
 	BOOL result = MoveFileExW(pOldBuffer, pNewBuffer, MOVEFILE_REPLACE_EXISTING);
 	winerrno = GetLastError();
+
+	if(!result && winerrno == ERROR_ACCESS_DENIED)
+	{
+		// This is evil. "Even though you've called CloseHandle on the file handle, the
+		// kernel may still have outstanding references that take a few milliseconds to
+		// close... Windows is notorious for this issue. sqlite handles the problem by
+		// retrying the delete operation every 100 milliseconds up to a maximum number."
+		// https://stackoverflow.com/questions/1753209/deletefile-fails-on-recently-closed-file
+
+		for(int i = 0; i < 10 && winerrno == ERROR_ACCESS_DENIED; i++)
+		{
+			::syslog(LOG_WARNING, "Failed to rename file from '%s' to '%s', sleeping "
+				"and trying again", pOldFileName, pNewFileName);
+			Sleep(100);
+
+			result = MoveFileExW(pOldBuffer, pNewBuffer, MOVEFILE_REPLACE_EXISTING);
+
+			if(result)
+			{
+				break;
+			}
+			else
+			{
+				winerrno = GetLastError();
+			}
+		}
+	}
+
 	delete [] pOldBuffer;
 	delete [] pNewBuffer;
 
