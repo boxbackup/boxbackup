@@ -2306,7 +2306,12 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 {
 	// Temporarily increase logging level to trace, to show stack traces on exceptions, to help
 	// debug random failures of this test on AppVeyor.
-	Logger::LevelGuard guard(Logging::GetConsole(), Log::TRACE);
+	Logger::LevelGuard log_all_trace(Logging::GetConsole(), Log::TRACE);
+
+	// Teardown calls check_account_and_fix_errors with the default logging level, WARNING,
+	// which silences log messages about opening files that we want to see, so override them:
+	LogLevelOverrideByFileGuard log_filestream_trace("FileStream.cpp", "", Log::TRACE);
+	log_filestream_trace.Install();
 
 	SETUP_TEST_SPECIALISED(spec);
 	BackupFileSystem& fs(spec.control().GetFileSystem());

@@ -1111,13 +1111,18 @@ bool test_getobject_on_nonexistent_file()
 		Logging::TempLoggerGuard guard(&capture);
 		query.CommandGetObject(args, opts);
 		std::vector<Capture::Message> messages = capture.GetMessages();
-		TEST_THAT(!messages.empty());
-		if (!messages.empty())
+
+		bool found = false;
+		for(std::vector<Capture::Message>::iterator
+			i = messages.begin(); i != messages.end(); i++)
 		{
-			std::string last_message = messages.back().message;
-			TEST_EQUAL("Object ID 0x2 does not exist on store.",
-				last_message);
+			if(i->message == "Object ID 0x2 does not exist on store.")
+			{
+				found = true;
+				break;
+			}
 		}
+		TEST_LINE(found, "Last log message was: " << messages.back().message);
 	}
 
 	TEARDOWN_TEST_BBACKUPD();

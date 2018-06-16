@@ -34,6 +34,7 @@
 
 #include "MemLeakFindOn.h"
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -46,10 +47,12 @@ FileStream::FileStream(const std::string& mFileName, int flags, int mode,
 	lock_mode_t lock_mode, bool delete_asap)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
-  mFileName(mFileName)
+  mFileName(mFileName),
+  mLockMode(lock_mode)
 {
 	OpenFile(flags, mode, lock_mode, delete_asap);
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -64,10 +67,12 @@ FileStream::FileStream(const char *pFilename, int flags, int mode,
 	lock_mode_t lock_mode, bool delete_asap)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
-  mFileName(pFilename)
+  mFileName(pFilename),
+  mLockMode(lock_mode)
 {
 	OpenFile(flags, mode, lock_mode, delete_asap);
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -81,7 +86,8 @@ FileStream::FileStream(tOSFileHandle FileDescriptor, const std::string& rFilenam
 	bool delete_asap)
 : mOSFileHandle(FileDescriptor),
   mIsEOF(false),
-  mFileName(rFilename)
+  mFileName(rFilename),
+  mLockMode(UNKNOWN)
 {
 	if(mOSFileHandle == INVALID_FILE)
 	{
@@ -92,17 +98,26 @@ FileStream::FileStream(tOSFileHandle FileDescriptor, const std::string& rFilenam
 	AfterOpen(delete_asap);
 }
 
-void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap)
+int FileStream::GetLockFlags(std::string* pMessage)
 {
 	std::string lock_method_name, lock_message;
+	int flags = 0;
 
-	if(lock_mode == EXCLUSIVE)
+	if(mLockMode == NONE)
+	{
+		lock_message = "no lock";
+	}
+	else if(mLockMode == UNKNOWN)
+	{
+		lock_message = "unknown locking";
+	}
+	else if(mLockMode == EXCLUSIVE)
 	{
 #ifdef BOX_LOCK_TYPE_O_EXLOCK
-		flags |= O_NONBLOCK | O_EXLOCK;
+		flags = O_NONBLOCK | O_EXLOCK;
 		lock_method_name = "O_EXLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
-		flags |= BOX_OPEN_LOCK;
+		flags = BOX_OPEN_LOCK;
 		lock_method_name = "dwShareMode 0";
 #elif defined BOX_LOCK_TYPE_F_OFD_SETLK
 		lock_method_name = "F_OFD_SETLK, F_WRLCK";
@@ -112,17 +127,17 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 		lock_method_name = "flock(LOCK_EX)";
 #elif defined BOX_LOCK_TYPE_DUMB
 		// We have no other way to get a lock, so this is equivalent to O_EXCL.
-		flags |= O_EXCL;
+		flags = O_EXCL;
 		lock_method_name = "O_EXCL";
 #else
 #	error "Unknown locking type"
 #endif
-		lock_message = std::string("exclusively using ") + lock_method_name;
+		lock_message = std::string("exclusive lock using ") + lock_method_name;
 	}
-	else
+	else if(mLockMode == SHARED)
 	{
 #ifdef BOX_LOCK_TYPE_O_EXLOCK
-		flags |= O_NONBLOCK | O_SHLOCK;
+		flags = O_NONBLOCK | O_SHLOCK;
 		lock_method_name = "O_SHLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
 		// no extra flags needed for FILE_SHARE_READ | FILE_SHARE_WRITE
@@ -138,11 +153,29 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 #else
 #	error "Unknown locking type"
 #endif
-		lock_message = std::string("shared using ") + lock_method_name;
+		lock_message = std::string("shared lock using ") + lock_method_name;
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, AssertFailed,
+			"Invalid lock mode: " << mLockMode);
 	}
 
+	if(pMessage != NULL)
+	{
+		*pMessage = lock_message;
+	}
+
+	return flags;
+}
+
+void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap)
+{
+	std::string lock_message;
+	flags |= GetLockFlags(&lock_message);
+
 	BOX_TRACE("Trying to " << (mode & O_CREAT ? "create" : "open") << " " <<
-		(delete_asap ? "temporary " : "") << mFileName << " " << lock_message);
+		(delete_asap ? "temporary " : "") << mFileName << " with " << lock_message);
 
 #ifdef WIN32
 	if(delete_asap)
@@ -166,14 +199,15 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 #elif defined BOX_LOCK_TYPE_DUMB
 		if(errno == EEXIST)
 #else // F_OFD_SETLK, F_SETLK or FLOCK
-		if(false)
+		if(false) // we didn't try to lock on open, so it's not a lock conflict
 #endif
 		{
 			// We failed to lock the file, which means that it's locked by someone else.
 			// Need to throw a specific exception that's expected by NamedLock, which
 			// should just return false in this case (and only this case).
 			THROW_EXCEPTION_MESSAGE(CommonException, FileLockingConflict,
-				BOX_FILE_MESSAGE(mFileName, "File already locked by another process"));
+				BOX_FILE_MESSAGE(mFileName, "Failed to acquire " << lock_message <<
+					": file already locked by another process"));
 		}
 		else if(errno == EACCES)
 		{
@@ -189,49 +223,53 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 
 	bool lock_failed = false;
 
+	if(lock_mode == SHARED || lock_mode == EXCLUSIVE)
+	{
 #ifdef BOX_LOCK_TYPE_FLOCK
-	BOX_TRACE("Trying to lock " << mFileName << " " << lock_message);
-	if(::flock(mOSFileHandle, (lock_mode == SHARED ? LOCK_SH : LOCK_EX) | LOCK_NB) != 0)
-	{
-		Close();
+		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
+		int flock_op;
+		if(::flock(mOSFileHandle, (lock_mode == SHARED ? LOCK_SH : LOCK_EX) | LOCK_NB) != 0)
+		{
+			Close();
 
-		if(errno == EWOULDBLOCK)
-		{
-			lock_failed = true;
+			if(errno == EWOULDBLOCK)
+			{
+				lock_failed = true;
+			}
+			else
+			{
+				THROW_SYS_FILE_ERROR("Failed to acquire " << lock_message,
+					mFileName, CommonException, OSFileError);
+			}
 		}
-		else
-		{
-			THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
-				mFileName, CommonException, OSFileError);
-		}
-	}
 #elif defined BOX_LOCK_TYPE_F_SETLK || defined BOX_LOCK_TYPE_F_OFD_SETLK
-	struct flock desc;
-	desc.l_type = (lock_mode == SHARED ? F_RDLCK : F_WRLCK);
-	desc.l_whence = SEEK_SET;
-	desc.l_start = 0;
-	desc.l_len = 0;
-	desc.l_pid = 0;
-	BOX_TRACE("Trying to lock " << mFileName << " " << lock_message);
+		struct flock desc;
+		desc.l_type = (lock_mode == SHARED ? F_RDLCK : F_WRLCK);
+		desc.l_whence = SEEK_SET;
+		desc.l_start = 0;
+		desc.l_len = 0;
+		desc.l_pid = 0;
+		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
 #	if defined BOX_LOCK_TYPE_F_OFD_SETLK
-	if(::fcntl(mOSFileHandle, F_OFD_SETLK, &desc) != 0)
+		if(::fcntl(mOSFileHandle, F_OFD_SETLK, &desc) != 0)
 #	else // BOX_LOCK_TYPE_F_SETLK
-	if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+		if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
 #	endif
-	{
-		Close();
+		{
+			Close();
 
-		if(errno == EAGAIN)
-		{
-			lock_failed = true;
+			if(errno == EAGAIN)
+			{
+				lock_failed = true;
+			}
+			else
+			{
+				THROW_SYS_FILE_ERROR("Failed to acquire " << lock_message,
+					mFileName, CommonException, OSFileError);
+			}
 		}
-		else
-		{
-			THROW_SYS_FILE_ERROR("Failed to lock lockfile " << lock_method_name,
-				mFileName, CommonException, OSFileError);
-		}
-	}
 #endif
+	} // if(lock_mode == SHARED || lock_mode == EXCLUSIVE)
 
 	if(lock_failed)
 	{
@@ -239,7 +277,8 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 		// Need to throw a specific exception that's expected by NamedLock, which
 		// should just return false in this case (and only this case).
 		THROW_EXCEPTION_MESSAGE(CommonException, FileLockingConflict,
-			BOX_FILE_MESSAGE(mFileName, "File already locked by another process"));
+			BOX_FILE_MESSAGE(mFileName, "Failed to acquire " << lock_message << ": "
+				"file already locked by another process"));
 	}
 
 	AfterOpen(delete_asap);
@@ -280,6 +319,7 @@ std::auto_ptr<FileStream> FileStream::CreateTemporaryFile(const std::string& pat
 	return fs;
 }
 
+
 void FileStream::AfterOpen(bool delete_asap)
 {
 	if(delete_asap)
@@ -299,6 +339,7 @@ void FileStream::AfterOpen(bool delete_asap)
 #endif
 	}
 }
+
 
 #if 0
 // --------------------------------------------------------------------------
@@ -325,6 +366,7 @@ FileStream::FileStream(const FileStream &rToCopy)
 }
 #endif // 0
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -340,6 +382,7 @@ FileStream::~FileStream()
 		Close();
 	}
 }
+
 
 // --------------------------------------------------------------------------
 //
@@ -556,6 +599,11 @@ void FileStream::Close()
 		THROW_EXCEPTION(CommonException, FileAlreadyClosed)
 	}
 
+	std::string lock_message;
+	GetLockFlags(&lock_message);
+
+	BOX_TRACE("Closing " << mFileName << " and releasing " << lock_message);
+
 #ifdef WIN32
 	if(::CloseHandle(mOSFileHandle) == 0)
 	{
@@ -575,7 +623,6 @@ void FileStream::Close()
 }
 
 
-
 // --------------------------------------------------------------------------
 //
 // Function
@@ -589,6 +636,7 @@ bool FileStream::StreamDataLeft()
 	return !mIsEOF;
 }
 
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -601,6 +649,7 @@ bool FileStream::StreamClosed()
 {
 	return (mOSFileHandle == INVALID_FILE);
 }
+
 
 // --------------------------------------------------------------------------
 //

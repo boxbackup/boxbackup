@@ -46,6 +46,8 @@ class FileStream : public IOStream
 {
 public:
 	enum lock_mode_t {
+		NONE,
+		UNKNOWN,
 		SHARED,
 		EXCLUSIVE,
 	};
@@ -99,11 +101,13 @@ private:
 	tOSFileHandle mOSFileHandle;
 	bool mIsEOF;
 	FileStream(const FileStream &rToCopy) { /* do not call */ }
+	int GetLockFlags(std::string* pMessage = NULL);
 	void OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap);
 	void AfterOpen(bool delete_asap);
 
 	// for debugging..
 	std::string mFileName;
+	lock_mode_t mLockMode;
 };
 
 
