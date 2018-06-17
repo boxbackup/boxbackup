@@ -46,6 +46,8 @@ BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+BOX_CHECK_CXX_FLAG(-Werror=infinite-recursion)
+BOX_CHECK_CXX_FLAG(-Werror=array-bounds)
 # Using Boost properly seems to need C++0x, or at least the "auto" type.
 # We don't need CMake to parse this, because it has built-in feature detecting macros
 # which we use instead:
