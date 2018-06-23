@@ -182,28 +182,30 @@ BackupProtocolCallable* BackupClientContext::GetOpenConnection() const
 // --------------------------------------------------------------------------
 void BackupClientContext::CloseAnyOpenConnection()
 {
-	BackupProtocolCallable* pConnection(GetOpenConnection());
-	if(pConnection)
-	{
-		try
-		{
-			// Quit nicely
-			pConnection->QueryFinished();
-		}
-		catch(...)
-		{
-			// Ignore errors here
-		}
-
-		// Delete it anyway.
-		mapConnection.reset();
-	}
-
 	// Delete any pending list
 	if(mpDeleteList != 0)
 	{
 		delete mpDeleteList;
 		mpDeleteList = 0;
+	}
+
+	BackupProtocolCallable* pConnection(GetOpenConnection());
+	if(pConnection)
+	{
+		try
+		{
+			// Quit nicely:
+			pConnection->QueryFinished();
+		}
+		catch(...)
+		{
+			// Close the connection anyway:
+			mapConnection.reset();
+			throw;
+		}
+
+		// Close the connection
+		mapConnection.reset();
 	}
 }
 
