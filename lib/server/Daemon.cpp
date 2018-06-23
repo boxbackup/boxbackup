@@ -717,7 +717,8 @@ void Daemon::WritePidFile()
 		std::string pid_str = pid_buf.str();
 
 		mapPidFile->Write(pid_str);
-		mapPidFile.reset();
+		// Do not close the PID file. We want it to stay locked, to prevent another daemon
+		// starting and overwriting it.
 	}
 }
 
