@@ -31,7 +31,7 @@ CollectInBufferStream::CollectInBufferStream()
 	: mBuffer(INITIAL_BUFFER_SIZE),
 	  mBufferSize(INITIAL_BUFFER_SIZE),
 	  mBytesInBuffer(0),
-	  mReadPosition(0),
+	  mCurrentPosition(0),
 	  mInWritePhase(true)
 {
 }
@@ -64,16 +64,16 @@ int CollectInBufferStream::Read(void *pBuffer, int NBytes, int Timeout)
 	}
 	
 	// Adjust to number of bytes left
-	if(NBytes > (mBytesInBuffer - mReadPosition))
+	if(NBytes > (mBytesInBuffer - mCurrentPosition))
 	{
-		NBytes = (mBytesInBuffer - mReadPosition);
+		NBytes = (mBytesInBuffer - mCurrentPosition);
 	}
 	ASSERT(NBytes >= 0);
 	if(NBytes <= 0) return 0;	// careful now
 	
 	// Copy in the requested number of bytes and adjust the read pointer
-	::memcpy(pBuffer, ((char*)mBuffer) + mReadPosition, NBytes);
-	mReadPosition += NBytes;
+	::memcpy(pBuffer, ((char*)mBuffer) + mCurrentPosition, NBytes);
+	mCurrentPosition += NBytes;
 	
 	return NBytes;
 }
@@ -90,7 +90,7 @@ IOStream::pos_type CollectInBufferStream::BytesLeftToRead()
 {
 	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
-	return (mBytesInBuffer - mReadPosition);
+	return (mBytesInBuffer - mCurrentPosition);
 }
 
 // --------------------------------------------------------------------------
@@ -107,7 +107,7 @@ void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 	if(mInWritePhase != true) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
 	
 	// Enough space in the buffer
-	if((mBytesInBuffer + NBytes) > mBufferSize)
+	if((mCurrentPosition + NBytes) > mBufferSize)
 	{
 		// Need to reallocate... what's the block size we'll use?
 		int allocateBlockSize = mBufferSize;
@@ -118,21 +118,32 @@ void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 		
 		// Write it the easy way. Although it's not the most efficient...
 		int newSize = mBufferSize;
-		while(newSize < (mBytesInBuffer + NBytes))
+		while(newSize < (mCurrentPosition + NBytes))
 		{
 			newSize += allocateBlockSize;
 		}
 		
 		// Reallocate buffer
 		mBuffer.Resize(newSize);
-		
+
 		// Store new size
 		mBufferSize = newSize;
 	}
+
+	// If we are skipping ahead, then fill empty space with zero bytes
+	if(mCurrentPosition > mBytesInBuffer)
+	{
+		memset(mBuffer + mBytesInBuffer, 0, (mCurrentPosition - mBytesInBuffer));
+	}
 	
 	// Copy in data and adjust counter
-	::memcpy(((char*)mBuffer) + mBytesInBuffer, pBuffer, NBytes);
-	mBytesInBuffer += NBytes;
+	::memcpy(((char*)mBuffer) + mCurrentPosition, pBuffer, NBytes);
+	mCurrentPosition += NBytes;
+
+	if(mBytesInBuffer < mCurrentPosition)
+	{
+		mBytesInBuffer = mCurrentPosition;
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -146,7 +157,7 @@ void CollectInBufferStream::Write(const void *pBuffer, int NBytes, int Timeout)
 // --------------------------------------------------------------------------
 IOStream::pos_type CollectInBufferStream::GetPosition() const
 {
-	return mInWritePhase?mBytesInBuffer:mReadPosition;
+	return mCurrentPosition;
 }
 
 // --------------------------------------------------------------------------
@@ -159,8 +170,6 @@ IOStream::pos_type CollectInBufferStream::GetPosition() const
 // --------------------------------------------------------------------------
 void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 {
-	if(mInWritePhase != false) { THROW_EXCEPTION(CommonException, CollectInBufferStreamNotInCorrectPhase) }
-	
 	int newPos = 0;
 	switch(SeekType)
 	{
@@ -168,7 +177,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 		newPos = Offset;
 		break;
 	case IOStream::SeekType_Relative:
-		newPos = mReadPosition + Offset;
+		newPos = mCurrentPosition + Offset;
 		break;
 	case IOStream::SeekType_End:
 		newPos = mBytesInBuffer + Offset;
@@ -178,11 +187,12 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 		break;
 	}
 	
-	// Make sure it doesn't go over
-	if(newPos > mBytesInBuffer)
+	// When in read phase, make sure it doesn't go past end of file:
+	if(!mInWritePhase && newPos > mBytesInBuffer)
 	{
 		newPos = mBytesInBuffer;
 	}
+
 	// or under
 	if(newPos < 0)
 	{
@@ -190,7 +200,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 	}
 	
 	// Set the new read position
-	mReadPosition = newPos;
+	mCurrentPosition = newPos;
 }
 
 // --------------------------------------------------------------------------
@@ -203,7 +213,7 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 bool CollectInBufferStream::StreamDataLeft()
 {
-	return mInWritePhase?(false):(mReadPosition < mBytesInBuffer);
+	return mInWritePhase?(false):(mCurrentPosition < mBytesInBuffer);
 }
 
 // --------------------------------------------------------------------------
@@ -236,6 +246,7 @@ void CollectInBufferStream::SetForReading()
 	
 	// Move to read phase
 	mInWritePhase = false;
+	mCurrentPosition = 0;
 }
 
 // --------------------------------------------------------------------------
@@ -276,6 +287,6 @@ void CollectInBufferStream::Reset()
 {
 	mInWritePhase = true;
 	mBytesInBuffer = 0;
-	mReadPosition = 0;
+	mCurrentPosition = 0;
 }
 

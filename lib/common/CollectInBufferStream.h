@@ -32,7 +32,7 @@ public:
 	: mBuffer(rOther.mBuffer.Release()),
 	  mBufferSize(rOther.mBufferSize),
 	  mBytesInBuffer(rOther.mBytesInBuffer),
-	  mReadPosition(rOther.mReadPosition),
+	  mCurrentPosition(rOther.mCurrentPosition),
 	  mInWritePhase(rOther.mInWritePhase)
 	{
 		rOther.Reset();
@@ -61,7 +61,7 @@ private:
 	MemoryBlockGuard<char*> mBuffer;
 	int mBufferSize;
 	int mBytesInBuffer;
-	int mReadPosition;
+	int mCurrentPosition;
 	bool mInWritePhase;
 };
 
