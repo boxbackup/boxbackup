@@ -48,11 +48,10 @@ protected:
 public:
 	virtual ~BackupStoreRefCountDatabase() { }
 
-	// Create a blank database, using a temporary file that you must
-	// Discard() or Commit() to make permanent.
-	virtual void Commit() = 0;
-	virtual void Discard() = 0;
-	virtual void Close() = 0;
+	// Three routes to close a refcount DB. Choose only one:
+	virtual void Commit() = 0; // for potential DBs only
+	virtual void Discard() = 0; // for potential and temporary DBs
+	virtual void Close() = 0; // for permanent DBs only
 
 	// I'm not sure that Reopen() is a good idea, but it's part of BackupFileSystem's
 	// API that it manages the lifetime of two BackupStoreRefCountDatabases, and
@@ -68,12 +67,15 @@ public:
 	// Create a new empty database:
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const BackupStoreAccountDatabase::Entry& rAccount);
+	// Create a blank database, which is temporary if reuse_existing_file is true, and can only
+	// be Discard()ed, or potential if !reuse_existing_file (you can Discard() or Commit() it,
+	// the latter of which makes it permanent):
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const std::string& Filename, int64_t AccountID, bool reuse_existing_file = false);
 	// Load it from the store
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
 		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
-	// Load it from a stream (file or RaidFile)
+	// Open an existing, permanent refcount DB stored in a file:
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
 		const std::string& FileName, int64_t AccountID, bool ReadOnly);
 	static std::string GetFilename(const BackupStoreAccountDatabase::Entry&

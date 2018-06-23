@@ -78,9 +78,11 @@ public:
 		(const BackupStoreAccountDatabase::Entry& rAccount);
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
 		(const std::string& Filename, int64_t AccountID);
-	void Commit();
-	void Discard();
-	void Close()
+
+	// Three routes to close a refcount DB. Choose only one:
+	void Commit(); // for potential DBs only
+	void Discard(); // for potential and temporary DBs
+	void Close() // for temporary and permanent DBs only
 	{
 		// If this was a potential database, it should have been
 		// Commit()ed or Discard()ed first.
@@ -496,6 +498,7 @@ refcount_t BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t ObjectID) const
 
 int64_t BackupStoreRefCountDatabaseImpl::GetLastObjectIDUsed() const
 {
+	ASSERT((GetSize() - sizeof(refcount_StreamFormat)) % sizeof(refcount_t) == 0);
 	return (GetSize() - sizeof(refcount_StreamFormat)) /
 		sizeof(refcount_t);
 }
