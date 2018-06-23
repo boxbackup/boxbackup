@@ -1081,9 +1081,11 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// to actually upload the file.
 			rContext.GetConnection();
 
+			bool uploadSuccess = false;
+
 			// Only do this step if there is room on the server.
 			// This step will be repeated later when there is space available
-			if(!rContext.StorageLimitExceeded())
+			for(int retries = 10; retries > 0 && !rContext.StorageLimitExceeded(); retries--)
 			{
 				// Upload the file to the server, recording the
 				// object ID it returns
@@ -1092,7 +1094,6 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				
 				// Surround this in a try/catch block, to
 				// catch errors, but still continue
-				bool uploadSuccess = false;
 				try
 				{
 					latestObjectID = UploadFile(rParams,
@@ -1131,9 +1132,17 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					if (e.GetType() == BackupStoreException::ExceptionType &&
 						e.GetSubType() == BackupStoreException::SignalReceived)
 					{
-						// abort requested, pass the
-						// exception on up.
-						throw;
+						if(rParams.mrRunStatusProvider.StopRun())
+						{
+							// abort requested, pass the
+							// exception on up.
+							throw;
+						}
+						else
+						{
+							// Unexpected signal. Try again.
+							continue;
+						}
 					}
 					
 					// an error occured -- make return
@@ -1146,8 +1155,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 						nonVssFilePath, e);
 				}
 
-				// Update structures if the file was uploaded
-				// successfully.
+				// Update structures if the file was uploaded successfully:
 				if(uploadSuccess)
 				{
 					fileSynced = true;
@@ -1157,11 +1165,27 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					{
 						mpPendingEntries->erase(*f);
 					}
+
+					break;
+				}
+				else
+				{
+					BOX_NOTICE("Upload failed, attempts remaining: " <<
+						retries);
 				}
 			}
-			else
+
+			if(rContext.StorageLimitExceeded())
 			{
 				rNotifier.NotifyFileSkippedServerFull(this, nonVssFilePath);
+			}
+			else if(!uploadSuccess)
+			{
+				// We only stop the loop on upload success, StorageLimitExceeded and
+				// running out of retries on signals received, and we ruled out the
+				// first two, and know that the signals were not terminate signals.
+				BOX_WARNING("Upload failed: all retry attempts failed due to "
+					"non-fatal signals. Is your KeepAliveTime too short?");
 			}
 		}
 		else if(en != 0 && en->GetAttributesHash() != attributesHash)
