@@ -50,11 +50,12 @@
 #include "RaidFileWrite.h"
 #include "S3Client.h"
 #include "StoreStructure.h"
+#include "TeeStream.h"
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
 
-const FileSystemCategory BackupFileSystem::LOCKING("Locking");
+const FileSystemCategory BackupFileSystem::LOCKING("Locking"); // Full name: FileSystem/Locking
 
 void BackupFileSystem::GetLock(int max_tries)
 {
@@ -1496,6 +1497,7 @@ void S3BackupFileSystem::GetCacheLock()
 }
 
 
+// TODO: refactor this code to support downloading and caching objects generally
 BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 	bool ReadOnly)
 {
@@ -1538,15 +1540,13 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 				"copy and the cache will be updated");
 		}
 
-		FileStream fs(local_path, O_CREAT | O_RDWR);
-		response.CopyStreamTo(fs);
-
-		// Check that we got the full and correct file. TODO: calculate the MD5
-		// digest while writing the file, instead of afterwards.
-		fs.Seek(0, IOStream::SeekType_Absolute);
+		FileStream fs(local_path, O_CREAT | O_TRUNC | O_RDWR);
 		MD5DigestStream digester;
-		fs.CopyStreamTo(digester);
-		digester.Close();
+		TeeStream tee(fs, digester);
+		response.CopyStreamTo(tee);
+		tee.Close();
+
+		// Check that we got the full and correct file.
 		digest = digester.DigestAsString();
 
 		if(response.GetHeaders().GetHeaderValue("etag") !=
