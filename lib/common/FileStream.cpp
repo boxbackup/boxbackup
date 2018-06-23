@@ -587,6 +587,41 @@ void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    FileStream::Truncate(int64_t length)
+//		Purpose: Truncates the file to the specified length
+//		Created: 2018-06-13
+//
+// --------------------------------------------------------------------------
+void FileStream::Truncate(IOStream::pos_type length)
+{
+	if(mOSFileHandle == INVALID_FILE)
+	{
+		THROW_EXCEPTION(CommonException, FileClosed)
+	}
+
+#ifdef WIN32
+	IOStream::pos_type old_pos = GetPosition();
+	Seek(length, IOStream::SeekType_Absolute);
+	if(!SetEndOfFile(mOSFileHandle))
+	{
+		winerrno = GetLastError();
+		THROW_WIN_FILE_ERROR("Failed to truncate file", mFileName,
+			CommonException, OSFileError);
+	}
+	Seek(old_pos, IOStream::SeekType_Absolute);
+#else // ! WIN32
+	if(::ftruncate(mOSFileHandle, length) == -1)
+	{
+		THROW_SYS_FILE_ERROR("Failed to truncate file", mFileName,
+			CommonException, OSFileError);
+	}
+#endif // WIN32
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    FileStream::Close()
 //		Purpose: Closes the underlying file
 //		Created: 2003/07/31

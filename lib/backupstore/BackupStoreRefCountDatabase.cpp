@@ -93,8 +93,13 @@ public:
 		{
 			Discard();
 		}
+		else
+		{
+			Truncate();
+		}
 		mapDatabaseFile.reset();
 	}
+
 	void Reopen();
 	bool IsReadOnly() { return mReadOnly; }
 
@@ -135,6 +140,7 @@ private:
 		return ((ObjectID - 1) * GetEntrySize()) +
 			sizeof(refcount_StreamFormat);
 	}
+	void Truncate();
 
 	// Location information
 	int64_t mAccountID;
@@ -192,6 +198,7 @@ void BackupStoreRefCountDatabaseImpl::Commit()
 			"Reference count database is already closed");
 	}
 
+	Truncate();
 	mapDatabaseFile->Close();
 	mapDatabaseFile.reset();
 
@@ -265,6 +272,36 @@ BackupStoreRefCountDatabaseImpl::~BackupStoreRefCountDatabaseImpl()
 				"in destructor: " << e.what());
 		}
 	}
+}
+
+void BackupStoreRefCountDatabaseImpl::Truncate()
+{
+	// There is no point truncating a temporary DB:
+	ASSERT(!mIsTemporaryDB);
+
+	if (!mapDatabaseFile.get())
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Reference count database is already closed");
+	}
+
+	// Truncate to the correct length, removing entries with zero refcounts at the end:
+	int64_t last_referenced_object_id = GetLastObjectIDUsed();
+	for (int64_t i = last_referenced_object_id; i >= 0; i--)
+	{
+		if(GetRefCount(i) > 0)
+		{
+			break;
+		}
+		else
+		{
+			last_referenced_object_id = i - 1;
+		}
+	}
+
+	IOStream::pos_type new_length = sizeof(refcount_StreamFormat) +
+		(last_referenced_object_id * sizeof(refcount_t));
+	mapDatabaseFile->Truncate(new_length);
 }
 
 std::string BackupStoreRefCountDatabase::GetFilename(const
