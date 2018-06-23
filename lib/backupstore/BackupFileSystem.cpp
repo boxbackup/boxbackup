@@ -1018,13 +1018,6 @@ RaidBackupFileSystem::CheckObjects(bool fix_errors)
 	CheckObjectsScanDir(0, 1, mAccountRootDir.substr(0, mAccountRootDir.size() - 1), result,
 		fix_errors);
 
-	// Then go through and scan all the objects within those directories
-	for(int64_t start_id = 0; start_id <= result.maxObjectIDFound;
-		start_id += (1<<STORE_ID_SEGMENT_LENGTH))
-	{
-		CheckObjectsDir(start_id, result, fix_errors);
-	}
-
 	return result;
 }
 
@@ -1161,46 +1154,10 @@ void RaidBackupFileSystem::CheckObjectsScanDir(int64_t StartID, int Level,
 			++Result.numErrorsFound;
 		}
 	}
-}
-
-
-// --------------------------------------------------------------------------
-//
-// Function
-//		Name:    RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
-//			 BackupFileSystem::CheckObjectsResult& Result,
-//			 bool fix_errors)
-//		Purpose: Check all the files within this directory which has
-//			 the given starting ID.
-//		Created: 22/4/04
-//
-// --------------------------------------------------------------------------
-void RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
-	BackupFileSystem::CheckObjectsResult& Result, bool fix_errors)
-{
-	// Make directory name -- first generate the filename of an entry in it
-	std::string dirName;
-	StoreStructure::MakeObjectFilename(StartID, mAccountRootDir, mStoreDiscSet,
-		dirName, false /* don't make sure the dir exists */);
-
-	// Check expectations
-	ASSERT(dirName.size() > 4 &&
-		(dirName[dirName.size() - 4] == DIRECTORY_SEPARATOR_ASCHAR ||
-		 dirName[dirName.size() - 4] == '/'));
-	// Remove the filename from it
-	dirName.resize(dirName.size() - 4); // four chars for "/o00"
-
-	// Check directory exists
-	if(!RaidFileRead::DirectoryExists(mStoreDiscSet, dirName))
-	{
-		BOX_ERROR("RaidFile dir " << dirName << " does not exist");
-		Result.numErrorsFound++;
-		return;
-	}
 
 	// Read directory contents
 	std::vector<std::string> files;
-	RaidFileRead::ReadDirectoryContents(mStoreDiscSet, dirName,
+	RaidFileRead::ReadDirectoryContents(mStoreDiscSet, rDirName,
 		RaidFileRead::DirReadType_FilesOnly, files);
 
 	// Parse each entry, building up a list of object IDs which are present in the dir.
@@ -1221,7 +1178,7 @@ void RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
 			}
 		}
 		// No other files should be present in subdirectories
-		else if(StartID != 0)
+		else if(Level > 1)
 		{
 			fileOK = false;
 		}
@@ -1239,14 +1196,13 @@ void RaidBackupFileSystem::CheckObjectsDir(int64_t StartID,
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			BOX_ERROR("Spurious file " << dirName <<
-				DIRECTORY_SEPARATOR << (*i) << " found" <<
-				(fix_errors?", deleting":""));
+			BOX_ERROR("Spurious file " << rDirName << DIRECTORY_SEPARATOR << (*i) << " "
+				"found" << (fix_errors?", deleting":""));
 			++Result.numErrorsFound;
 			if(fix_errors)
 			{
 				RaidFileWrite del(mStoreDiscSet,
-					dirName + DIRECTORY_SEPARATOR + *i);
+					rDirName + DIRECTORY_SEPARATOR + *i);
 				del.Delete();
 			}
 		}
@@ -2305,16 +2261,7 @@ S3BackupFileSystem::CheckObjects(bool fix_errors)
 	// Find the maximum start ID of directories -- worked out by looking at list of
 	// objects on store, not trusting anything.
 	CheckObjectsResult result;
-	start_id_to_files_t start_id_to_files;
-	CheckObjectsScanDir(0, 1, "", result, fix_errors, start_id_to_files);
-
-	// Then go through and scan all the objects within those directories
-	for(int64_t StartID = 0; StartID <= result.maxObjectIDFound;
-		StartID += (1<<STORE_ID_SEGMENT_LENGTH))
-	{
-		CheckObjectsDir(StartID, result, fix_errors, start_id_to_files);
-	}
-
+	CheckObjectsScanDir(0, 1, "", result, fix_errors);
 	return result;
 }
 
@@ -2336,7 +2283,7 @@ S3BackupFileSystem::CheckObjects(bool fix_errors)
 
 void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 	const std::string &dir_name, BackupFileSystem::CheckObjectsResult& result,
-	bool fix_errors, start_id_to_files_t& start_id_to_files)
+	bool fix_errors)
 {
 	//TRACE2("Scan directory for max dir starting ID %s, StartID %lld\n", rDirName.c_str(), StartID);
 
@@ -2349,7 +2296,6 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 	std::vector<std::string> dirs;
 	bool is_truncated;
 	int max_keys = 1000;
-	start_id_to_files[start_id] = std::vector<std::string>();
 
 	// Remove the initial / from BasePath. It must also end with /, and dir_name
 	// must not start with / but must end with / (or be empty), so that when
@@ -2389,15 +2335,14 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 			"Failed to check directory: " << prefix << ": too many entries");
 	}
 
-	// Cache the list of files in this directory for later use.
-	for(std::vector<S3Client::BucketEntry>::const_iterator i = files.begin();
-		i != files.end(); i++)
+	// Check each file in this directory for validity:
+	std::vector<std::string> file_names;
+	for(std::vector<S3Client::BucketEntry>::const_iterator i(files.begin());
+		i != files.end(); ++i)
 	{
-		// This will throw an exception if the filename does not start with
-		// the prefix:
-		std::string unprefixed_name = RemovePrefix(prefix, i->name());
-		start_id_to_files[start_id].push_back(unprefixed_name);
+		file_names.push_back(i->name());
 	}
+	CheckObjectsDir(start_id, result, fix_errors, prefix, file_names);
 
 	for(std::vector<std::string>::const_iterator i(dirs.begin());
 		i != dirs.end(); ++i)
@@ -2416,7 +2361,7 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 			CheckObjectsScanDir(
 				start_id | (n << (level * STORE_ID_SEGMENT_LENGTH)),
 				level + 1, dir_name + subdir_name + "/", sub_result,
-				fix_errors, start_id_to_files);
+				fix_errors);
 			result.numErrorsFound += sub_result.numErrorsFound;
 
 			// Found a greater starting ID?
@@ -2444,8 +2389,8 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 // Function
 //		Name:    S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 //			 BackupFileSystem::CheckObjectsResult& result,
-//			 bool fix_errors,
-//			 const dir_id_to_files_t& dir_id_to_files)
+//			 bool fix_errors, std::string& prefix,
+//		         std::vector<std::string> files)
 //		Purpose: Check all the files within this directory which has
 //			 the given starting ID.
 //		Created: 2016/03/21
@@ -2453,24 +2398,8 @@ void S3BackupFileSystem::CheckObjectsScanDir(int64_t start_id, int level,
 // --------------------------------------------------------------------------
 void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 	BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
-	const start_id_to_files_t& start_id_to_files)
+	const std::string& prefix, std::vector<std::string> files)
 {
-	// Make directory name -- first generate the filename of an entry that
-	// would be in this directory (it doesn't need to actually be there):
-	std::string prefix = GetFileURI(start_id);
-
-	// Check that GetFileURI returned what we expected:
-	ASSERT(EndsWith(".file", prefix));
-	std::string::size_type last_slash = prefix.find_last_of('/');
-	ASSERT(last_slash != std::string::npos);
-
-	// Remove the filename from it
-	prefix.resize(last_slash);
-
-	// Get directory contents. operator[] is not const, so we can't do this:
-	// std::vector<std::string> files = start_id_to_files[start_id];
-	std::vector<std::string> files = start_id_to_files.find(start_id)->second;
-
 	// Parse each entry, checking whether it has a valid name for an object
 	// file: must begin with '0x', followed by some hex digits and end with
 	// .file or .dir. The object ID must belong in this position in the
@@ -2478,17 +2407,19 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 	// fix_errors is true, it will be deleted.
 	for(std::vector<std::string>::const_iterator i(files.begin()); i != files.end(); ++i)
 	{
+		// Each filename should start with the prefix, so remove it
+		std::string unprefixed_filename = RemovePrefix(prefix, *i);
 		bool fileOK = false;
-		if(StartsWith("0x", (*i)))
+		if(StartsWith("0x", unprefixed_filename))
 		{
 			std::string object_id_str;
-			if(EndsWith(".file", *i))
+			if(EndsWith(".file", unprefixed_filename))
 			{
-				object_id_str = RemoveSuffix(".file", *i);
+				object_id_str = RemoveSuffix(".file", unprefixed_filename);
 			}
-			else if(EndsWith(".dir", *i))
+			else if(EndsWith(".dir", unprefixed_filename))
 			{
-				object_id_str = RemoveSuffix(".dir", *i);
+				object_id_str = RemoveSuffix(".dir", unprefixed_filename);
 			}
 			else
 			{
@@ -2526,8 +2457,8 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 			ASSERT(!fileOK);
 		}
 		// info and refcount databases are OK in the root directory
-		else if(*i == S3_INFO_FILE_NAME ||
-			*i == S3_REFCOUNT_FILE_NAME)
+		else if(unprefixed_filename == S3_INFO_FILE_NAME ||
+			unprefixed_filename == S3_REFCOUNT_FILE_NAME)
 		{
 			fileOK = true;
 		}
@@ -2539,7 +2470,7 @@ void S3BackupFileSystem::CheckObjectsDir(int64_t start_id,
 		if(!fileOK)
 		{
 			// Unexpected or bad file, delete it
-			std::string uri = prefix + "/" + (*i);
+			std::string uri = "/" + *i;
 			BOX_ERROR("Spurious file " << uri << " found" <<
 				(fix_errors?", deleting":""));
 			++result.numErrorsFound;

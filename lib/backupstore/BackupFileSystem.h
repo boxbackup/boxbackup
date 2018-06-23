@@ -287,8 +287,6 @@ protected:
 private:
 	void CheckObjectsScanDir(int64_t StartID, int Level, const std::string &rDirName,
 		CheckObjectsResult& Result, bool fix_errors);
-	void CheckObjectsDir(int64_t StartID,
-		BackupFileSystem::CheckObjectsResult& Result, bool fix_errors);
 };
 
 #define S3_INFO_FILE_NAME "boxbackup.info"
@@ -425,13 +423,11 @@ private:
 
 	int64_t GetRevisionID(const std::string& uri, HTTPResponse& response) const;
 
-	typedef std::map<int64_t, std::vector<std::string> > start_id_to_files_t;
 	void CheckObjectsScanDir(int64_t start_id, int level, const std::string &dir_name,
-		CheckObjectsResult& result, bool fix_errors,
-		start_id_to_files_t& start_id_to_files);
+		CheckObjectsResult& result, bool fix_errors);
 	void CheckObjectsDir(int64_t start_id,
 		BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
-		const start_id_to_files_t& start_id_to_files);
+		const std::string& prefix, std::vector<std::string> files);
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 };
 
