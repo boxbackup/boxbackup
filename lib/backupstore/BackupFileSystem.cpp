@@ -2153,9 +2153,13 @@ void S3BackupFileSystem::ReleaseLock()
 {
 	BackupFileSystem::ReleaseLock();
 
-	// It's possible that neither the temporary nor the permanent refcount DB was
-	// requested while we had the write lock, so the cache lock may not have been
-	// acquired.
+	// Close any open refcount DBs, which writes them back to permanent storage, before
+	// releasing our lock on the cache.
+	mapPotentialRefCountDatabase.reset();
+	mapPermanentRefCountDatabase.reset();
+
+	// It's possible that neither the temporary nor the permanent refcount DB was requested
+	// while we had the write lock, so the cache lock may not have been acquired.
 	if(mCacheLock.GotLock())
 	{
 		mCacheLock.ReleaseLock();
@@ -2206,16 +2210,9 @@ void S3BackupFileSystem::ReleaseLock()
 
 S3BackupFileSystem::~S3BackupFileSystem()
 {
-	// Close any open refcount DBs before partially destroying the
-	// BackupFileSystem that they need to close down. Need to do this in
-	// the subclass to avoid calling SaveRefCountDatabase() when the
-	// subclass has already been partially destroyed.
-	// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-	mapPotentialRefCountDatabase.reset();
-	mapPermanentRefCountDatabase.reset();
-
-	// This needs to be in the source file, not inline, as long as we don't include
-	// the whole of SimpleDBClient.h in BackupFileSystem.h.
+	// Close and write back to permanent storage any refcount DBs that are open. Need to do this
+	// in the subclass to avoid calling SaveRefCountDatabase() when the subclass has already
+	// been partially destroyed.
 	if(mHaveLock)
 	{
 		try
