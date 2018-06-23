@@ -2194,23 +2194,22 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 
 	// Add a directory, this should try to push the object size back up, which will try to
 	// modify the subdir's entry in its parent, which no longer exists, which should return
-	// an error, but only when the cache is flushed (which could be much later):
-	create_directory(protocol, subdirid);
-	TEST_CHECK_THROWS(
-		rwContext.FlushDirectoryCache(),
-		BackupStoreException,
-		CouldNotFindEntryInDirectory);
+	// an error:
+	{
+		BackupStoreFilenameClear dirname("lovely_directory");
+		std::auto_ptr<IOStream> attr(new MemBlockStream(attr1, sizeof(attr1)));
+		TEST_COMMAND_RETURNS_ERROR(protocol,
+			QueryCreateDirectory2(subdirid, FAKE_ATTR_MODIFICATION_TIME,
+				FAKE_MODIFICATION_TIME, dirname, attr),
+			Err_DoesNotExistInDirectory);
+	}
 
 	// Repair the error ourselves, as bbstoreaccounts can't.
 	protocol.QueryFinished();
-	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, spec));
-	root.AddEntry(enCopy);
-	fs.PutDirectory(root);
 
-	// We also have to remove the entry for lovely_directory created by
-	// create_directory(), because otherwise we can't create it again.
-	// (Perhaps it should not have been committed because we failed to
-	// update the parent, but currently it is.)
+	// We also have to remove the entry for lovely_directory created above, because otherwise
+	// we can't create it again. (Perhaps it should not have been committed because we failed
+	// to update the parent, but currently it is.)
 	BackupStoreDirectory subdir(
 		*get_object_stream(true, // IsDirectory
 			subdirid, // ObjectID
@@ -2223,15 +2222,31 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 			BackupStoreFilenameClear("lovely_directory"));
 	}
 	TEST_THAT_OR(en, return false);
-	protocol.Reopen();
-	protocol.QueryDeleteDirectory(en->GetObjectID());
 	set_refcount(en->GetObjectID(), 0);
+	subdir.DeleteEntry(en->GetObjectID());
+	fs.PutDirectory(subdir);
+
+	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, spec));
+	root.AddEntry(enCopy);
+	fs.PutDirectory(root);
+
+	// Deleting the directory and removing its entry will have changed the block counts by 3,
+	// so repair the store to fix them now.
+	TEST_EQUAL(2, check_account_and_fix_errors(fs));
+	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+	protocol.Reopen();
 
 	// This should have fixed the error, so we should be able to add the
 	// entry now. This should push the object size back up.
 	int64_t dir2id = create_directory(protocol, subdirid);
 	TEST_EQUAL(new_size, get_disc_usage_in_blocks(true, subdirid, spec));
-	TEST_EQUAL(new_size, get_object_size(protocol_read_only, subdirid,
+	TEST_EQUAL(new_size, get_object_size(protocol, subdirid,
+		BACKUPSTORE_ROOT_DIRECTORY_ID));
+
+	// The root directory may have been rewritten in the same second, so the cache may not
+	// realise that it needs to reload it, so clear the cache:
+	roContext.ClearDirectoryCache();
+	TEST_EQUAL(old_size, get_object_size(protocol_read_only, subdirid,
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	// Delete it again, which should reduce the object size again

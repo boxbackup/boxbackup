@@ -1161,8 +1161,13 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 			BackupStoreDirectory::Entry::Flags_Dir,
 			0 /* attributes hash */);
 
-		// Save the directory back (or actually just mark it dirty)
-		SaveDirectoryLater(dir);
+		// Save the parent directory. We do not defer this because adding directories is
+		// less common than adding files, it cannot be fully repaired by BackupStoreCheck
+		// because we do not store a directory's parent directory ID inside it, and the
+		// potential damage from failing to save the parent is much greater, because there's
+		// no limit to the number of files that may be moved to the wrong place, and thus
+		// potentially lost.
+		SaveDirectoryNow(dir);
 
 		// Increment reference count on the new directory to one:
 		mpRefCount->AddReference(id);
