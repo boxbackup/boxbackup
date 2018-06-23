@@ -173,8 +173,8 @@ void BackupStoreCheck::HandleUnattachedObject(IDBlock *pblock, int index,
 		// Just delete it to be safe.
 		if(diffFromObjectID != 0)
 		{
-			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, "
-				"and is a patch. Deleting, cannot reliably recover.");
+			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is a patch and "
+				"is unattached. Deleting, cannot reliably recover it.");
 			++mNumberErrorsFound;
 
 			// Delete this object instead
@@ -192,7 +192,7 @@ void BackupStoreCheck::HandleUnattachedObject(IDBlock *pblock, int index,
 
 		// Files contain their original filename, so perhaps the orginal directory still
 		// exists, or we can infer the existance of a directory? Look for a matching entry
-		// in the mDirsWhichContainLostDirs map./ Can't do this with a directory, because
+		// in the mDirsWhichContainLostDirs map. Can't do this with a directory, because
 		// the name just wouldn't be known, which is pretty useless as bbackupd would just
 		// delete it. So better to put it in lost+found where the admin can do something
 		// about it.
@@ -244,7 +244,9 @@ void BackupStoreCheck::HandleUnattachedObject(IDBlock *pblock, int index,
 	{
 		object_id << " " << BOX_FORMAT_OBJECTID(putIntoDirectoryID);
 	}
-	BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is unattached, " <<
+
+	BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(ObjectID) << " is a " <<
+		((flags & Flags_IsDir) ? "directory" : "file") << " and is unattached, " <<
 		(mFixErrors ? "reattaching" : "would reattach") << " in " <<
 		(adding_to_lost_and_found ? "lost and found" : "original") << " "
 		"directory" << object_id.str());
@@ -312,14 +314,16 @@ int64_t BackupStoreCheck::TryToRecreateDirectory(int64_t MissingDirectoryID)
 	if(!mFixErrors)
 	{
 		BOX_WARNING("Missing directory " << 
-			BOX_FORMAT_OBJECTID(MissingDirectoryID) <<
-			" could be recreated.");
+			BOX_FORMAT_OBJECTID(MissingDirectoryID) << " "
+			"could be recreated in directory " <<
+			BOX_FORMAT_OBJECTID(missing->second));
 		mDirsAdded.insert(MissingDirectoryID);
 		return 0;
 	}
 
 	BOX_WARNING("Recreating missing directory " << 
-		BOX_FORMAT_OBJECTID(MissingDirectoryID));
+		BOX_FORMAT_OBJECTID(MissingDirectoryID) << " in directory " <<
+		BOX_FORMAT_OBJECTID(missing->second));
 
 	// Create a blank directory. We don't call CreateBlankDirectory here because that counts
 	// the newly created directory, but this one was already counted when its entry in its
@@ -506,7 +510,8 @@ void BackupStoreCheck::FixDirsWithWrongContainerID()
 //
 // Function
 //		Name:    BackupStoreCheck::FixDirsWithLostDirs()
-//		Purpose: Fix directories
+//		Purpose: Fix directories containing entries to directories
+//		         that were not found on the store, and not recreated.
 //		Created: 22/4/04
 //
 // --------------------------------------------------------------------------
@@ -518,19 +523,39 @@ void BackupStoreCheck::FixDirsWithLostDirs()
 		return;
 	}
 
-	// Run through things which need fixing
-	for(std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t>::iterator i(mDirsWhichContainLostDirs.begin());
-			i != mDirsWhichContainLostDirs.end(); ++i)
+	// Run through things which need fixing. Any directory which was recreated will have been
+	// removed from this list. Any still remaining should have their entries removed from the
+	// parent directory to delete them permanently.
+
+	for(std::map<BackupStoreCheck_ID_t, BackupStoreCheck_ID_t>::iterator
+		i(mDirsWhichContainLostDirs.begin());
+		i != mDirsWhichContainLostDirs.end(); ++i)
 	{
 		int32_t index = 0;
 		IDBlock *pblock = LookupID(i->second, index);
-		if(pblock == 0) continue;
+		++mNumberErrorsFound;
+
+		if(pblock == 0)
+		{
+			BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(i->first) << " was a missing "
+				"directory, but we cannot now find the directory that referenced "
+				"it, which is odd");
+			// It's hard to see how this could happen, and therefore not clear whether
+			// this entry was ever counted (and should now be uncounted).
+			continue;
+		}
+
+		// If it had valid entries then it would have been recreated already:
+		BOX_ERROR("Object " << BOX_FORMAT_OBJECTID(i->first) << " was a missing directory "
+			"and was not recreated, so its entry will be removed from directory " <<
+			BOX_FORMAT_OBJECTID(i->second));
 
 		// Load the parent directory
 		BackupStoreDirectory dir;
 		mrFileSystem.GetDirectory(i->second, dir);
 
-		// Uncount this directory. It was counted earlier, but not replaced.
+		// Uncount this directory. It was counted earlier while iterating over its parent,
+		// but not recreated, so it does not occupy the space that was counted for it.
 		BackupStoreDirectory::Entry *en = dir.FindEntryByID(i->first);
 		ASSERT(en != NULL);
 		CountDirectoryEntry(i->first, en->GetFlags(), en->GetSizeInBlocks(),
