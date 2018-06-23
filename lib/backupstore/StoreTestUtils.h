@@ -30,20 +30,8 @@ bool delete_account();
 //! Cleans up and prepares the test environment for a generic or unspecialised test
 bool setup_test_unified();
 
-//! Creates the standard test account for specialised tests (e.g. with S3 support)
-bool create_test_account_specialised(const std::string& spec_name,
-	BackupAccountControl& control);
-
-//! Cleans up and prepares the test environment for a specialised test (e.g. S3)
-bool setup_test_specialised(const std::string& spec_name,
-	BackupAccountControl& control);
-
 //! Checks account for errors and shuts down daemons at end of every unified test.
 bool teardown_test_unified();
-
-//! Checks account for errors and shuts down daemons at end of every specialised test.
-bool teardown_test_specialised(const std::string& spec_name,
-	BackupAccountControl& control, bool check_for_errors = true);
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_UNIFIED() \

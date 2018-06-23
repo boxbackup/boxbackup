@@ -52,7 +52,6 @@
 #include "SimpleDBClient.h"
 #include "Socket.h"
 #include "SocketStreamTLS.h"
-#include "StoreStructure.h"
 #include "StoreTestUtils.h"
 #include "TLSContext.h"
 #include "Test.h"
@@ -252,11 +251,7 @@ void CheckEntries(BackupStoreDirectory &rDir, int16_t FlagsMustBeSet, int16_t Fl
 
 std::auto_ptr<RaidFileRead> get_raid_file(int64_t ObjectID)
 {
-	std::string filename;
-	StoreStructure::MakeObjectFilename(ObjectID,
-		"backup/01234567/" /* mStoreRoot */, 0 /* mStoreDiscSet */,
-		filename, false /* EnsureDirectoryExists */);
-	return RaidFileRead::Open(0, filename);
+	return RaidFileRead::Open(0, get_raid_file_path(ObjectID));
 }
 
 int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
@@ -264,18 +259,14 @@ int get_disc_usage_in_blocks(bool IsDirectory, int64_t ObjectID,
 {
 	if(spec.name() == "s3")
 	{
-		S3BackupFileSystem& fs
-			(dynamic_cast<S3BackupFileSystem&>(spec.control().GetFileSystem()));
-		std::string local_path = "testfiles/store" +
-			(IsDirectory ? fs.GetDirectoryURI(ObjectID) :
-			 fs.GetFileURI(ObjectID));
+		std::string local_path = get_s3_file_path(ObjectID, IsDirectory, spec);
 		int size = TestGetFileSize(local_path);
 		TEST_LINE(size != -1, "File does not exist: " << local_path);
+		S3BackupFileSystem& fs(dynamic_cast<S3BackupFileSystem&>(spec.control().GetFileSystem()));
 		return fs.GetSizeInBlocks(size);
 	}
 	else
 	{
-		// TODO: merge get_raid_file() into here
 		return get_raid_file(ObjectID)->GetDiscUsageInBlocks();
 	}
 }
@@ -285,16 +276,11 @@ std::auto_ptr<IOStream> get_object_stream(bool IsDirectory, int64_t ObjectID,
 {
 	if(spec.name() == "s3")
 	{
-		S3BackupFileSystem& s3fs(
-			dynamic_cast<S3BackupFileSystem&>(spec.control().GetFileSystem()));
-		std::string local_path = "testfiles/store" +
-			(IsDirectory ? s3fs.GetDirectoryURI(ObjectID) :
-			 s3fs.GetFileURI(ObjectID));
+		std::string local_path = get_s3_file_path(ObjectID, IsDirectory, spec);
 		return std::auto_ptr<IOStream>(new FileStream(local_path));
 	}
 	else
 	{
-		// TODO: merge get_raid_file() into here
 		return std::auto_ptr<IOStream>(get_raid_file(ObjectID).release());
 	}
 }
@@ -3642,10 +3628,12 @@ int test(int argc, const char *argv[])
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
 
-	std::auto_ptr<RaidAndS3TestSpecs> specs(new RaidAndS3TestSpecs());
+	std::auto_ptr<RaidAndS3TestSpecs> specs(
+		new RaidAndS3TestSpecs(DEFAULT_BBACKUPD_CONFIG_FILE));
 
 	TEST_THAT(kill_running_daemons());
 	TEST_THAT(StartSimulator());
+
 	TEST_THAT(test_s3backupfilesystem(specs->s3()));
 	TEST_THAT(test_simpledb_locking(specs->s3()));
 
@@ -3653,8 +3641,8 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_temporary_refcount_db_is_independent());
 	TEST_THAT(test_backupstore_directory());
 
-	// Run all tests that take a BackupAccountControl argument twice, once with an
-	// S3BackupAccountControl and once with a BackupStoreAccountControl.
+	// Run all tests that take a RaidAndS3TestSpecs::Specialisation argument twice, once with
+	// each specialisation that we have (S3 and BackupStore).
 
 	for(auto i = specs->specs().begin(); i != specs->specs().end(); i++)
 	{

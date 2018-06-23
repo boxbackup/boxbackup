@@ -12,33 +12,8 @@
 
 #include <string>
 
+#include "BackupAccountControl.h"
 #include "Test.h"
-
-#define SETUP_TEST_SPECIALISED(spec) \
-	SETUP_SPECIALISED(spec.name()); \
-	TEST_THAT_OR(setup_test_specialised(spec.name(), spec.control()), FAIL); \
-	try \
-	{ // left open for TEARDOWN_TEST_SPECIALISED()
-
-#define _TEARDOWN_TEST_SPECIALISED(spec, check_for_errors) \
-		TEST_THAT_OR(teardown_test_specialised(spec.name(), spec.control(), \
-			check_for_errors), FAIL); \
-	} \
-	catch (BoxException &e) \
-	{ \
-		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
-			spec.name() << ": " << e.what()); \
-		TEST_THAT_OR(teardown_test_specialised(spec.name(), spec.control(), \
-			check_for_errors), FAIL); \
-		throw; \
-	} \
-	TEARDOWN();
-
-#define TEARDOWN_TEST_SPECIALISED(spec) \
-	_TEARDOWN_TEST_SPECIALISED(spec, true)
-
-#define TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec) \
-	_TEARDOWN_TEST_SPECIALISED(spec, false)
 
 class RaidAndS3TestSpecs
 {
@@ -84,8 +59,49 @@ public:
 	Specialisation& s3() const { return *mpS3; }
 	Specialisation& store() const { return *mpStore; }
 
-	RaidAndS3TestSpecs(); // constructor
+	RaidAndS3TestSpecs(const std::string& bbackupd_config); // constructor
 };
 
-#endif // CLIENTTESTUTILS__H
+//! Creates the standard test account for specialised tests (e.g. with S3 support)
+bool create_test_account_specialised(const std::string& spec_name,
+	BackupAccountControl& control);
 
+//! Cleans up and prepares the test environment for a specialised test (e.g. S3)
+bool setup_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control);
+
+//! Checks account for errors and shuts down daemons at end of every specialised test.
+bool teardown_test_specialised(const std::string& spec_name,
+	BackupAccountControl& control, bool check_for_errors = true);
+
+std::string get_raid_file_path(int64_t ObjectID);
+std::string get_s3_file_path(int64_t ObjectID, bool IsDirectory,
+	RaidAndS3TestSpecs::Specialisation& spec);
+
+#define SETUP_TEST_SPECIALISED(spec) \
+	SETUP_SPECIALISED(spec.name()); \
+	TEST_THAT_OR(setup_test_specialised(spec.name(), spec.control()), FAIL); \
+	try \
+	{ // left open for TEARDOWN_TEST_SPECIALISED()
+
+#define _TEARDOWN_TEST_SPECIALISED(spec, check_for_errors) \
+		TEST_THAT_OR(teardown_test_specialised(spec.name(), spec.control(), \
+			check_for_errors), FAIL); \
+	} \
+	catch (BoxException &e) \
+	{ \
+		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
+			spec.name() << ": " << e.what()); \
+		TEST_THAT_OR(teardown_test_specialised(spec.name(), spec.control(), \
+			check_for_errors), FAIL); \
+		throw; \
+	} \
+	TEARDOWN();
+
+#define TEARDOWN_TEST_SPECIALISED(spec) \
+	_TEARDOWN_TEST_SPECIALISED(spec, true)
+
+#define TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec) \
+	_TEARDOWN_TEST_SPECIALISED(spec, false)
+
+#endif // CLIENTTESTUTILS__H

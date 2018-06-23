@@ -56,31 +56,6 @@ bool delete_account()
 	return true;
 }
 
-bool create_test_account_specialised(const std::string& spec_name,
-	BackupAccountControl& control)
-{
-	if(spec_name == "s3")
-	{
-		TEST_THAT_OR(
-			dynamic_cast<S3BackupAccountControl&>(control).
-			CreateAccount("test", 10000, 20000) == 0, FAIL);
-	}
-	else if(spec_name == "store")
-	{
-		TEST_THAT_OR(
-			dynamic_cast<BackupStoreAccountControl&>(control).
-			CreateAccount(0, 10000, 20000) == 0, FAIL);
-	}
-	else
-	{
-		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Don't know how to create accounts for store type: " <<
-			spec_name);
-	}
-
-	return true;
-}
-
 bool setup_test_unified()
 {
 	if (ServerIsAlive(bbstored_pid))
