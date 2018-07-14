@@ -88,6 +88,14 @@ private:
 	void HousekeepingInit();
 	int64_t mLastHousekeepingRun;
 
+	virtual void NotifyListenerIsReady()
+	{
+		// bbstored forks a housekeeping process (except on Windows) which may inherit the
+		// exclusive lock on the PID file, so we might have to wait for it to be released,
+		// by passing wait_for_shared_lock = true, which unfortunately extends the race
+		// condition.
+		WritePidFile(true); // wait_for_shared_lock
+	}
 public:
 	void SetTestHook(BackupStoreContext::TestHook& rTestHook)
 	{

@@ -87,6 +87,10 @@ public:
 	}
 
 protected:
+	// Shouldn't really expose mapPidFile here, but need a way for bbstored to close it after
+	// forking the housekeeping process:
+	std::auto_ptr<FileStream> mapPidFile;
+
 	virtual void SetupInInitialProcess();
 	box_time_t GetLoadedConfigModifiedTime() const;
 	virtual std::string GetOptionString();
@@ -106,7 +110,7 @@ protected:
 		// this to delay writing.
 		WritePidFile();
 	}
-	void WritePidFile();
+	void WritePidFile(bool wait_for_shared_lock = false);
 
 private:
 	static void SignalHandler(int sigraised);
@@ -127,7 +131,7 @@ private:
 	std::auto_ptr<FileLogger> mapLogFileLogger;
 	static Daemon *spDaemon;
 	std::string mAppName;
-	std::auto_ptr<FileStream> mapPidFile;
+	bool mPidFileWritten;
 };
 
 #define DAEMON_VERIFY_SERVER_KEYS \

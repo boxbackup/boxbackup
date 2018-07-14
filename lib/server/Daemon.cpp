@@ -77,7 +77,8 @@ Daemon::Daemon()
 	#endif
 	  mHaveConfigFile(false),
 	  mLogFileLevel(Log::INVALID),
-	  mAppName(DaemonName())
+	  mAppName(DaemonName()),
+	  mPidFileWritten(false)
 {
 }
 
@@ -704,21 +705,38 @@ int Daemon::Main(const std::string &rConfigFileName)
 	return retcode;
 }
 
-void Daemon::WritePidFile()
+void Daemon::WritePidFile(bool wait_for_shared_lock)
 {
 	// We only want to write the PID file once, but we might be called again by
 	// ServerStream::Run2 (via NotifyListenerIsReady) and we just want to do nothing
 	// in that case.
 
-	if(mapPidFile.get() != NULL)
+	if(!mPidFileWritten)
 	{
 		std::ostringstream pid_buf;
 		pid_buf << getpid();
 		std::string pid_str = pid_buf.str();
 
 		mapPidFile->Write(pid_str);
-		// Do not close the PID file. We want it to stay locked, to prevent another daemon
-		// starting and overwriting it.
+
+		// Ideally we would not close the PID file, because we want it to stay locked, to
+		// prevent another daemon starting and overwriting it. But at least on Windows, this
+		// also stops anyone from opening the file for *reading*. So instead we close it and
+		// reopen in shared mode, to prevent another daemon from getting an exclusive lock.
+		// There is a very short window of opportunity for a race here, since we don't block
+		// if the lock fails, but raise an exception.
+		std::string pid_file_name = mapPidFile->GetFileName();
+		mapPidFile.reset();
+
+		// If the parent has forked another process (e.g. bbstored housekeeping) then it may
+		// be holding an exclusive lock on the PID file too, so we might have to wait for it
+		// to be released (if wait_for_shared_lock is true), which unfortunately extends the
+		// race condition.
+		mapPidFile.reset(new FileStream(pid_file_name, O_RDONLY, 0, // mode
+			FileStream::SHARED, false, // !delete_asap
+			wait_for_shared_lock)); // wait_for_lock
+
+		mPidFileWritten = true;
 	}
 }
 

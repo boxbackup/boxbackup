@@ -205,6 +205,8 @@ void BackupStoreDaemon::Run()
 		case 0:
 			{
 				// In child process
+				// Don't hold open an exclusive lock on the PID file:
+				mapPidFile.reset();
 				mIsHousekeepingProcess = true;
 				SetProcessTitle("housekeeping, idle");
 				whichSocket = 1;
