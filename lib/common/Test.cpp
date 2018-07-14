@@ -100,6 +100,13 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 		}
 	}
 
+	cleanup_test_environment();
+
+	return true;
+}
+
+void cleanup_test_environment(bool delete_pid_files)
+{
 	// We need to do something more complex than "rm -rf testfiles" to clean up the mess and
 	// prepare for the next test, in a way that works on Windows (without rm -rf) as well.
 	DIR* pDir = opendir("testfiles");
@@ -127,18 +134,30 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
 			EndsWith("testfile", filename) ||
-			EndsWith(".qdbm", filename))
+			EndsWith(".qdbm", filename) ||
+			(delete_pid_files && EndsWith(".pid", filename)))
 		{
 			std::string filepath = std::string("testfiles" DIRECTORY_SEPARATOR) +
 				filename;
-
 			object_exists_t filetype = ObjectExists(filepath);
+
 			if(filetype == ObjectExists_File)
 			{
 				if(EMU_UNLINK(filepath.c_str()) != 0)
 				{
-					TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
-						"test fixture file: unlink(\"" << filepath << "\")"));
+					if(EndsWith(".pid", filename))
+					{
+						// Failure to delete the PID file may mean that the daemon is still
+						// running, and in some tests that is expected.
+						BOX_WARNING(BOX_SYS_FILE_ERRNO_MESSAGE("Failed to delete existing "
+							"PID file", errno, filepath));
+						continue;
+					}
+					else
+					{
+						TEST_FAIL_WITH_MESSAGE(BOX_SYS_ERROR_MESSAGE("Failed to delete "
+							"test fixture file: unlink(\"" << filepath << "\")"));
+					}
 				}
 			}
 			else if(filetype == ObjectExists_Dir)
@@ -233,8 +252,6 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/bbackupd-cache-2", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store", 0755) == 0);
 	TEST_THAT_THROWONFAIL(mkdir("testfiles/store/subdir", 0755) == 0);
-
-	return true;
 }
 
 bool tearDown()

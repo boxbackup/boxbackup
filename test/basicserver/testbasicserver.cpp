@@ -548,6 +548,8 @@ int test(int argc, const char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 
+	cleanup_test_environment(true); // delete_pid_files
+
 	//printf("SKIPPING TESTS------------------------\n");
 	//goto protocolserver;
 

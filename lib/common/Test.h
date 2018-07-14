@@ -225,7 +225,7 @@ extern HANDLE sTestChildDaemonJobObject;
 #define TEST_STARTSWITH(expected, actual) \
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
-//! Sets up (cleans up) test environment at the start of every test.
+//! Checks whether this test should run, and if so sets up (cleans up) test environment.
 bool setUp(const std::string& function_name, const std::string& specialisation);
 
 //! Checks account for errors and shuts down daemons at end of every test.
@@ -233,6 +233,9 @@ bool tearDown();
 
 //! Like tearDown() but returns false, because a test failure was detected.
 bool fail();
+
+//! Cleans up the test environment at the start of every test.
+void cleanup_test_environment(bool delete_pid_files = false);
 
 //! Report final status of all tests, and return the correct value to test main().
 int finish_test_suite();
