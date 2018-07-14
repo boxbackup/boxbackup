@@ -428,8 +428,7 @@ BackupStoreDirectory::Entry::Entry()
   mMarkNumber(0),
   mDependsOnObject(0),
   mRequiredByObject(0)
-{
-}
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -440,8 +439,7 @@ BackupStoreDirectory::Entry::Entry()
 //
 // --------------------------------------------------------------------------
 BackupStoreDirectory::Entry::~Entry()
-{
-}
+{ }
 
 // --------------------------------------------------------------------------
 //
@@ -454,7 +452,7 @@ BackupStoreDirectory::Entry::~Entry()
 BackupStoreDirectory::Entry::Entry(const Entry &rToCopy)
 :
 #ifndef BOX_RELEASE_BUILD
-  mInvalidated(false),
+  mInvalidated(rToCopy.mInvalidated),
 #endif
   mName(rToCopy.mName),
   mModificationTime(rToCopy.mModificationTime),
@@ -467,8 +465,7 @@ BackupStoreDirectory::Entry::Entry(const Entry &rToCopy)
   mMarkNumber(rToCopy.mMarkNumber),
   mDependsOnObject(rToCopy.mDependsOnObject),
   mRequiredByObject(rToCopy.mRequiredByObject)
-{
-}
+{ }
 
 
 // --------------------------------------------------------------------------
@@ -494,8 +491,7 @@ BackupStoreDirectory::Entry::Entry(const BackupStoreFilename &rName, box_time_t 
   mMarkNumber(0),
   mDependsOnObject(0),
   mRequiredByObject(0)
-{
-}
+{ }
 
 
 
@@ -510,6 +506,7 @@ BackupStoreDirectory::Entry::Entry(const BackupStoreFilename &rName, box_time_t 
 void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 {
 	ASSERT(!mInvalidated); // Compiled out of release builds
+
 	// Grab the raw bytes from the stream which compose the header
 	en_StreamFormat entry;
 	if(!rStream.ReadFullBuffer(&entry, sizeof(entry),
@@ -548,13 +545,14 @@ void BackupStoreDirectory::Entry::ReadFromStream(IOStream &rStream, int Timeout)
 void BackupStoreDirectory::Entry::WriteToStream(IOStream &rStream) const
 {
 	ASSERT(!mInvalidated); // Compiled out of release builds
+
 	// Build a structure
 	en_StreamFormat entry;
-	entry.mModificationTime = 	box_hton64(mModificationTime);
-	entry.mObjectID = 			box_hton64(mObjectID);
-	entry.mSizeInBlocks = 		box_hton64(mSizeInBlocks);
-	entry.mAttributesHash =		box_hton64(mAttributesHash);
-	entry.mFlags = 				htons(mFlags);
+	entry.mModificationTime = box_hton64(mModificationTime);
+	entry.mObjectID = box_hton64(mObjectID);
+	entry.mSizeInBlocks = box_hton64(mSizeInBlocks);
+	entry.mAttributesHash =	box_hton64(mAttributesHash);
+	entry.mFlags = htons(mFlags);
 
 	// Write it
 	rStream.Write(&entry, sizeof(entry));
