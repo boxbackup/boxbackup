@@ -58,7 +58,8 @@ public:
 		int flags = (O_RDONLY | O_BINARY),
 		int mode = DEFAULT_MODE,
 		lock_mode_t lock_mode = SHARED,
-		bool delete_asap = false);
+		bool delete_asap = false,
+		bool wait_for_lock = false);
 
 	// Ensure that const char * name doesn't end up as a handle
 	// on Windows!
@@ -67,7 +68,8 @@ public:
 		int flags = (O_RDONLY | O_BINARY),
 		int mode = DEFAULT_MODE,
 		lock_mode_t lock_mode = SHARED,
-		bool delete_asap = false);
+		bool delete_asap = false,
+		bool wait_for_lock = false);
 
 	FileStream(tOSFileHandle FileDescriptor, const std::string& rFilename = "",
 		bool delete_asap = false);
@@ -102,8 +104,9 @@ private:
 	tOSFileHandle mOSFileHandle;
 	bool mIsEOF;
 	FileStream(const FileStream &rToCopy) { /* do not call */ }
-	int GetLockFlags(std::string* pMessage = NULL);
-	void OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap);
+	int GetLockFlags(std::string* pMessage = NULL, bool wait_for_lock = false);
+	void OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap,
+		bool wait_for_lock);
 	void AfterOpen(bool delete_asap);
 
 	// for debugging..

@@ -44,13 +44,13 @@
 //
 // --------------------------------------------------------------------------
 FileStream::FileStream(const std::string& mFileName, int flags, int mode,
-	lock_mode_t lock_mode, bool delete_asap)
+	lock_mode_t lock_mode, bool delete_asap, bool wait_for_lock)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
   mFileName(mFileName),
   mLockMode(lock_mode)
 {
-	OpenFile(flags, mode, lock_mode, delete_asap);
+	OpenFile(flags, mode, lock_mode, delete_asap, wait_for_lock);
 }
 
 
@@ -64,13 +64,13 @@ FileStream::FileStream(const std::string& mFileName, int flags, int mode,
 //
 // --------------------------------------------------------------------------
 FileStream::FileStream(const char *pFilename, int flags, int mode,
-	lock_mode_t lock_mode, bool delete_asap)
+	lock_mode_t lock_mode, bool delete_asap, bool wait_for_lock)
 : mOSFileHandle(INVALID_FILE),
   mIsEOF(false),
   mFileName(pFilename),
   mLockMode(lock_mode)
 {
-	OpenFile(flags, mode, lock_mode, delete_asap);
+	OpenFile(flags, mode, lock_mode, delete_asap, wait_for_lock);
 }
 
 
@@ -98,7 +98,7 @@ FileStream::FileStream(tOSFileHandle FileDescriptor, const std::string& rFilenam
 	AfterOpen(delete_asap);
 }
 
-int FileStream::GetLockFlags(std::string* pMessage)
+int FileStream::GetLockFlags(std::string* pMessage, bool wait_for_lock)
 {
 	std::string lock_method_name, lock_message;
 	int flags = 0;
@@ -114,9 +114,17 @@ int FileStream::GetLockFlags(std::string* pMessage)
 	else if(mLockMode == EXCLUSIVE)
 	{
 #ifdef BOX_LOCK_TYPE_O_EXLOCK
-		flags = O_NONBLOCK | O_EXLOCK;
+		flags = O_EXLOCK;
+		if(!wait_for_lock)
+		{
+			flags |= O_NONBLOCK;
+		}
 		lock_method_name = "O_EXLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
+		// CreateFileW cannot wait for a lock. We could use LockFileEx, but currently we
+		// don't need support for it, because it's only needed to wait for the forked
+		// housekeeping process to release its lock on the PID file, and Windows doesn't
+		// do fork().
 		flags = BOX_OPEN_LOCK;
 		lock_method_name = "dwShareMode 0";
 #elif defined BOX_LOCK_TYPE_F_OFD_SETLK
@@ -137,7 +145,11 @@ int FileStream::GetLockFlags(std::string* pMessage)
 	else if(mLockMode == SHARED)
 	{
 #ifdef BOX_LOCK_TYPE_O_EXLOCK
-		flags = O_NONBLOCK | O_SHLOCK;
+		flags = O_SHLOCK;
+		if(!wait_for_lock)
+		{
+			flags |= O_NONBLOCK;
+		}
 		lock_method_name = "O_SHLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
 		// no extra flags needed for FILE_SHARE_READ | FILE_SHARE_WRITE
@@ -169,10 +181,11 @@ int FileStream::GetLockFlags(std::string* pMessage)
 	return flags;
 }
 
-void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap)
+void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap,
+	bool wait_for_lock)
 {
 	std::string lock_message;
-	flags |= GetLockFlags(&lock_message);
+	flags |= GetLockFlags(&lock_message, wait_for_lock);
 
 	BOX_TRACE("Trying to " << (mode & O_CREAT ? "create" : "open") << " " <<
 		(delete_asap ? "temporary " : "") << mFileName << " with " << lock_message);
@@ -228,7 +241,12 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 #ifdef BOX_LOCK_TYPE_FLOCK
 		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
 		int flock_op;
-		if(::flock(mOSFileHandle, (lock_mode == SHARED ? LOCK_SH : LOCK_EX) | LOCK_NB) != 0)
+		int flock_flags = (lock_mode == SHARED ? LOCK_SH : LOCK_EX);
+		if(!wait_for_lock)
+		{
+			flock_flags |= LOCK_NB;
+		}
+		if(::flock(mOSFileHandle, flock_flags) != 0)
 		{
 			Close();
 
@@ -251,9 +269,9 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 		desc.l_pid = 0;
 		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
 #	if defined BOX_LOCK_TYPE_F_OFD_SETLK
-		if(::fcntl(mOSFileHandle, F_OFD_SETLK, &desc) != 0)
+		if(::fcntl(mOSFileHandle, wait_for_lock ? F_OFD_SETLKW : F_OFD_SETLK, &desc) != 0)
 #	else // BOX_LOCK_TYPE_F_SETLK
-		if(::fcntl(mOSFileHandle, F_SETLK, &desc) != 0)
+		if(::fcntl(mOSFileHandle, wait_for_lock ? F_SETLKW : F_SETLK, &desc) != 0)
 #	endif
 		{
 			Close();
@@ -635,7 +653,7 @@ void FileStream::Close()
 	}
 
 	std::string lock_message;
-	GetLockFlags(&lock_message);
+	GetLockFlags(&lock_message, false); // !wait_for_lock
 
 	BOX_TRACE("Closing " << mFileName << " and releasing " << lock_message);
 
