@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <limits.h>
 
-#ifdef HAVE_FCNTL_G
+#ifdef HAVE_FCNTL_H
 	#include <fcntl.h>
 #endif
 
@@ -121,12 +121,11 @@ int FileStream::GetLockFlags(std::string* pMessage, bool wait_for_lock)
 		}
 		lock_method_name = "O_EXLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
-		// CreateFileW cannot wait for a lock. We could use LockFileEx, but currently we
-		// don't need support for it, because it's only needed to wait for the forked
-		// housekeeping process to release its lock on the PID file, and Windows doesn't
-		// do fork().
-		flags = BOX_OPEN_LOCK;
-		lock_method_name = "dwShareMode 0";
+		// CreateFileW cannot wait for a lock, so we no longer use dwShareMode for
+		// locking. Instead we lock the file for shared or exclusive access using
+		// LockFileEx, after opening it for read and write sharing first, to avoid causing
+		// CreateFile() to fail if it's already open and locked exclusively.
+		lock_method_name = "LockFileEx(LOCKFILE_EXCLUSIVE_LOCK)";
 #elif defined BOX_LOCK_TYPE_F_OFD_SETLK
 		lock_method_name = "F_OFD_SETLK, F_WRLCK";
 #elif defined BOX_LOCK_TYPE_F_SETLK
@@ -152,8 +151,11 @@ int FileStream::GetLockFlags(std::string* pMessage, bool wait_for_lock)
 		}
 		lock_method_name = "O_SHLOCK";
 #elif defined BOX_LOCK_TYPE_WIN32
-		// no extra flags needed for FILE_SHARE_READ | FILE_SHARE_WRITE
-		lock_method_name = "dwShareMode FILE_SHARE_READ | FILE_SHARE_WRITE";
+		// CreateFileW cannot wait for a lock, so we no longer use dwShareMode for
+		// locking. Instead we lock the file for shared or exclusive access using
+		// LockFileEx, after opening it for read and write sharing first, to avoid causing
+		// CreateFile() to fail if it's already open and locked exclusively.
+		lock_method_name = "LockFileEx(~LOCKFILE_EXCLUSIVE_LOCK)";
 #elif defined BOX_LOCK_TYPE_F_OFD_SETLK
 		lock_method_name = "F_OFD_SETLK, F_RDLCK";
 #elif defined BOX_LOCK_TYPE_F_SETLK
@@ -181,23 +183,26 @@ int FileStream::GetLockFlags(std::string* pMessage, bool wait_for_lock)
 	return flags;
 }
 
-void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delete_asap,
+void FileStream::OpenFile(int orig_flags, int mode, lock_mode_t lock_mode, bool delete_asap,
 	bool wait_for_lock)
 {
+#ifdef WIN32
+	if(delete_asap)
+	{
+		orig_flags |= O_TEMPORARY;
+	}
+#endif
+
 	std::string lock_message;
-	flags |= GetLockFlags(&lock_message, wait_for_lock);
+	int open_flags = orig_flags | GetLockFlags(&lock_message, wait_for_lock);
 
 	BOX_TRACE("Trying to " << (mode & O_CREAT ? "create" : "open") << " " <<
 		(delete_asap ? "temporary " : "") << mFileName << " with " << lock_message);
 
 #ifdef WIN32
-	if(delete_asap)
-	{
-		flags |= O_TEMPORARY;
-	}
-	mOSFileHandle = ::openfile(mFileName.c_str(), flags, mode);
+	mOSFileHandle = ::openfile(mFileName.c_str(), open_flags, mode);
 #else
-	mOSFileHandle = ::open(mFileName.c_str(), flags, mode);
+	mOSFileHandle = ::open(mFileName.c_str(), open_flags, mode);
 #endif
 
 	if(mOSFileHandle == INVALID_FILE)
@@ -285,6 +290,34 @@ void FileStream::OpenFile(int flags, int mode, lock_mode_t lock_mode, bool delet
 				THROW_SYS_FILE_ERROR("Failed to acquire " << lock_message,
 					mFileName, CommonException, OSFileError);
 			}
+		}
+#elif defined BOX_LOCK_TYPE_WIN32
+		if(lock_mode == SHARED && (orig_flags & (O_WRONLY | O_RDWR)))
+		{
+			// "Locking a portion of a file for shared access denies all processes
+			// write access to the specified region of the file, including the process
+			// that first locks the region. All processes can read the locked region."
+			// So if write access was requested, an exclusive lock is REQUIRED.
+			BOX_WARNING(BOX_FILE_MESSAGE(mFileName, "opened for writing with shared "
+				"lock requested, upgrading to exclusive lock"));
+			lock_mode = mLockMode = EXCLUSIVE;
+		}
+
+		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
+		DWORD flags =
+			(lock_mode == EXCLUSIVE ? LOCKFILE_EXCLUSIVE_LOCK : 0) |
+			(wait_for_lock ? 0 : LOCKFILE_FAIL_IMMEDIATELY);
+		OVERLAPPED overlapped;
+		overlapped.Offset = 0;
+		overlapped.OffsetHigh = 0;
+		overlapped.hEvent = 0;
+
+		if(!LockFileEx(mOSFileHandle, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
+		{
+			BOX_LOG_WIN_WARNING(
+				BOX_FILE_MESSAGE(mFileName, "Failed to acquire " << lock_message)
+			);
+			lock_failed = true;
 		}
 #endif
 	} // if(lock_mode == SHARED || lock_mode == EXCLUSIVE)
@@ -658,6 +691,22 @@ void FileStream::Close()
 	BOX_TRACE("Closing " << mFileName << " and releasing " << lock_message);
 
 #ifdef WIN32
+#	if defined BOX_LOCK_TYPE_WIN32
+	if(mLockMode == SHARED || mLockMode == EXCLUSIVE)
+	{
+		BOX_TRACE("Trying to unlock " << mFileName << " with " << lock_message);
+		OVERLAPPED overlapped;
+		overlapped.Offset = 0;
+		overlapped.OffsetHigh = 0;
+		overlapped.hEvent = 0;
+		if(!UnlockFileEx(mOSFileHandle, 0, MAXDWORD, MAXDWORD, &overlapped))
+		{
+			THROW_WIN_FILE_ERROR("Failed to unlock file", mFileName,
+				CommonException, OSFileCloseError);
+		}
+	}
+#endif
+
 	if(::CloseHandle(mOSFileHandle) == 0)
 	{
 		THROW_WIN_FILE_ERROR("Failed to close file", mFileName,

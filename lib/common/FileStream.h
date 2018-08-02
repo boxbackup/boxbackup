@@ -57,7 +57,7 @@ public:
 	FileStream(const std::string& rFilename,
 		int flags = (O_RDONLY | O_BINARY),
 		int mode = DEFAULT_MODE,
-		lock_mode_t lock_mode = SHARED,
+		lock_mode_t lock_mode = NONE,
 		bool delete_asap = false,
 		bool wait_for_lock = false);
 
@@ -67,7 +67,7 @@ public:
 	FileStream(const char *pFilename, 
 		int flags = (O_RDONLY | O_BINARY),
 		int mode = DEFAULT_MODE,
-		lock_mode_t lock_mode = SHARED,
+		lock_mode_t lock_mode = NONE,
 		bool delete_asap = false,
 		bool wait_for_lock = false);
 

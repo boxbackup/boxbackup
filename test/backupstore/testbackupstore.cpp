@@ -2893,22 +2893,27 @@ bool test_login_with_no_refcount_db(RaidAndS3TestSpecs::Specialisation& spec)
 	// Test with a bbstored server, which doesn't make sense for S3 tests
 	if(spec.name() == "store")
 	{
+		TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+
 		// Start a server and try again, remotely. This is difficult to debug
 		// because housekeeping may fix the refcount database while we're
 		// stepping through.
 		TEST_THAT_THROWONFAIL(StartServer());
+
+		// We need to close it first on Windows, otherwise we won't be able to delete it
+		// because it's locked exclusively:
+		fs.CloseRefCountDatabase(&fs.GetPermanentRefCountDatabase(true)); // ReadOnly
+
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 		TEST_CHECK_THROWS(connect_and_login(tls_context),
 			ConnectionException, Protocol_UnexpectedReply);
 
 		TEST_THAT(ServerIsAlive(bbstored_pid));
 
-		// Run housekeeping, check that it fixes the refcount db. We need to close the
-		// permanent DB, if open, because housekeeping wants to open a new (potential) DB,
+		// Run housekeeping, check that it fixes the refcount db. We need to have closed
+		// the permanent DB above, because housekeeping wants to open a new (potential) DB
 		// and the filesystem won't let us have a read/write permanent and a potential DB
 		// open at the same time.
-		fs.CloseRefCountDatabase(fs.GetCurrentRefCountDatabase()); // ReadOnly
-
 		TEST_EQUAL_LINE(1, run_housekeeping(fs),
 			"Housekeeping should report 1 error if the refcount db is missing");
 		TEST_THAT(FileExists("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
@@ -3691,4 +3696,3 @@ int test(int argc, const char *argv[])
 
 	return finish_test_suite();
 }
-

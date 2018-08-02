@@ -1123,6 +1123,7 @@ bool test_httpserver()
 		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
+		f2.Close();
 		TEST_EQUAL(0, EMU_UNLINK("testfiles/store/newfile"));
 	}
 
@@ -1241,6 +1242,7 @@ bool test_httpserver()
 		FileStream f1("testfiles/dsfdsfs98.fd");
 		FileStream f2("testfiles/store/newfile");
 		TEST_THAT(f1.CompareWith(f2));
+		f2.Close();
 		TEST_THAT(EMU_UNLINK("testfiles/store/newfile") == 0);
 	}
 
