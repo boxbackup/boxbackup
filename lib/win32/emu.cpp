@@ -589,22 +589,25 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 	}
 
 	// flags could be O_WRONLY | O_CREAT | O_RDONLY
-	DWORD createDisposition = OPEN_EXISTING;
-	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE 
-		| FILE_SHARE_DELETE;
-	DWORD accessRights = FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY 
-		| FILE_READ_EA;
-
-	if (flags & O_WRONLY)
+	DWORD accessRights;
+	if (flags & BOX_OPEN_NOACCESS)
 	{
-		accessRights = FILE_WRITE_DATA;
+		accessRights = 0;
 	}
 	else if (flags & O_RDWR)
 	{
-		accessRights |= FILE_WRITE_ATTRIBUTES 
-			| FILE_WRITE_DATA | FILE_WRITE_EA;
+		accessRights = FILE_GENERIC_READ | FILE_GENERIC_WRITE;
+	}
+	else if (flags & O_WRONLY)
+	{
+		accessRights = FILE_GENERIC_WRITE;
+	}
+	else // O_RDONLY has value 0, so we can only detect it by the absence of the other flags
+	{
+		accessRights = FILE_GENERIC_READ;
 	}
 
+	DWORD createDisposition = OPEN_EXISTING;
 	if (flags & O_CREAT)
 	{
 		createDisposition = OPEN_ALWAYS;
@@ -620,9 +623,26 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		createDisposition = CREATE_NEW;
 	}
 
+	DWORD shareMode;
 	if (flags & BOX_OPEN_LOCK)
 	{
+		// Don't allow sharing with any other process:
 		shareMode = 0;
+	}
+	else
+	{
+		// Do not allow deleting an open file, such as a PID or lock file, by granting
+		// FILE_SHARE_DELETE, unless explicitly asked by passing BOX_FILE_SHARE_DELETE.
+		// A file deleted while open cannot be recreated until all handles are closed
+		// (including this one), unlike on Unix. It remains in a zombie state, and all
+		// access attempts fail with "Access denied". This is less useful than just
+		// blocking the delete:
+		shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+	}
+
+	if (flags & BOX_FILE_SHARE_DELETE)
+	{
+		shareMode |= FILE_SHARE_DELETE;
 	}
 
 	DWORD winFlags = FILE_FLAG_BACKUP_SEMANTICS;

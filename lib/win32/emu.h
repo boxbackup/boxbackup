@@ -16,6 +16,7 @@
 	#define EMU_LSTAT  emu_stat
 	#define EMU_LINK   emu_link
 	#define EMU_UNLINK emu_unlink
+	#define BOX_FILE_SHARE_DELETE 0x100000
 #else
 	#define EMU_STRUCT_STAT struct stat
 	#define EMU_STRUCT_POLLFD struct pollfd
@@ -24,6 +25,7 @@
 	#define EMU_LSTAT  ::lstat
 	#define EMU_LINK   ::link
 	#define EMU_UNLINK ::unlink
+	#define BOX_FILE_SHARE_DELETE 0
 #endif
 
 #ifdef WIN32
@@ -258,6 +260,8 @@ int closedir(DIR *dp);
 
 // local constant to open file exclusively without shared access
 #define BOX_OPEN_LOCK 0x10000
+// local constant to open file without any access at all (needed to wait using LockFileEx)
+#define BOX_OPEN_NOACCESS 0x20000
 
 extern DWORD winerrno; /* used to report errors from openfile() */
 HANDLE openfile(const char *filename, int flags, int mode);
