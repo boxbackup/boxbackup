@@ -87,13 +87,14 @@ public:
 		// If this was a potential database, it should have been
 		// Commit()ed or Discard()ed first.
 		ASSERT(!mIsPotentialDB);
+
 		// If this is a temporary database, we should Discard() it to
 		// delete the file:
 		if(mIsTemporaryDB)
 		{
 			Discard();
 		}
-		else
+		else if(!mReadOnly)
 		{
 			Truncate();
 		}
@@ -278,6 +279,7 @@ void BackupStoreRefCountDatabaseImpl::Truncate()
 {
 	// There is no point truncating a temporary DB:
 	ASSERT(!mIsTemporaryDB);
+	ASSERT(!mReadOnly);
 
 	if (!mapDatabaseFile.get())
 	{
