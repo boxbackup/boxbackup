@@ -471,7 +471,9 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 			"): expected " << pidIfKnown << " but found " <<
 			pid);
 		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");
-		return -1;
+		// We want to return the actual PID, not the one in the PID file, so that if the
+		// server was started, it is always stopped at the end of the test.
+		return pidIfKnown;
 	}
 
 	return pid;
@@ -491,20 +493,25 @@ int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_fi
 bool StopDaemon(int current_pid, const std::string& pid_file,
 	const std::string& memleaks_file, bool wait_for_process)
 {
-	TEST_THAT_OR(current_pid != 0, return false);
-	TEST_THAT_OR(ServerIsAlive(current_pid), return false);
-	TEST_THAT_OR(KillServer(current_pid, wait_for_process), return false);
-	TEST_THAT_OR(!ServerIsAlive(current_pid), return false);
+	if(current_pid != 0)
+	{
+		TEST_THAT_OR(ServerIsAlive(current_pid), return false);
+		TEST_THAT_OR(KillServer(current_pid, wait_for_process), return false);
+		TEST_THAT_OR(!ServerIsAlive(current_pid), return false);
+	}
 
 #ifdef WIN32
 	int unlink_result = EMU_UNLINK(pid_file.c_str());
-	TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
-	if(unlink_result != 0)
+	if(unlink_result != 0 && errno != ENOENT)
 	{
+		TEST_EQUAL_LINE(0, unlink_result, std::string("unlink ") + pid_file);
 		return false;
 	}
 #else
-	TestRemoteProcessMemLeaks(memleaks_file.c_str());
+	if(current_pid != 0)
+	{
+		TestRemoteProcessMemLeaks(memleaks_file.c_str());
+	}
 #endif
 
 	return true;
