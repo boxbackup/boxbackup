@@ -24,8 +24,18 @@ public:
 #else
 		int flags = O_RDONLY,
 #endif
-		int mode = DEFAULT_MODE)
-	: FileStream(filename, flags, mode, FileStream::SHARED, true) // delete_asap
+		int mode = DEFAULT_MODE,
+		// Default to no lock, to allow multiple opens for diffing:
+		lock_mode_t lock_mode = FileStream::NONE)
+	: FileStream(filename,
+#ifdef WIN32
+		// In order for another user to delete the file on closing, we must open it with
+		// FILE_SHARE_DELETE share mode:
+		flags | BOX_FILE_SHARE_DELETE,
+#else
+		flags,
+#endif
+		mode, lock_mode, true) // delete_asap
 	{ }
 
 private:	
