@@ -24,6 +24,9 @@
 // message resource definitions for syslog()
 #include "messages.h"
 
+#define WINDOWS_RECENTLY_CLOSED_RETRIES 10
+#define WINDOWS_RECENTLY_CLOSED_SLEEP 200
+
 DWORD winerrno;
 struct passwd gTempPasswd;
 
@@ -1821,6 +1824,36 @@ int emu_unlink(const char* pFileName)
 
 	BOOL result = DeleteFileW(pBuffer);
 	winerrno  = GetLastError();
+
+	if (!result)
+	{
+		// This is evil. "Even though you've called CloseHandle on the file handle, the
+		// kernel may still have outstanding references that take a few milliseconds to
+		// close... Windows is notorious for this issue. sqlite handles the problem by
+		// retrying the delete operation every 100 milliseconds up to a maximum number."
+		// https://stackoverflow.com/questions/1753209/deletefile-fails-on-recently-closed-file
+
+		for(int i = 0; i < WINDOWS_RECENTLY_CLOSED_RETRIES && (winerrno == ERROR_ACCESS_DENIED ||
+			winerrno == ERROR_SHARING_VIOLATION); i++)
+		{
+			::syslog(LOG_WARNING, "Failed to delete file '%s', sleeping and trying "
+				"again: %s", pFileName, GetErrorMessage(winerrno).c_str());
+			Sleep(WINDOWS_RECENTLY_CLOSED_SLEEP);
+
+			result = DeleteFileW(pBuffer);
+
+			if(result)
+			{
+				break;
+			}
+			else
+			{
+				winerrno = GetLastError();
+				errno = EACCES;
+			}
+		}
+	}
+
 	delete [] pBuffer;
 
 	if (!result)
@@ -1840,8 +1873,7 @@ int emu_unlink(const char* pFileName)
 		}
 		else
 		{
-			::syslog(LOG_WARNING, "Failed to delete file "
-				"'%s': %s", pFileName, 
+			::syslog(LOG_WARNING, "Failed to delete file '%s': %s", pFileName,
 				GetErrorMessage(winerrno).c_str());
 			errno = ENOSYS;
 		}
@@ -1899,11 +1931,11 @@ int emu_rename(const char* pOldFileName, const char* pNewFileName)
 		// retrying the delete operation every 100 milliseconds up to a maximum number."
 		// https://stackoverflow.com/questions/1753209/deletefile-fails-on-recently-closed-file
 
-		for(int i = 0; i < 10 && winerrno == ERROR_ACCESS_DENIED; i++)
+		for(int i = 0; i < WINDOWS_RECENTLY_CLOSED_RETRIES && winerrno == ERROR_ACCESS_DENIED; i++)
 		{
 			::syslog(LOG_WARNING, "Failed to rename file from '%s' to '%s', sleeping "
 				"and trying again", pOldFileName, pNewFileName);
-			Sleep(100);
+			Sleep(WINDOWS_RECENTLY_CLOSED_SLEEP);
 
 			result = MoveFileExW(pOldBuffer, pNewBuffer, MOVEFILE_REPLACE_EXISTING);
 
