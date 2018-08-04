@@ -305,8 +305,6 @@ bool run_housekeeping_and_check_account(BackupFileSystem& filesystem)
 	}
 	TEST_EQUAL_LINE(0, num_housekeeping_errors, "run_housekeeping");
 
-	filesystem.CloseRefCountDatabase(filesystem.GetCurrentRefCountDatabase());
-
 	int num_check_errors = check_account_and_fix_errors(filesystem);
 	TEST_EQUAL_LINE(0, num_check_errors, "check_account_and_fix_errors");
 

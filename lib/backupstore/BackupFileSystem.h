@@ -97,8 +97,9 @@ public:
 	virtual BackupStoreRefCountDatabase&
 		GetPermanentRefCountDatabase(bool ReadOnly) = 0;
 	// SaveRefCountDatabase() uploads a modified database to permanent storage
-	// (if necessary). It must be called with the permanent database. Calling Commit()
-	// on the temporary database calls this function automatically.
+	// (if necessary). It must be called with the permanent database, and it must already
+	// have been Close()d. Calling Commit() on the temporary database calls this function
+	// automatically.
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db) = 0;
 
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0) = 0;
@@ -154,7 +155,10 @@ public:
 	// and the Context to be reopened.
 	void CloseRefCountDatabase(BackupStoreRefCountDatabase* p_refcount_db)
 	{
+		ASSERT(p_refcount_db);
 		ASSERT(p_refcount_db == mapPermanentRefCountDatabase.get());
+		// Ensure that the database is closed before trying to save it:
+		p_refcount_db->Close();
 		SaveRefCountDatabase(*p_refcount_db);
 		mapPermanentRefCountDatabase.reset();
 	}
