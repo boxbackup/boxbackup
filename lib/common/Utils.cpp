@@ -415,7 +415,9 @@ object_exists_t ObjectExists(const std::string& rFilename)
 		}
 		else
 		{
-			THROW_EXCEPTION(CommonException, OSFileError);
+			THROW_EMU_ERROR(
+				BOX_FILE_MESSAGE(rFilename, "Failed to check for existence and type of file"),
+				CommonException, OSFileError);
 		}
 	}
 
