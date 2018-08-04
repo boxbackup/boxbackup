@@ -321,18 +321,6 @@ public:
 	: mapUnderlying(apUnderlying),
 	  mrFileSystem(filesystem)
 	{ }
-	virtual ~BackupStoreRefCountDatabaseWrapper()
-	{
-		// If this is the permanent database, and not read-only, write it to permanent
-		// storage on object destruction. (TODO: avoid double Save() by AfterCommit
-		// handler and this destructor for potential databases).
-		if(this == mrFileSystem.mapPermanentRefCountDatabase.get() &&
-			// ReadOnly: don't make the database read-write if it isn't already
-			!IsReadOnly())
-		{
-			mrFileSystem.SaveRefCountDatabase(*this);
-		}
-	}
 
 	virtual void Commit()
 	{
