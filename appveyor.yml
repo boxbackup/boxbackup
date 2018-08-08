@@ -39,12 +39,6 @@ init:
 
 # scripts that run after cloning repository (before the build step, not after!)
 install:
-  # work around sourceforge brokenness by temporarily download some files ourselves:
-  - ps: New-Item -ItemType Directory -Force -Path $env:TEMP\chocolatey\nsis.portable\3.02.0.20160720
-  - ps: invoke-webrequest -uri https://10gbps-io.dl.sourceforge.net/project/nsis/NSIS%203%20Pre-release/3.0rc2/nsis-3.0rc2.zip -outfile $env:TEMP\chocolatey\nsis.portable\3.02.0.20160720\download
-  - ps: New-Item -ItemType Directory -Force -Path ..\cmake\Download\boost
-  - ps: invoke-webrequest -uri http://download.openpkg.org/components/cache/boost/boost_1_62_0.tar.bz2 -outfile ..\cmake\Download\boost\boost_1_62_0.tar.bz2
-
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
