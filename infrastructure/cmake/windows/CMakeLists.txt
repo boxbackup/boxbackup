@@ -130,6 +130,10 @@ if(NOT EXISTS ${openssl_package_file})
 		DEPENDEES install
 		BYPRODUCTS ${openssl_package_file}
 		ALWAYS 1
+		# Reduce impact on cache, and needless console output, by deleting docs from the
+		# local OpenSSL installation before packaging it:
+		COMMAND ${CMAKE_COMMAND} -E remove_directory
+			${openssl_install_dir}/html
 		COMMAND ${CMAKE_COMMAND} -E tar czvf ${openssl_package_file}
 			${openssl_install_dir}
 	)
