@@ -11,6 +11,8 @@ enable_testing()
 
 set(base_dir ${CMAKE_SOURCE_DIR}/../..)
 
+get_property(generator_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+
 set(files_to_configure
 	bin/bbackupd/bbackupd-config
 	bin/bbstored/bbstored-certs
@@ -363,8 +365,9 @@ else()
 		DESTINATION "." COMPONENT Extras)
 endif()
 
-# We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
-# generators such as MSVC. We need to use a generator expression instead.
+# We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for
+# multi-configuration generators such as MSVC. We need to use a generator expression
+# instead. https://cmake.org/cmake/help/v3.9/prop_gbl/GENERATOR_IS_MULTI_CONFIG.html
 target_compile_definitions(lib_common PUBLIC
 	$<$<CONFIG:Release>:BOX_RELEASE_BUILD>
 	$<$<CONFIG:RelWithDebInfo>:BOX_RELEASE_BUILD>
@@ -404,14 +407,29 @@ if(WIN32)
 	# We must link against zlibstaticD if this is a debug build, otherwise
 	# we have a C runtime mismatch (/MD versus /MDd) and the application
 	# crashes at runtime.
-	find_library(ZLIB_LIBRARY_STATIC_DEBUG NAMES zlibstaticd
-		PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
-	find_library(ZLIB_LIBRARY_STATIC_RELEASE NAMES zlibstatic
-		PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+	if(generator_is_multi_config)
+		find_library(ZLIB_LIBRARY_STATIC_DEBUG NAMES zlibstaticd
+			PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+		find_library(ZLIB_LIBRARY_STATIC_RELEASE NAMES zlibstatic
+			PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+		target_link_libraries(lib_compress PUBLIC
+			debug ${ZLIB_LIBRARY_STATIC_DEBUG}
+			optimized ${ZLIB_LIBRARY_STATIC_RELEASE})
+		message(STATUS "Using ZLIB multi-config: ${ZLIB_LIBRARY_STATIC_DEBUG} ${ZLIB_LIBRARY_STATIC_RELEASE}")
+	elseif(CMAKE_BUILD_TYPE STREQUAL Debug)
+		find_library(ZLIB_LIBRARY_STATIC_DEBUG NAMES zlibstaticd
+			PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+		target_link_libraries(lib_compress PUBLIC
+			debug ${ZLIB_LIBRARY_STATIC_DEBUG})
+		message(STATUS "Using ZLIB ${CMAKE_BUILD_TYPE}: ${ZLIB_LIBRARY_STATIC_DEBUG}")
+	else()
+		find_library(ZLIB_LIBRARY_STATIC_RELEASE NAMES zlibstatic
+			PATHS ${ZLIB_ROOT}/lib NO_DEFAULT_PATH)
+		target_link_libraries(lib_compress PUBLIC
+			optimized ${ZLIB_LIBRARY_STATIC_RELEASE})
+		message(STATUS "Using ZLIB ${CMAKE_BUILD_TYPE}: ${ZLIB_LIBRARY_STATIC_RELEASE}")
+	endif()
 
-	target_link_libraries(lib_compress PUBLIC
-		debug ${ZLIB_LIBRARY_STATIC_DEBUG}
-		optimized ${ZLIB_LIBRARY_STATIC_RELEASE})
 else()
 	find_package(ZLIB REQUIRED)
 	include_directories(${ZLIB_INCLUDE_DIRS})
@@ -419,28 +437,90 @@ else()
 endif()
 
 # Link to OpenSSL
-# Workaround for incorrect library suffixes searched by FindOpenSSL:
-# https://gitlab.kitware.com/cmake/cmake/issues/17604
-if(WIN32 AND MSVC)
-	find_package(OpenSSL)
-	set(OPENSSL_SSL_LIBRARY ${SSL_EAY_RELEASE})
-	set(OPENSSL_CRYPTO_LIBRARY ${LIB_EAY_RELEASE})
-	set(OPENSSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY} crypt32)
-	find_package_handle_standard_args(OpenSSL
-	REQUIRED_VARS
-		OPENSSL_SSL_LIBRARY
-		OPENSSL_CRYPTO_LIBRARY
-		OPENSSL_INCLUDE_DIR
-	VERSION_VAR
-		OPENSSL_VERSION
-	FAIL_MESSAGE
-		"Could NOT find OpenSSL, try to set the path to OpenSSL root folder in the system variable OPENSSL_ROOT_DIR"
+set(OPENSSL_MSVC_STATIC_RT TRUE CACHE BOOL "Link with OpenSSL statically (not using DLLs)")
+
+if(WIN32 AND MSVC AND OPENSSL_ROOT_DIR)
+	# If OPENSSL_ROOT_DIR is specified, we use it exactly, not using
+	# find_package(OpenSSL) because it searches various other paths as well. The
+	# following code is copied from FindOpenSSL.cmake and modified slightly.
+	# https://gitlab.kitware.com/cmake/cmake/issues/17604
+
+	# /MD and /MDd are the standard values - if someone wants to use
+	# others, the libnames have to change here too
+	# use also ssl and ssleay32 in debug as fallback for openssl < 0.9.8b
+	# enable OPENSSL_MSVC_STATIC_RT to get the libs build /MT (Multithreaded no-DLL)
+	# In Visual C++ naming convention each of these four kinds of Windows libraries has it's standard suffix:
+	#   * MD for dynamic-release
+	#   * MDd for dynamic-debug
+	#   * MT for static-release
+	#   * MTd for static-debug
+
+	# Implementation details:
+	# We are using the libraries located in the VC subdir instead of the parent directory eventhough :
+	# libeay32MD.lib is identical to ../libeay32.lib, and
+	# ssleay32MD.lib is identical to ../ssleay32.lib
+	# enable OPENSSL_USE_STATIC_LIBS to use the static libs located in lib/VC/static
+
+	if (OPENSSL_MSVC_STATIC_RT)
+		set(_OPENSSL_MSVC_RT_MODE "MT")
+	else ()
+		set(_OPENSSL_MSVC_RT_MODE "MD")
+	endif ()
+
+	# Since OpenSSL 1.1, lib names are like libcrypto32MTd.lib and libssl32MTd.lib
+	if( "${CMAKE_SIZEOF_VOID_P}" STREQUAL "8" )
+		set(_OPENSSL_MSVC_ARCH_SUFFIX "64")
+	else()
+		set(_OPENSSL_MSVC_ARCH_SUFFIX "32")
+	endif()
+
+	set(_OPENSSL_PATH_SUFFIXES
+		"lib/VC/static"
+		"VC/static"
+		"lib"
 	)
+
+	find_library(LIB_EAY_DEBUG
+		NAMES
+			libcrypto${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+			libcrypto${_OPENSSL_MSVC_RT_MODE}
+			libcrypto
+			libeay32${_OPENSSL_MSVC_RT_MODE}
+			libeay32
+		NAMES_PER_DIR
+		PATHS
+			${OPENSSL_ROOT_DIR}
+		PATH_SUFFIXES
+			${_OPENSSL_PATH_SUFFIXES}
+	)
+
+	find_library(SSL_EAY_DEBUG
+		NAMES
+			libssl${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+			libssl${_OPENSSL_MSVC_RT_MODE}
+			libssl
+			ssleay32${_OPENSSL_MSVC_RT_MODE}
+			ssleay32
+		NAMES_PER_DIR
+		PATHS
+			${OPENSSL_ROOT_DIR}
+		PATH_SUFFIXES
+			${_OPENSSL_PATH_SUFFIXES}
+	)
+
+	if(NOT SSL_EAY_DEBUG)
+		message(FATAL_ERROR "OPENSSL_ROOT_DIR is set, but does not point to valid include/openssl.h and lib/libssl.lib: ${OPENSSL_ROOT_DIR} ${_OPENSSL_PATH_SUFFIXES}")
+	endif()
+
+	set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT_DIR}/include)
+	set(OPENSSL_LIBRARIES ${LIB_EAY_DEBUG} ${SSL_EAY_DEBUG} Crypt32.lib)
 else()
 	find_package(OpenSSL REQUIRED)
 endif()
+
 include_directories(${OPENSSL_INCLUDE_DIR})
 target_link_libraries(lib_crypto PUBLIC ${OPENSSL_LIBRARIES})
+message(STATUS "Linking OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
 # Link to PCRE
 if (WIN32)
@@ -453,8 +533,19 @@ if (WIN32)
 	find_library(pcreposixd_lib_path pcreposixd ${PCRE_ROOT}/lib)
 	find_library(pcre_lib_path  pcre  ${PCRE_ROOT}/lib)
 	find_library(pcred_lib_path pcred ${PCRE_ROOT}/lib)
-	target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}" optimized "${pcreposix_lib_path}")
-	target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}"      optimized "${pcre_lib_path}")
+	if(generator_is_multi_config)
+		target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}"
+			optimized "${pcreposix_lib_path}")
+		target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}"
+			optimized "${pcre_lib_path}")
+	elseif(CMAKE_BUILD_TYPE STREQUAL Debug)
+		target_link_libraries(lib_common PUBLIC debug "${pcreposixd_lib_path}")
+		target_link_libraries(lib_common PUBLIC debug "${pcred_lib_path}")
+	else()
+		target_link_libraries(lib_common PUBLIC optimized "${pcreposix_lib_path}")
+		target_link_libraries(lib_common PUBLIC optimized "${pcre_lib_path}")
+	endif()
+
 	include_directories(${PCRE_ROOT}/include)
 else()
 	find_package(PkgConfig REQUIRED)

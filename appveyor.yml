@@ -16,12 +16,16 @@ configuration:
   - RelWithDebInfo
 
 environment:
-  VisualStudioVersion: 11.0
-  Generator_Base: Visual Studio 11 2012
+  VisualStudioVersion: 14.0
+  Generator_Base: Visual Studio 14 2015
   OPENSSL_VERSION: 1.1.0f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
+
+  matrix:
+    - build_tool: msbuild
+    - build_tool: nmake
 
 cache:
   - '%CMAKE_UNIBUILD_DIR%\cache -> infrastructure\cmake\windows\CMakeLists.txt'
@@ -32,17 +36,26 @@ init:
 # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
   - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
+  - ps: $env:vcvarsall_platform = $(if ($env:PLATFORM.equals('x64')) {'x86_amd64'} else {'x86'})
   - ps: $env:public_config = $($env:CONFIGURATION.replace("RelWithDebInfo", "Release"))
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
   - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:APPVEYOR_REPO_BRANCH.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
   - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:public_config)"
+
+# scripts that run after cloning repository (before the build step, not after!)
+install:
+  # Left near-empty to be overridden by the matrix for build_tool: nmake
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
-# scripts that run after cloning repository (before the build step, not after!)
-install:
+# Remove Xamarin to remove 500 lines of junk from build logs
+# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
+before_build:
+  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
+  # Install packages here, not in install block, to allow install to be overridden by the
+  # matrix for build_tool: nmake and have these commands still run:
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
@@ -54,18 +67,30 @@ install:
   # We install cmake.portable instead of cmake, to get it on the path again
   # <http://disq.us/p/xdknrt>.
 
-  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+  # Set environment to build x86 or amd64 code using the x86 compiler:
+  # https://www.appveyor.com/docs/lang/cpp/. But calling SetEnv with /x64 never works!
+  # Call it with /x86 instead, because that does work, and reset to 64-bit target afterwards:
+  - echo "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /%sane_platform%
+  - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /%sane_platform%
+  # Calling vcvarsall.bat also never works?
+  - echo "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %vcvarsall_platform%
+  - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %vcvarsall_platform%
+  - echo %PATH%
+
   - if not exist %CMAKE_UNIBUILD_DIR% md %CMAKE_UNIBUILD_DIR%
   - cd %CMAKE_UNIBUILD_DIR%
+  - cmake --version
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
-  # the current PATH.
-  - echo cmake -G "%generator_name%"
+  # the current PATH. We also need to specify -T $(DefaultPlatformToolset) to stop CMake
+  # from defaulting to v140 (etc) which AppVeyor says causes problems on some images
+  # (and indeed the build often fails with errors about nonexistent toolsets).
+  - echo cmake -G "%generator_name%" -T $(DefaultPlatformToolset)
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%"
+  - cmake -G "%generator_name%" -T $(DefaultPlatformToolset)
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
@@ -77,15 +102,23 @@ install:
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
 
-# Remove Xamarin to remove 500 lines of junk from build logs
-# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
-before_build:
-  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
-
 build:
   parallel: true
   project: ..\cmake\BoxBackup_Windows.sln
   verbosity: minimal
+
+# Override $generator_name and the build: section (replaced by build_script) when building with nmake:
+for:
+-
+  matrix:
+    only:
+      - build_tool: nmake
+
+  install:
+  - ps: $env:generator_name="NMake Makefiles"
+
+  build_script:
+  - cmd: nmake
 
 test_script:
   # Check the results of the build (cmake directory), and the contents of the cache

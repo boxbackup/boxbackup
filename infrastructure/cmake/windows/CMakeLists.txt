@@ -7,6 +7,7 @@ set_property(DIRECTORY PROPERTY EP_BASE .)
 set(install_dir ${CMAKE_BINARY_DIR}/install)
 set(cache_dir ${CMAKE_BINARY_DIR}/cache)
 file(MAKE_DIRECTORY ${cache_dir})
+get_property(generator_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 
 # Automate the process of downloading, building and "installing" dependencies on Windows,
 # as used by AppVeyor.
@@ -54,15 +55,27 @@ endfunction()
 if(EXISTS ${zlib_package_file})
 	ExternalProject_Cached(zlib ${zlib_package_file} ${zlib_install_dir})
 else()
+	if(generator_is_multi_config)
+		set(zlib_install_command
+			# We need to build both versions, debug and release, because cmake requires
+			# both to be present to generate its multi-configuration project files for
+			# Visual Studio/MSBuild.
+			INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
+			COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
+		)
+	else()
+		set(zlib_install_command
+			INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
+			--config ${CMAKE_BUILD_TYPE}
+		)
+	endif()
+
 	ExternalProject_Add(zlib
 		URL "http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
 		URL_HASH ${ZLIB_HASH}
 		DOWNLOAD_NO_PROGRESS 1
 		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${zlib_install_dir} ${SUB_CMAKE_EXTRA_ARGS}
-		# We need to build both versions, debug and release, because cmake requires both to be
-		# present to generate its multi-configuration project files for Visual Studio/MSBuild.
-		INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
-		COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
+		${zlib_install_command}
 		COMMAND         ${CMAKE_COMMAND} -E tar czvf ${zlib_package_file}
 			${zlib_install_dir}
 		STEP_TARGETS configure install
@@ -146,6 +159,21 @@ set(pcre_package_file "${cache_dir}/pcre_${cmake_lists_hash}.tgz")
 if(EXISTS ${pcre_package_file})
 	ExternalProject_Cached(pcre ${pcre_package_file} ${pcre_install_dir})
 else()
+	if(generator_is_multi_config)
+		set(pcre_install_command
+			# We need to build both versions, debug and release, because cmake requires
+			# both to be present to generate its multi-configuration project files for
+			# Visual Studio/MSBuild.
+			INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
+			COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
+		)
+	else()
+		set(pcre_install_command
+			INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
+			--config ${CMAKE_BUILD_TYPE}
+		)
+	endif()
+
 	ExternalProject_Add(pcre
 		URL "https://ftp.pcre.org/pub/pcre/pcre-${PCRE_VERSION}.tar.bz2"
 		URL_HASH ${PCRE_HASH}
@@ -156,10 +184,7 @@ else()
 		-DPCRE_BUILD_PCRECPP=OFF
 		-DPCRE_BUILD_PCREGREP=OFF
 		-DPCRE_BUILD_TESTS=OFF
-		# We need to build both versions, debug and release, because cmake requires both to be
-		# present to generate its multi-configuration project files for Visual Studio/MSBuild.
-		INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Debug
-		COMMAND         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config Release
+		${pcre_install_command}
 		COMMAND         ${CMAKE_COMMAND} -E tar czvf ${pcre_package_file}
 			${pcre_install_dir}
 	)
