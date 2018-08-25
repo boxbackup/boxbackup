@@ -391,6 +391,13 @@ if(WIN32)
 	target_link_libraries(lib_common PUBLIC dbghelp ws2_32 gdi32)
 endif()
 
+# Our own OpenSSL libraries are prefixed with "lib" even on Windows, unusually. But our PCRE
+# libraries are not. Therefore we need to set CMAKE_FIND_LIBRARY_PREFIXES to check both with and
+# without the "lib" prefix.
+if(WIN32)
+	set(CMAKE_FIND_LIBRARY_PREFIXES "" "lib")
+endif()
+
 # On Windows we want to statically link zlib to make debugging and distribution easier,
 # but FindZLIB.cmake doesn't offer that as an option, so we have to go through some
 # contortions to "find" the correct library. ZLIB_ROOT is required in this case.
@@ -439,7 +446,7 @@ endif()
 # Link to OpenSSL
 set(OPENSSL_MSVC_STATIC_RT TRUE CACHE BOOL "Link with OpenSSL statically (not using DLLs)")
 
-if(WIN32 AND MSVC AND OPENSSL_ROOT_DIR)
+if(DEFINED OPENSSL_ROOT_DIR)
 	# If OPENSSL_ROOT_DIR is specified, we use it exactly, not using
 	# find_package(OpenSSL) because it searches various other paths as well. The
 	# following code is copied from FindOpenSSL.cmake and modified slightly.
@@ -461,6 +468,17 @@ if(WIN32 AND MSVC AND OPENSSL_ROOT_DIR)
 	# ssleay32MD.lib is identical to ../ssleay32.lib
 	# enable OPENSSL_USE_STATIC_LIBS to use the static libs located in lib/VC/static
 
+	set(_openssl_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+	if(WIN32)
+		set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+	else()
+		set(CMAKE_FIND_LIBRARY_SUFFIXES .a )
+	endif()
+
+	# Disable replacement of lib/ components in the search path by lib32 or lib64:
+	set(_openssl_ORIG_CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX ${CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX})
+	set(CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX "")
+
 	if (OPENSSL_MSVC_STATIC_RT)
 		set(_OPENSSL_MSVC_RT_MODE "MT")
 	else ()
@@ -480,40 +498,55 @@ if(WIN32 AND MSVC AND OPENSSL_ROOT_DIR)
 		"lib"
 	)
 
+	set(libcrypto_names
+		crypto${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+		crypto${_OPENSSL_MSVC_RT_MODE}
+		crypto
+		eay32${_OPENSSL_MSVC_RT_MODE}
+		eay32
+	)
+
 	find_library(LIB_EAY_DEBUG
-		NAMES
-			libcrypto${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
-			libcrypto${_OPENSSL_MSVC_RT_MODE}
-			libcrypto
-			libeay32${_OPENSSL_MSVC_RT_MODE}
-			libeay32
+		NAMES ${libcrypto_names}
 		NAMES_PER_DIR
-		PATHS
-			${OPENSSL_ROOT_DIR}
-		PATH_SUFFIXES
-			${_OPENSSL_PATH_SUFFIXES}
+		PATHS ${OPENSSL_ROOT_DIR}
+		PATH_SUFFIXES ${_OPENSSL_PATH_SUFFIXES}
+		NO_DEFAULT_PATH
+	)
+
+	if(NOT LIB_EAY_DEBUG)
+		message(FATAL_ERROR "OPENSSL_ROOT_DIR is set to '${OPENSSL_ROOT_DIR}', but did not find any file matching ${OPENSSL_ROOT_DIR}/{${_OPENSSL_PATH_SUFFIXES}}/${CMAKE_FIND_LIBRARY_PREFIXES}{${libcrypto_names}}{${CMAKE_FIND_LIBRARY_SUFFIXES}}")
+	endif()
+
+	set(libssl_names
+		ssl${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+		ssl${_OPENSSL_MSVC_RT_MODE}
+		ssl
+		ssleay32${_OPENSSL_MSVC_RT_MODE}
+		ssleay32
 	)
 
 	find_library(SSL_EAY_DEBUG
-		NAMES
-			libssl${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
-			libssl${_OPENSSL_MSVC_RT_MODE}
-			libssl
-			ssleay32${_OPENSSL_MSVC_RT_MODE}
-			ssleay32
+		NAMES ${libssl_names}
 		NAMES_PER_DIR
-		PATHS
-			${OPENSSL_ROOT_DIR}
-		PATH_SUFFIXES
-			${_OPENSSL_PATH_SUFFIXES}
+		PATHS ${OPENSSL_ROOT_DIR}
+		PATH_SUFFIXES ${_OPENSSL_PATH_SUFFIXES}
+		NO_DEFAULT_PATH
 	)
 
 	if(NOT SSL_EAY_DEBUG)
-		message(FATAL_ERROR "OPENSSL_ROOT_DIR is set, but does not point to valid include/openssl.h and lib/libssl.lib: ${OPENSSL_ROOT_DIR} ${_OPENSSL_PATH_SUFFIXES}")
+		message(FATAL_ERROR "OPENSSL_ROOT_DIR is set to '${OPENSSL_ROOT_DIR}', but did not find any file matching ${OPENSSL_ROOT_DIR}/{${_OPENSSL_PATH_SUFFIXES}}/${CMAKE_FIND_LIBRARY_PREFIXES}{${libssl_names}}{${CMAKE_FIND_LIBRARY_SUFFIXES}}")
 	endif()
 
 	set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT_DIR}/include)
-	set(OPENSSL_LIBRARIES ${LIB_EAY_DEBUG} ${SSL_EAY_DEBUG} Crypt32.lib)
+	set(OPENSSL_LIBRARIES ${LIB_EAY_DEBUG} ${SSL_EAY_DEBUG})
+
+	if(WIN32)
+		set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} crypt32.lib)
+	endif()
+
+	set(CMAKE_FIND_LIBRARY_SUFFIXES ${_openssl_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+	set(CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX ${_openssl_ORIG_CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX})
 else()
 	find_package(OpenSSL REQUIRED)
 endif()
@@ -523,11 +556,7 @@ target_link_libraries(lib_crypto PUBLIC ${OPENSSL_LIBRARIES})
 message(STATUS "Linking OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
 # Link to PCRE
-if (WIN32)
-	if(NOT DEFINED PCRE_ROOT)
-		message(FATAL_ERROR "You must set PCRE_ROOT to point to include/pcreposix.h and lib/pcreposix[d].lib on Windows")
-	endif()
-
+if(DEFINED PCRE_ROOT)
 	target_compile_definitions(lib_common PUBLIC -DPCRE_STATIC)
 	find_library(pcreposix_lib_path  pcreposix  ${PCRE_ROOT}/lib)
 	find_library(pcreposixd_lib_path pcreposixd ${PCRE_ROOT}/lib)
@@ -548,6 +577,10 @@ if (WIN32)
 
 	include_directories(${PCRE_ROOT}/include)
 else()
+	if(WIN32)
+		message(FATAL_ERROR "You must set PCRE_ROOT to point to include/pcreposix.h and lib/pcreposix[d].lib on Windows")
+	endif()
+
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(PCRE REQUIRED libpcreposix)
 	include_directories(${PCRE_INCLUDE_DIRS})

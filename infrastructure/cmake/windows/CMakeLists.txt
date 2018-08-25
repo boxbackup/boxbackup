@@ -47,7 +47,11 @@ function(ExternalProject_Cached project_name package_file install_path)
 			"No configure step needed (using cached package)"
 		BUILD_COMMAND ${CMAKE_COMMAND} -E echo
 			"No build step needed (using cached package)"
-		INSTALL_COMMAND ${CMAKE_COMMAND} -E tar xzvf ${package_file}
+		INSTALL_COMMAND
+			${CMAKE_COMMAND} -E echo
+			"Extracting ${package_file} to ${install_path}"
+		COMMAND
+			${CMAKE_COMMAND} -E tar xzvf ${package_file}
 			${install_path}
 	)
 endfunction()

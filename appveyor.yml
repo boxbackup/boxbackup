@@ -120,6 +120,10 @@ for:
   build_script:
   - cmd: nmake
 
+on_failure:
+  - dir %CMAKE_UNIBUILD_DIR%\install\openssl
+  - dir %CMAKE_UNIBUILD_DIR%\install\openssl\lib
+
 test_script:
   # Check the results of the build (cmake directory), and the contents of the cache
   - cd %CMAKE_UNIBUILD_DIR%\Build\boxbackup
