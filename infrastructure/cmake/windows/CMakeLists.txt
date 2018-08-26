@@ -47,12 +47,24 @@ function(ExternalProject_Cached project_name package_file install_path)
 			"No configure step needed (using cached package)"
 		BUILD_COMMAND ${CMAKE_COMMAND} -E echo
 			"No build step needed (using cached package)"
-		INSTALL_COMMAND
+		INSTALL_COMMAND ${CMAKE_COMMAND} -E echo
+			"No install step needed (using cached package)"
+	)
+	# We want our tar files to contain the Install/<package> prefix (not for any
+	# very special reason, only for consistency and so that we can identify them
+	# in the extraction logs) which means that we must extract them in the
+	# binary (top-level build) directory to have them installed in the right
+	# place for subsequent ExternalProjects to pick them up. It seems that the
+	# only way to control the working directory is with Add_Step!
+	ExternalProject_Add_Step(${project_name} extract
+		ALWAYS 1
+		COMMAND
 			${CMAKE_COMMAND} -E echo
 			"Extracting ${package_file} to ${install_path}"
 		COMMAND
 			${CMAKE_COMMAND} -E tar xzvf ${package_file}
 			${install_path}
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 	)
 endfunction()
 
@@ -88,6 +100,16 @@ endif()
 
 set(openssl_install_dir "${install_dir}/openssl")
 set(openssl_package_file "${cache_dir}/openssl_${cmake_lists_hash}.tgz")
+
+# Note: because this is evaluated when CMake is run, not when make is run, you will need to rerun
+# CMake to detect and use any generated packages. This works well enough for the main use case,
+# which is speeding up AppVeyor builds, since the cache from a previous run is always restored
+# before CMake is run.
+if(EXISTS ${openssl_package_file})
+	message(STATUS "Using cached package file: ${openssl_package_file}")
+else()
+	message(STATUS "No cached package file found: ${openssl_package_file}")
+endif()
 
 if(EXISTS ${openssl_package_file})
 	ExternalProject_Cached(openssl ${openssl_package_file} ${openssl_install_dir})
@@ -141,12 +163,17 @@ else()
 	)
 endif()
 
+# Common to the three non-cached cases above: create cache package after build:
+
+# Note: because this is evaluated when CMake is run, not when make is run, you will need to rerun
+# CMake to stop it repackaging your already-packaged sources. This works well enough for the main
+# use case, which is speeding up AppVeyor builds, since the cache from a previous run is always
+# restored before CMake is run, so if we already have a package then this code will never be run.
 if(NOT EXISTS ${openssl_package_file})
-	# Common to the three non-cached cases above: create cache package after build:
 	ExternalProject_Add_Step(openssl package
 		DEPENDEES install
 		BYPRODUCTS ${openssl_package_file}
-		ALWAYS 1
+		COMMAND ${CMAKE_COMMAND} -E echo "Updating cached package file: ${openssl_package_file}"
 		# Reduce impact on cache, and needless console output, by deleting docs from the
 		# local OpenSSL installation before packaging it:
 		COMMAND ${CMAKE_COMMAND} -E remove_directory
