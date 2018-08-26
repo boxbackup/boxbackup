@@ -53,6 +53,8 @@ install:
 # Remove Xamarin to remove 500 lines of junk from build logs
 # http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
 before_build:
+  - ps: $env:cmake_toolset_args = $(if ($env:build_tool.equals('msbuild')) {'-T $(DefaultPlatformToolset)'} else {''})
+
   - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
   # Install packages here, not in install block, to allow install to be overridden by the
   # matrix for build_tool: nmake and have these commands still run:
@@ -85,12 +87,12 @@ before_build:
   # the current PATH. We also need to specify -T $(DefaultPlatformToolset) to stop CMake
   # from defaulting to v140 (etc) which AppVeyor says causes problems on some images
   # (and indeed the build often fails with errors about nonexistent toolsets).
-  - echo cmake -G "%generator_name%" -T $(DefaultPlatformToolset)
+  - echo cmake -G "%generator_name%" %cmake_toolset_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%" -T $(DefaultPlatformToolset)
+  - cmake -G "%generator_name%" %cmake_toolset_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
