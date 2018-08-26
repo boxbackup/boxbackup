@@ -765,7 +765,7 @@ void BackupDaemon::Run2()
 	DeleteAllIDMaps();
 }
 
-std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling()
+std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling(bool return_context)
 {
 	bool errorOccurred = false;
 	int errorCode = 0, errorSubCode = 0;
@@ -876,6 +876,16 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 	// If we were retrying after an error, and this backup succeeded,
 	// then now would be a good time to stop :-)
 	mDoSyncForcedByPreviousSyncError = errorOccurred && !isBerkelyDbFailure;
+
+	// If we are not returning the context, then release it before signalling to any command
+	// socket client that the backup is finished, because (especially in tests) they may believe
+	// that they can immediately kill the daemon when that happens. That is dangerous because
+	// S3 contexts will not have had time to upload any modified files, e.g. BackupStoreInfo
+	// and refcount DB before being killed.
+	if(!return_context)
+	{
+		mapClientContext.reset();
+	}
 
 	OnBackupFinish();
 	return mapClientContext; // releases mapClientContext

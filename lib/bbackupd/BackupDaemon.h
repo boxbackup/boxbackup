@@ -135,7 +135,9 @@ private:
 
 public:
 	void InitCrypto();
-	std::auto_ptr<BackupClientContext> RunSyncNowWithExceptionHandling();
+	std::auto_ptr<BackupClientContext> RunSyncNowWithExceptionHandling(
+		bool return_context = false
+	);
 	std::auto_ptr<BackupClientContext> RunSyncNow();
 	void ResetCachedState();
 	void OnBackupStart();

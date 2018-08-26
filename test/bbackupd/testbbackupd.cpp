@@ -1904,7 +1904,6 @@ bool test_bbackupd_responds_to_connection_failure()
 		TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
 
 		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
-		std::auto_ptr<BackupClientContext> apClientContext;
 
 		{
 			Console& console(Logging::GetConsole());
@@ -1915,7 +1914,7 @@ bool test_bbackupd_responds_to_connection_failure()
 				console.Filter(Log::NOTHING);
 			}
 
-			apClientContext = bbackupd.RunSyncNowWithExceptionHandling();
+			bbackupd.RunSyncNowWithExceptionHandling();
 		}
 
 		// Should only have been triggered once
