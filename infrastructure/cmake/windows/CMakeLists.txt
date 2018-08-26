@@ -139,7 +139,7 @@ elseif(WIN32)
 		TEST_COMMAND    nmake /s test
 		# The only way to silence all the "Copying..." messages appears to be redirecting
 		# to /dev/null:
-		INSTALL_COMMAND cmd /c "nmake /s install >nul"
+		INSTALL_COMMAND cmd /c "nmake /s install_sw >nul"
 		STEP_TARGETS build test
 	)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -150,6 +150,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 		DOWNLOAD_NO_PROGRESS 1
 		CONFIGURE_COMMAND perl Configure darwin64-x86_64-cc
 			--prefix=${openssl_install_dir}
+		INSTALL_COMMAND make install_sw
 		BUILD_IN_SOURCE 1
 	)
 else()
@@ -159,6 +160,7 @@ else()
 		URL_HASH ${OPENSSL_HASH}
 		DOWNLOAD_NO_PROGRESS 1
 		CONFIGURE_COMMAND ./config --prefix=${openssl_install_dir}
+		INSTALL_COMMAND make install_sw
 		BUILD_IN_SOURCE 1
 	)
 endif()
