@@ -32,6 +32,7 @@
 #include "BackupStoreInfo.h"
 #include "BoxPortsAndFiles.h"
 #include "CollectInBufferStream.h"
+#include "ClientTestUtils.h"
 #include "FileStream.h"
 #include "MemBlockStream.h"
 #include "RaidFileController.h"
@@ -284,97 +285,12 @@ bool test_depends_in_dirs()
 	TEARDOWN();
 }
 
-bool setup_test_backupstorepatch_specialised(const std::string& spec_name,
-	BackupAccountControl& control)
-{
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), FAIL);
-	}
-
-	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
-	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
-
-	if(spec_name == "s3")
-	{
-		TEST_THAT_OR(
-			dynamic_cast<S3BackupAccountControl&>(control).
-			CreateAccount("test", 30000, 40000) == 0, FAIL);
-	}
-	else if(spec_name == "store")
-	{
-		TEST_THAT_OR(
-			dynamic_cast<BackupStoreAccountControl&>(control).
-			CreateAccount(0, 30000, 40000) == 0, FAIL);
-	}
-	else
-	{
-		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"Don't know how to create accounts for store type: " <<
-			spec_name);
-	}
-
-	return true;
-}
-
-#define SETUP_TEST_BACKUPSTOREPATCH_SPECIALISED(name, control) \
-	SETUP_SPECIALISED(name); \
-	TEST_THAT_OR(setup_test_backupstorepatch_specialised(name, control), FAIL); \
-	try \
-	{ // left open for TEARDOWN_TEST_BACKUPSTOREPATCH_SPECIALISED()
-
-//! Checks account for errors and shuts down daemons at end of every test.
-bool teardown_test_backupstore_specialised(const std::string& spec_name,
-	BackupAccountControl& control)
-{
-	bool status = true;
-
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), status = false);
-	}
-
-	BackupFileSystem& fs(control.GetFileSystem());
-	TEST_THAT_OR(check_reference_counts(
-		fs.GetPermanentRefCountDatabase(true)), // ReadOnly
-		status = false);
-	TEST_EQUAL_OR(0, check_account_and_fix_errors(fs), status = false);
-	control.GetFileSystem().ReleaseLock();
-
-	return status;
-}
-
-#define TEARDOWN_TEST_BACKUPSTOREPATCH_SPECIALISED(name, control) \
-		if (ServerIsAlive(bbstored_pid)) \
-			StopServer(); \
-		if(control.GetCurrentFileSystem() != NULL) \
-		{ \
-			control.GetCurrentFileSystem()->ReleaseLock(); \
-		} \
-		TEST_THAT_OR(teardown_test_backupstore_specialised(name, control), FAIL); \
-	} \
-	catch (BoxException &e) \
-	{ \
-		BOX_WARNING("Specialised test failed with exception, cleaning up: " << \
-			name << ": " << e.what()); \
-		if (ServerIsAlive(bbstored_pid)) \
-			StopServer(); \
-		if(control.GetCurrentFileSystem() != NULL) \
-		{ \
-			control.GetCurrentFileSystem()->ReleaseLock(); \
-		} \
-		TEST_THAT(teardown_test_backupstore_specialised(name, control)); \
-		throw; \
-	} \
-	TEARDOWN();
-
 TLSContext context;
 
-bool test_housekeeping_patch_merging(const std::string& specialisation_name,
-	BackupAccountControl& control)
+bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_BACKUPSTOREPATCH_SPECIALISED(specialisation_name, control);
-	BackupFileSystem& fs(control.GetFileSystem());
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	std::string storeRootDir;
 	int discSet = 0;
@@ -504,14 +420,14 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 		int64_t newer = newer_exists ? test_files[f + 1].IDOnServer : 0;
 		int64_t older = older_exists ? test_files[f - 1].IDOnServer : 0;
 
-		if(specialisation_name == "s3")
+		if(spec.name() == "s3")
 		{
 			bool newer_depends_on_us = newer_exists &&
 				!test_files[f + 1].IsCompletelyDifferent;
 			test_files[f].DependsOn = test_files[f].IsCompletelyDifferent ? 0 : older;
 			test_files[f].RequiredBy = newer_depends_on_us ? newer : 0;
 		}
-		else if(specialisation_name == "store")
+		else if(spec.name() == "store")
 		{
 			bool depends_on_newer = newer_exists &&
 				!test_files[f + 1].IsCompletelyDifferent;
@@ -599,9 +515,9 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 
 					// Test that size is plausible
 #ifdef BOX_RELEASE_BUILD
-					int minimum_size = (specialisation_name == "s3" ? 1 : 40);
+					int minimum_size = (spec.name() == "s3" ? 1 : 40);
 #else
-					int minimum_size = (specialisation_name == "s3" ? 4 : 40);
+					int minimum_size = (spec.name() == "s3" ? 4 : 40);
 #endif
 					if(en->GetDependsOnObject() == 0)
 					{
@@ -789,7 +705,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 			// If this file is deleted, but was completely different, then its blocks
 			// have been incorporated into the later file (s3 stores), so that file is
 			// now completely different.
-			if(specialisation_name == "store")
+			if(spec.name() == "store")
 			{
 				older_is_completely_different = test_files[older].IsCompletelyDifferent;
 			}
@@ -811,7 +727,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 			// If this file is deleted, but was completely different, then its blocks
 			// have been incorporated into the older file (backupstore stores), so that
 			// file is now completely different.
-			if(specialisation_name == "s3")
+			if(spec.name() == "s3")
 			{
 				newer_is_completely_different = test_files[newer].IsCompletelyDifferent;
 			}
@@ -827,7 +743,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 			}
 		}
 
-		if(specialisation_name == "s3")
+		if(spec.name() == "s3")
 		{
 			if(newer < (int)NUMBER_FILES)
 			{
@@ -848,7 +764,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 					test_files[newer].IDOnServer : 0;
 			}
 		}
-		else if(specialisation_name == "store")
+		else if(spec.name() == "store")
 		{
 			if(newer < (int)NUMBER_FILES)
 			{
@@ -881,7 +797,7 @@ bool test_housekeeping_patch_merging(const std::string& specialisation_name,
 		}
 	}
 
-	TEARDOWN_TEST_BACKUPSTOREPATCH_SPECIALISED(specialisation_name, control);
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 int test(int argc, const char *argv[])
@@ -924,10 +840,8 @@ int test(int argc, const char *argv[])
 	TEST_THAT(kill_running_daemons());
 	TEST_THAT(StartSimulator());
 
-	typedef std::map<std::string, BackupAccountControl*> test_specialisation;
-	test_specialisation specialisations;
-	specialisations["s3"] = ap_s3control.get();
-	specialisations["store"] = &storecontrol;
+	std::auto_ptr<RaidAndS3TestSpecs> specs(
+		new RaidAndS3TestSpecs(DEFAULT_BBACKUPD_CONFIG_FILE));
 
 	// Create test files
 	create_test_files();
@@ -935,17 +849,12 @@ int test(int argc, const char *argv[])
 	// Check the basic directory stuff works
 	TEST_THAT(test_depends_in_dirs());
 
-#define RUN_SPECIALISED_TEST(name, pControl, function) \
-	TEST_THAT(function(name, *(pControl)));
+	// Run all tests that take a RaidAndS3TestSpecs::Specialisation argument twice, once with
+	// each specialisation that we have (S3 and BackupStore).
 
-	// Run all tests that take a BackupAccountControl argument twice, once with an
-	// S3BackupAccountControl and once with a BackupStoreAccountControl.
-
-	for(test_specialisation::iterator i = specialisations.begin();
-		i != specialisations.end(); i++)
+	for(auto i = specs->specs().begin(); i != specs->specs().end(); i++)
 	{
-		RUN_SPECIALISED_TEST(i->first, i->second,
-			test_housekeeping_patch_merging);
+		TEST_THAT(test_housekeeping_patch_merging(*i));
 	}
 
 	::free(buffer);
