@@ -36,10 +36,9 @@ include(ExternalProject)
 
 file(MD5 ${CMAKE_CURRENT_LIST_FILE} cmake_lists_hash)
 
-set(zlib_install_dir "${install_dir}/zlib")
-set(zlib_package_file "${cache_dir}/zlib_${cmake_lists_hash}.tgz")
+function(ExternalProject_Use_Cache project_name package_file install_path)
+	message(STATUS "Will use cached package file: ${package_file}")
 
-function(ExternalProject_Cached project_name package_file install_path)
 	ExternalProject_Add(${project_name}
 		DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E echo
 			"No download step needed (using cached package)"
@@ -50,6 +49,7 @@ function(ExternalProject_Cached project_name package_file install_path)
 		INSTALL_COMMAND ${CMAKE_COMMAND} -E echo
 			"No install step needed (using cached package)"
 	)
+
 	# We want our tar files to contain the Install/<package> prefix (not for any
 	# very special reason, only for consistency and so that we can identify them
 	# in the extraction logs) which means that we must extract them in the
@@ -66,10 +66,37 @@ function(ExternalProject_Cached project_name package_file install_path)
 			${install_path}
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 	)
+
+	ExternalProject_Add_StepTargets(${project_name} extract)
 endfunction()
 
+function(ExternalProject_Create_Cache project_name package_file install_path)
+	if(NOT EXISTS ${package_file})
+		# Note: because this is evaluated when CMake is run, not when make is run, you will
+		# need to rerun CMake to stop it repackaging your already-packaged sources. This
+		# works well enough for the main use case, which is speeding up AppVeyor builds,
+		# since the cache from a previous run is always restored before CMake is run, so if
+		# we already have a package then this code will never be run.
+
+		message(STATUS "Will create cached package file: ${package_file}")
+
+		ExternalProject_Add_Step(${project_name} package
+			DEPENDEES install
+			BYPRODUCTS ${package_file}
+			COMMAND ${CMAKE_COMMAND} -E echo "Updating cached package file: ${package_file}"
+			COMMAND ${CMAKE_COMMAND} -E tar czvf ${package_file}
+				${install_path}
+		)
+
+		ExternalProject_Add_StepTargets(${project_name} package)
+	endif()
+endfunction()
+
+set(zlib_install_dir "${install_dir}/zlib")
+set(zlib_package_file "${cache_dir}/zlib_${cmake_lists_hash}.tgz")
+
 if(EXISTS ${zlib_package_file})
-	ExternalProject_Cached(zlib ${zlib_package_file} ${zlib_install_dir})
+	ExternalProject_Use_Cache(zlib ${zlib_package_file} ${zlib_install_dir})
 else()
 	if(generator_is_multi_config)
 		set(zlib_install_command
@@ -92,27 +119,17 @@ else()
 		DOWNLOAD_NO_PROGRESS 1
 		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${zlib_install_dir} ${SUB_CMAKE_EXTRA_ARGS}
 		${zlib_install_command}
-		COMMAND         ${CMAKE_COMMAND} -E tar czvf ${zlib_package_file}
-			${zlib_install_dir}
-		STEP_TARGETS configure install
+		STEP_TARGETS configure build install
 	)
+
+	ExternalProject_Create_Cache(zlib ${zlib_package_file} ${zlib_install_dir})
 endif()
 
 set(openssl_install_dir "${install_dir}/openssl")
 set(openssl_package_file "${cache_dir}/openssl_${cmake_lists_hash}.tgz")
 
-# Note: because this is evaluated when CMake is run, not when make is run, you will need to rerun
-# CMake to detect and use any generated packages. This works well enough for the main use case,
-# which is speeding up AppVeyor builds, since the cache from a previous run is always restored
-# before CMake is run.
 if(EXISTS ${openssl_package_file})
-	message(STATUS "Using cached package file: ${openssl_package_file}")
-else()
-	message(STATUS "No cached package file found: ${openssl_package_file}")
-endif()
-
-if(EXISTS ${openssl_package_file})
-	ExternalProject_Cached(openssl ${openssl_package_file} ${openssl_install_dir})
+	ExternalProject_Use_Cache(openssl ${openssl_package_file} ${openssl_install_dir})
 elseif(WIN32)
 	if(PLATFORM STREQUAL "x64")
 		set(openssl_config debug-VC-WIN64A)
@@ -166,31 +183,13 @@ else()
 endif()
 
 # Common to the three non-cached cases above: create cache package after build:
-
-# Note: because this is evaluated when CMake is run, not when make is run, you will need to rerun
-# CMake to stop it repackaging your already-packaged sources. This works well enough for the main
-# use case, which is speeding up AppVeyor builds, since the cache from a previous run is always
-# restored before CMake is run, so if we already have a package then this code will never be run.
-if(NOT EXISTS ${openssl_package_file})
-	ExternalProject_Add_Step(openssl package
-		DEPENDEES install
-		BYPRODUCTS ${openssl_package_file}
-		COMMAND ${CMAKE_COMMAND} -E echo "Updating cached package file: ${openssl_package_file}"
-		# Reduce impact on cache, and needless console output, by deleting docs from the
-		# local OpenSSL installation before packaging it:
-		COMMAND ${CMAKE_COMMAND} -E remove_directory
-			${openssl_install_dir}/html
-		COMMAND ${CMAKE_COMMAND} -E tar czvf ${openssl_package_file}
-			${openssl_install_dir}
-	)
-	ExternalProject_Add_StepTargets(openssl package)
-endif()
+ExternalProject_Create_Cache(openssl ${openssl_package_file} ${openssl_install_dir})
 
 set(pcre_install_dir "${install_dir}/pcre")
 set(pcre_package_file "${cache_dir}/pcre_${cmake_lists_hash}.tgz")
 
 if(EXISTS ${pcre_package_file})
-	ExternalProject_Cached(pcre ${pcre_package_file} ${pcre_install_dir})
+	ExternalProject_Use_Cache(pcre ${pcre_package_file} ${pcre_install_dir})
 else()
 	if(generator_is_multi_config)
 		set(pcre_install_command
@@ -218,9 +217,9 @@ else()
 		-DPCRE_BUILD_PCREGREP=OFF
 		-DPCRE_BUILD_TESTS=OFF
 		${pcre_install_command}
-		COMMAND         ${CMAKE_COMMAND} -E tar czvf ${pcre_package_file}
-			${pcre_install_dir}
 	)
+
+	ExternalProject_Create_Cache(pcre ${pcre_package_file} ${pcre_install_dir})
 endif()
 
 string(REPLACE "." "_" BOOST_VERSION_UNDERSCORES ${BOOST_VERSION})
