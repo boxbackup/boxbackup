@@ -136,7 +136,7 @@ std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	init_context(rContext);
 	std::auto_ptr<SocketStreamTLS> conn(new SocketStreamTLS);
 	conn->Open(rContext, Socket::TypeINET, hostname,
-		BOX_PORT_BBSTORED_TEST);
+		BOX_PORT_BBSTORED_TEST, SHORT_TIMEOUT);
 	return static_cast<std::auto_ptr<SocketStream> >(conn);
 }
 

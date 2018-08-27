@@ -152,7 +152,8 @@ int main(int argc, const char *argv[])
 		std::string socket = conf.GetKeyValue("CommandSocket");
 		connection.Connect(socket);
 #else
-		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str());
+		connection.Open(Socket::TypeUNIX, conf.GetKeyValue("CommandSocket").c_str(),
+			0, PROTOCOL_DEFAULT_TIMEOUT);
 #endif
 	}
 	catch(...)

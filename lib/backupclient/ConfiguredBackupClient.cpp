@@ -11,6 +11,7 @@
 
 #include "Box.h"
 
+#include "BackupConstants.h"
 #include "BackupFileSystem.h"
 #include "BackupStoreContext.h"
 #include "ConfiguredBackupClient.h"
@@ -40,7 +41,7 @@ BackupStoreDaemonClient::BackupStoreDaemonClient(const Configuration& config)
 
 	// Connect!
 	((SocketStreamTLS *)(apSocket.get()))->Open(mTlsContext,
-		Socket::TypeINET, hostname, port);
+		Socket::TypeINET, hostname, port, BACKUP_STORE_TIMEOUT);
 
 	if(config.GetKeyValueBool("TcpNice"))
 	{

@@ -621,20 +621,20 @@ int test(int argc, const char *argv[])
 			// Make some connections
 			{
 				SocketStream conn1;
-				conn1.Open(Socket::TypeINET, "localhost", 2003);
+				conn1.Open(Socket::TypeINET, "localhost", 2003, SHORT_TIMEOUT);
 
 				#ifndef WIN32
 					SocketStream conn2;
-					conn2.Open(Socket::TypeUNIX, 
-						"testfiles/srv2.sock");
+					conn2.Open(Socket::TypeUNIX, "testfiles/srv2.sock",
+						SHORT_TIMEOUT);
 					SocketStream conn3;
-					conn3.Open(Socket::TypeINET, 
-						"localhost", 2003);
+					conn3.Open(Socket::TypeINET, "localhost", 2003,
+						SHORT_TIMEOUT);
 				#endif // !WIN32
 
 				// Quick check that reconnections fail
 				TEST_CHECK_THROWS(conn1.Open(Socket::TypeUNIX,
-					"testfiles/srv2.sock");, 
+						"testfiles/srv2.sock", SHORT_TIMEOUT),
 					ServerException, SocketAlreadyOpen);
 
 				// Stuff some data around
@@ -700,20 +700,20 @@ int test(int argc, const char *argv[])
 						"testfiles/clientTrustedCAs.pem");
 
 				SocketStreamTLS conn1;
-				conn1.Open(context, Socket::TypeINET, "localhost", 2003);
+				conn1.Open(context, Socket::TypeINET, "localhost", 2003,
+					SHORT_TIMEOUT);
 				#ifndef WIN32
 					SocketStreamTLS conn2;
-					conn2.Open(context, Socket::TypeUNIX,
-						"testfiles/srv3.sock");
+					conn2.Open(context, Socket::TypeUNIX, "testfiles/srv3.sock",
+						0, SHORT_TIMEOUT);
 					SocketStreamTLS conn3;
-					conn3.Open(context, Socket::TypeINET,
-						"localhost", 2003);
+					conn3.Open(context, Socket::TypeINET, "localhost", 2003,
+						SHORT_TIMEOUT);
 				#endif
 
 				// Quick check that reconnections fail
-				TEST_CHECK_THROWS(conn1.Open(context,
-					Socket::TypeUNIX,
-					"testfiles/srv3.sock");,
+				TEST_CHECK_THROWS(conn1.Open(context, Socket::TypeUNIX,
+						"testfiles/srv3.sock", 0, SHORT_TIMEOUT),
 					ServerException, SocketAlreadyOpen);
 
 				// Stuff some data around
@@ -764,9 +764,10 @@ int test(int argc, const char *argv[])
 			// Open a connection to it		
 			std::auto_ptr<SocketStream> apConn(new SocketStream);
 			#ifdef WIN32
-				apConn->Open(Socket::TypeINET, "localhost", 2003);
+				apConn->Open(Socket::TypeINET, "localhost", 2003, SHORT_TIMEOUT);
 			#else
-				apConn->Open(Socket::TypeUNIX, "testfiles/srv4.sock");
+				apConn->Open(Socket::TypeUNIX, "testfiles/srv4.sock", 0,
+					SHORT_TIMEOUT);
 			#endif
 			
 			// Create a protocol

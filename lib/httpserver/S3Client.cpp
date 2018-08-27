@@ -381,8 +381,8 @@ HTTPResponse S3Client::FinishAndSendRequest(HTTPRequest request, IOStream* pStre
 			if (!mapClientSocket.get())
 			{
 				mapClientSocket.reset(new SocketStream());
-				mapClientSocket->Open(Socket::TypeINET,
-					mHostName, mPort);
+				mapClientSocket->Open(Socket::TypeINET, mHostName, mPort,
+					mNetworkTimeout);
 			}
 			response = SendRequest(request, pStreamToSend,
 				pStreamContentType);

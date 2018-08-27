@@ -12,12 +12,15 @@
 
 #include <string>
 
+#include "BackupStoreAccountDatabase.h"
 #include "Test.h"
 
 class BackupAccountControl;
 class BackupProtocolCallable;
 class BackupProtocolClient;
 class BackupFileSystem;
+class BackupStoreInfo;
+class BackupStoreRefCountDatabase;
 class SocketStreamTLS;
 class TLSContext;
 
@@ -168,6 +171,8 @@ bool kill_running_daemons();
 
 #define TEST_COMMAND_RETURNS_ERROR(protocol, command, error) \
 	TEST_COMMAND_RETURNS_ERROR_OR(protocol, command, error,)
+
+#define SHORT_TIMEOUT 5000
 
 #endif // STORETESTUTILS__H
 

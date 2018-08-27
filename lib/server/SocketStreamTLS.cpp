@@ -104,9 +104,9 @@ SocketStreamTLS::~SocketStreamTLS()
 //
 // --------------------------------------------------------------------------
 void SocketStreamTLS::Open(const TLSContext &rContext, Socket::Type Type,
-	const std::string& rName, int Port)
+	const std::string& rName, int Port, int Timeout)
 {
-	SocketStream::Open(Type, rName, Port);
+	SocketStream::Open(Type, rName, Port, Timeout);
 	Handshake(rContext);
 	ResetCounters();
 }

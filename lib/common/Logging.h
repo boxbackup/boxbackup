@@ -156,14 +156,15 @@
 	THROW_EMU_ERROR(BOX_FILE_MESSAGE(filename, message), \
 		exception, subtype)
 
+#define BOX_SOCKET_DESC(_type, _name, _port) \
+	"(type " << _type << ", name " << _name << ", port " << _port << ")"
+
 #ifdef WIN32
 #	define BOX_SOCKET_ERROR_MESSAGE(_type, _name, _port, stuff) \
-	BOX_WIN_ERRNO_MESSAGE(WSAGetLastError(), stuff << " (type " << _type << \
-		", name " << _name << ", port " << _port << ")")
+	BOX_WIN_ERRNO_MESSAGE(WSAGetLastError(), stuff << BOX_SOCKET_DESC(_type, _name, _port))
 #else
 #	define BOX_SOCKET_ERROR_MESSAGE(_type, _name, _port, stuff) \
-	BOX_SYS_ERROR_MESSAGE(stuff << " (type " << _type << ", name " << _name << \
-		", port " << _port << ")")
+	BOX_SYS_ERROR_MESSAGE(stuff << BOX_SOCKET_DESC(_type, _name, _port))
 #endif
 
 #define BOX_FORMAT_HEX32(number) \

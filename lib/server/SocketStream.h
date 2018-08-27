@@ -45,7 +45,8 @@ public:
 	SocketStream(const SocketStream &rToCopy);
 	~SocketStream();
 	
-	void Open(Socket::Type Type, const std::string& rName, int Port = 0);
+	void Open(Socket::Type Type, const std::string& rName, int Port = 0,
+		int Timeout = IOStream::TimeOutInfinite);
 	void Attach(int socket);
 
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
@@ -102,7 +103,7 @@ protected:
 			return (int) BoxTimeToMilliSeconds(remaining);
 		}
 	}
-	bool Poll(short Events, int Timeout);
+	bool Poll(short Events, int Timeout, short* p_events_out = NULL);
 
 private:
 	tOSSocketHandle mSocketHandle;

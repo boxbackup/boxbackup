@@ -38,8 +38,8 @@ private:
 	SocketStreamTLS(const SocketStreamTLS &rToCopy);
 public:
 
-	void Open(const TLSContext &rContext, Socket::Type Type,
-		const std::string& rName, int Port = 0);
+	void Open(const TLSContext &rContext, Socket::Type Type, const std::string& rName,
+		int Port = 0, int Timeout = IOStream::TimeOutInfinite);
 	void Handshake(const TLSContext &rContext, bool IsServer = false);
 	
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);

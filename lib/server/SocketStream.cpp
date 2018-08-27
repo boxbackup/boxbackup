@@ -156,12 +156,22 @@ void SocketStream::Attach(int socket)
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
+void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port,
+	int Timeout)
 {
 	if(mSocketHandle != INVALID_SOCKET_VALUE) 
 	{
 		THROW_EXCEPTION(ServerException, SocketAlreadyOpen)
 	}
+
+	CheckForMissingTimeout(Timeout);
+
+	// NOTE: Although the timeout is mandatory, it is not always honoured. Only if connect()
+	// fails with EINTR will we select() with a timeout. To fix this, it seems that we'd need to
+	// set the socket to nonblocking before connect(), and set it back afterwards, and this is
+	// done quite differently on Windows to other platforms:
+	// https://stackoverflow.com/questions/2597608/c-socket-connection-timeout
+	// https://docs.microsoft.com/en-us/windows/desktop/api/winsock/nf-winsock-ioctlsocket
 	
 	// Setup parameters based on type, looking up names if required
 	int sockDomain = 0;
@@ -184,22 +194,59 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	// Connect it
 	if(::connect(mSocketHandle, &addr.sa_generic, addrLen) == -1)
 	{
-		// Dispose of the socket
-		try
+		if(errno == EINTR)
 		{
-			THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
-				BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
-				"Failed to connect to socket"));
+			// Interrupted system call. Wait for the connect() to complete.
+			// We cannot simply call connect() again: see
+			// http://www.madore.org/~david/computers/connect-intr.html
+			BOX_TRACE(BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
+				"Failed to connect to socket, waiting for "
+				"connection to complete"));
+			short events;
+			if(Poll(POLLOUT | POLLERR, Timeout, &events))
+			{
+				if(events & POLLERR)
+				{
+					mSocketHandle = INVALID_SOCKET_VALUE;
+					THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+						BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
+							"Failed to connect to socket after "
+							"interruption"));
+				}
+				else if(events & POLLOUT)
+				{
+					BOX_TRACE("Delayed connect succeeded " <<
+						BOX_SOCKET_DESC(Type, name_pretty, Port));
+				}
+			}
+			else
+			{
+				mSocketHandle = INVALID_SOCKET_VALUE;
+				THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+					BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
+						"Failed to connect to socket after interruption: "
+						"timed out"));
+			}
 		}
-		catch(ServerException &e)
+		else
 		{
+			// Something unexpected happened. Dispose of the socket.
+			try
+			{
+				THROW_EXCEPTION_MESSAGE(ServerException, SocketOpenError,
+					BOX_SOCKET_ERROR_MESSAGE(Type, name_pretty, Port,
+					"Failed to connect to socket"));
+			}
+			catch(ServerException &e)
+			{
 #ifdef WIN32
-			::closesocket(mSocketHandle);
+				::closesocket(mSocketHandle);
 #else // !WIN32
-			::close(mSocketHandle);
+				::close(mSocketHandle);
 #endif // WIN32
-			mSocketHandle = INVALID_SOCKET_VALUE;
-			throw;
+				mSocketHandle = INVALID_SOCKET_VALUE;
+				throw;
+			}
 		}
 	}
 
@@ -313,7 +360,7 @@ bool SocketStream::ReadFullBuffer(void *pBuffer, int NBytes, int *pNBytesRead, i
 }
 
 
-bool SocketStream::Poll(short Events, int Timeout)
+bool SocketStream::Poll(short Events, int Timeout, short* p_events_out)
 {
 	// Wait for data to send.
 	EMU_STRUCT_POLLFD p;
@@ -344,6 +391,10 @@ bool SocketStream::Poll(short Events, int Timeout)
 
 	default:
 		// good to go!
+		if(p_events_out)
+		{
+			*p_events_out = p.revents;
+		}
 		return true;
 	}
 }

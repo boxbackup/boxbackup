@@ -153,7 +153,7 @@ void SimpleDBClient::SendAndReceive(HTTPRequest& request, HTTPResponse& response
 	int expected_status_code)
 {
 	SocketStream sock;
-	sock.Open(Socket::TypeINET, mHostName, mPort ? mPort : 80);
+	sock.Open(Socket::TypeINET, mHostName, mPort ? mPort : 80, mTimeout);
 
 	// Send() throws exceptions if anything goes wrong.
 	request.Send(sock, mTimeout);
