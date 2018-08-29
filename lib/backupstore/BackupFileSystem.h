@@ -106,7 +106,8 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut) = 0;
 	virtual void PutDirectory(BackupStoreDirectory& rDir) = 0;
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount) = 0;
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount,
+		bool allow_overwrite = false) = 0;
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData,
 		BackupStoreRefCountDatabase::refcount_t refcount) = 0;
@@ -250,7 +251,8 @@ public:
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount,
+		bool allow_overwrite = false);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData,
 		BackupStoreRefCountDatabase::refcount_t refcount);
@@ -341,12 +343,14 @@ public:
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
 	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
+	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
 	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
-		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount);
+		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount,
+		bool allow_overwrite = false);
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData,
 		BackupStoreRefCountDatabase::refcount_t refcount)
@@ -432,7 +436,6 @@ private:
 	void CheckObjectsDir(int64_t start_id,
 		BackupFileSystem::CheckObjectsResult& result, bool fix_errors,
 		const std::string& prefix, std::vector<std::string> files);
-	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
 };
 
 #endif // BACKUPFILESYSTEM__H

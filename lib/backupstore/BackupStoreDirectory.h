@@ -76,7 +76,7 @@ private:
 	// Copying not allowed
 	BackupStoreDirectory(const BackupStoreDirectory &rToCopy);
 public:
-	~BackupStoreDirectory();
+	virtual ~BackupStoreDirectory();
 
 	class Entry
 	{
@@ -292,7 +292,7 @@ public:
 #endif // !BOX_RELEASE_BUILD
 
 	void ReadFromStream(IOStream &rStream, int Timeout);
-	void WriteToStream(IOStream &rStream,
+	virtual void WriteToStream(IOStream &rStream,
 			int16_t FlagsMustBeSet = Entry::Flags_INCLUDE_EVERYTHING,
 			int16_t FlagsNotToBeSet = Entry::Flags_EXCLUDE_NOTHING,
 			bool StreamAttributes = true, bool StreamDependencyInfo = true) const;

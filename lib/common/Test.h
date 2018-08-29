@@ -183,7 +183,7 @@ extern HANDLE sTestChildDaemonJobObject;
 	TEST_EQUAL_OR(_expected, _found,)
 
 // utility macro for comparing two strings in a line
-#define TEST_EQUAL_LINE(_expected, _found, _line) \
+#define TEST_EQUAL_LINE_OR(_expected, _found, _line, or_command) \
 { \
 	std::ostringstream _oss1; \
 	_oss1 << _expected; \
@@ -201,8 +201,12 @@ extern HANDLE sTestChildDaemonJobObject;
 			"but found <" << _found_str << "> " \
 			"in <" << _line << ">"; \
 		TEST_FAIL_WITH_MESSAGE(_oss3.str()); \
+		or_command; \
 	} \
 }
+
+#define TEST_EQUAL_LINE(_expected, _found, _line) \
+	TEST_EQUAL_LINE_OR(_expected, _found, _line,)
 
 // utility macros for testing a string/output line
 #define TEST_LINE(_condition, _line) \

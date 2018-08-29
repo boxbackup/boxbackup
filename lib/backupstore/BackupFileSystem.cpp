@@ -662,20 +662,27 @@ RaidPutFileCompleteTransaction::~RaidPutFileCompleteTransaction()
 
 std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
-	BackupStoreRefCountDatabase::refcount_t refcount)
+	BackupStoreRefCountDatabase::refcount_t refcount, bool allow_overwrite)
 {
 	// Create the containing directory if it doesn't exist.
 	std::string filename = GetObjectFileName(ObjectID, true);
-
-	// We can only do this when the file (ObjectID) doesn't already exist.
-	ASSERT(refcount == 0);
 
 	RaidPutFileCompleteTransaction* pTrans = new RaidPutFileCompleteTransaction(
 		mStoreDiscSet, filename, refcount);
 	std::auto_ptr<BackupFileSystem::Transaction> apTrans(pTrans);
 
 	RaidFileWrite& rStoreFile(pTrans->GetRaidFile());
-	rStoreFile.Open(false); // no overwriting
+
+	if(allow_overwrite)
+	{
+		rStoreFile.Open(true); // allow overwriting
+	}
+	else
+	{
+		// We can only do this when the file (ObjectID) doesn't already exist.
+		ASSERT(refcount == 0);
+		rStoreFile.Open(false); // no overwriting
+	}
 
 	BackupStoreFile::VerifyStream validator(rFileData);
 
@@ -1836,7 +1843,7 @@ S3PutFileCompleteTransaction::~S3PutFileCompleteTransaction()
 
 std::auto_ptr<BackupFileSystem::Transaction>
 S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
-	BackupStoreRefCountDatabase::refcount_t refcount)
+	BackupStoreRefCountDatabase::refcount_t refcount, bool allow_overwrite)
 {
 	ASSERT(refcount == 0 || refcount == 1);
 	BackupStoreFile::VerifyStream validator(rFileData);

@@ -32,7 +32,9 @@ my @check_move = (
 	[]
 );
 
-if($ARGV[0] eq 'init')
+my $command = shift @ARGV;
+
+if($command eq 'init')
 {
 	open(my $fh, ">>", "testfiles/file-listing.txt")
 		or die "cannot open testfiles/file-listing.txt: $!";
@@ -55,8 +57,12 @@ if($ARGV[0] eq 'init')
 
 	close $fh;
 }
-elsif($ARGV[0] eq 'check')
+elsif($command eq 'check')
 {
+	my $specialisation = shift @ARGV;
+	my $config_file = ($specialisation eq "s3") ? "testfiles/bbackupd.s3.conf"
+		: "testfiles/bbackupd.bbstored.conf";
+
 	# build set of expected lines
 	my %expected;
 	my %filenames;
@@ -74,7 +80,7 @@ elsif($ARGV[0] eq 'check')
 	close INITIAL;
 
 	# modify expected lines to match the expected output
-	my $check_num = int($ARGV[1]);
+	my $check_num = int(shift @ARGV);
 	my $n = $check_num;
 	{
 		for(@{$check_add[$n]})
@@ -104,7 +110,7 @@ elsif($ARGV[0] eq 'check')
 
 	# read in the new listing, and compare
 	open LISTING,"../../bin/bbackupquery/bbackupquery -Wwarning " .
-		"-c testfiles/bbackupd.conf " .
+		"-c $config_file " .
 		"\"list -R\" quit |"
 		or die "Can't open list utility";
 	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt'
@@ -138,10 +144,14 @@ elsif($ARGV[0] eq 'check')
 	
 	exit $err;
 }
-elsif($ARGV[0] eq 'reroot')
+elsif($command eq 'reroot')
 {
+	my $specialisation = shift @ARGV;
+	my $config_file = ($specialisation eq "s3") ? "testfiles/bbackupd.s3.conf"
+		: "testfiles/bbackupd.bbstored.conf";
+
 	open LISTING,"../../bin/bbackupquery/bbackupquery -Wwarning " .
-		"-c testfiles/bbackupd.conf " .
+		"-c $config_file " .
 		"\"list -R\" quit |"
 		or die "Can't open list utility";
 	open LISTING_COPY,'>testfiles/listing'.$ARGV[1].'.txt'
