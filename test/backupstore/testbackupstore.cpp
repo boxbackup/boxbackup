@@ -3549,8 +3549,13 @@ bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 		TEST_EQUAL(hostname_buf, fs.GetCurrentHostName());
 		expected["hostname"] = hostname_buf;
 
-		TEST_THAT(fs.GetSinceTime() >= before);
-		TEST_THAT(fs.GetSinceTime() <= after);
+		TEST_LINE(fs.GetSinceTime() >= before, "Lock was apparently taken at " <<
+			FormatTime(fs.GetSinceTime(), false, true) << " which should be after " <<
+			FormatTime(before, false, true) << " but was not");
+		TEST_LINE(fs.GetSinceTime() <= after, "Lock was apparently taken at " <<
+			FormatTime(fs.GetSinceTime(), false, true) << " which should be before " <<
+			FormatTime(after, false, true) << " but was not");
+
 		std::ostringstream since_buf;
 		since_buf << fs.GetSinceTime();
 		expected["since"] = since_buf.str();
