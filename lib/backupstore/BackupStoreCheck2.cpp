@@ -429,7 +429,7 @@ int64_t BackupStoreCheck::GetLostAndFoundDirID()
 	if(!mFixErrors)
 	{
 		// The result will never be used anyway if errors aren't being fixed
-		return 1;
+		return 0;
 	}
 
 	// Load up the root directory
