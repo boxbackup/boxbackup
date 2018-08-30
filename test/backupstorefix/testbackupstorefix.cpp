@@ -1075,7 +1075,7 @@ bool test_directory_bad_object_id_delete_empty_dir_add_reference(
 	}
 
 	// Fix it
-	TEST_THAT(check_for_errors(13, 141, 114, 0, 0, 27, 114, &spec));
+	TEST_THAT(check_for_errors(14, 141, 114, 0, 0, 27, 114, &spec));
 
 	// Check everything is as it should be
 	TEST_THAT(compare_store_contents_with_expected(3, &spec));

@@ -358,9 +358,10 @@ public:
 	{
 		return mapUnderlying->RemoveReference(ObjectID);
 	}
-	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
+	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs,
+		int64_t ignore_object_id = 0)
 	{
-		return mapUnderlying->ReportChangesTo(rOldRefs);
+		return mapUnderlying->ReportChangesTo(rOldRefs, ignore_object_id);
 	}
 };
 

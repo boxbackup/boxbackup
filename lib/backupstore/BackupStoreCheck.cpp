@@ -197,7 +197,12 @@ void BackupStoreCheck::Check()
 		// (temporary) open but not yet committed.
 		BackupStoreRefCountDatabase& old_refs(
 			mrFileSystem.GetPermanentRefCountDatabase(true)); // ReadOnly
-		mNumberErrorsFound += mpNewRefs->ReportChangesTo(old_refs);
+
+		// If we have created a new lost+found directory (and thus allocated it a nonzero
+		// object ID) then it's not surprising that the previous refcount DB did not have
+		// a reference to this directory, and not an error, so ignore it.
+		mNumberErrorsFound += mpNewRefs->ReportChangesTo(old_refs,
+			mLostAndFoundDirectoryID); // ignore_object_id
 	}
 	catch(BoxException &e)
 	{

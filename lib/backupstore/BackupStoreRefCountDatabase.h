@@ -91,7 +91,8 @@ public:
 	virtual void AddReference(int64_t ObjectID) = 0;
 	// RemoveReference returns false if refcount drops to zero
 	virtual bool RemoveReference(int64_t ObjectID) = 0;
-	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs) = 0;
+	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs,
+		int64_t ignore_object_id = 0) = 0;
 };
 
 #endif // BACKUPSTOREREFCOUNTDATABASE__H
