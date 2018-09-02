@@ -285,15 +285,134 @@ bool test_depends_in_dirs()
 	TEARDOWN();
 }
 
+bool check_current_state(RaidAndS3TestSpecs::Specialisation& spec, int just_deleted)
+{
+	int num_failures_initial = num_failures;
+	BackupFileSystem& fs(spec.control().GetFileSystem());
+
+	// Take a lock before actually reading files from disk,
+	// to avoid them changing under our feet.
+	fs.GetLock(30); // try for up to 30 seconds
+
+	// Load up the root directory
+	BackupStoreDirectory dir;
+	fs.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, dir);
+	dir.Dump(std::cout, true);
+
+	// Check that dependency info is correct
+	for(unsigned int f = 0; f < NUMBER_FILES; ++f)
+	{
+		//TRACE1("t f = %d\n", f);
+		BackupStoreDirectory::Entry *en = dir.FindEntryByID(test_files[f].IDOnServer);
+		if(en == 0)
+		{
+			TEST_LINE(test_files[f].HasBeenDeleted,
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") was unexpectedly deleted by housekeeping");
+			// check that unreferenced object was removed by
+			// housekeeping
+			TEST_LINE(!fs.ObjectExists(test_files[f].IDOnServer),
+				"Unreferenced object " << test_files[f].IDOnServer <<
+				" was not deleted by housekeeping");
+		}
+		else
+		{
+			TEST_LINE(!test_files[f].HasBeenDeleted,
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") was unexpectedly not deleted by housekeeping");
+			TEST_EQUAL_LINE(test_files[f].DependsOn, en->GetDependsOnObject(),
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") depends on unexpected object after housekeeping");
+			TEST_EQUAL_LINE(test_files[f].RequiredBy, en->GetRequiredByObject(),
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") depended on by unexpected object after housekeeping");
+
+			// Test that size is plausible
+#ifdef BOX_RELEASE_BUILD
+			int minimum_size = (spec.name() == "s3" ? 1 : 40);
+#else
+			int minimum_size = (spec.name() == "s3" ? 4 : 40);
+#endif
+			if(en->GetDependsOnObject() == 0)
+			{
+				// Should be a full file
+				TEST_LINE(en->GetSizeInBlocks() >= minimum_size,
+					"Test file " << f << " (id " <<
+					BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+					") was smaller than expected: "
+					"wanted a full file with >= " << minimum_size <<
+					" blocks, but found " << en->GetSizeInBlocks());
+			}
+			else
+			{
+				// Should be a patch
+				TEST_LINE(en->GetSizeInBlocks() <= minimum_size,
+					"Test file " << f << " (id " <<
+					BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+					") was larger than expected: "
+					"wanted a patch file with <= " << minimum_size <<
+					" blocks, but found " << en->GetSizeInBlocks());
+			}
+		}
+
+		// All the files that we've deleted so far should have had
+		// HasBeenDeleted set to true.
+		if(test_files[f].HasBeenDeleted)
+		{
+			TEST_LINE(en == NULL, "Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") should have been deleted by this point");
+		}
+		else if(en == 0)
+		{
+			TEST_FAIL_WITH_MESSAGE("Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") was unexpectedly deleted, cannot check its size");
+		}
+		// If the file that was just deleted was a patch that this file depended on,
+		// then it should have been merged with this file, which should have made this
+		// file larger. But that might not translate to a larger number of blocks.
+		else if(just_deleted != -1 &&
+			test_files[just_deleted].RequiredBy == test_files[f].IDOnServer)
+		{
+			TEST_LINE(en->GetSizeInBlocks() >= test_files[f].CurrentSizeInBlocks,
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") has been merged with another patch, so it "
+				"should be larger than its previous size of " <<
+				test_files[f].CurrentSizeInBlocks << " blocks, but it is " <<
+				en->GetSizeInBlocks() << " blocks now");
+		}
+		else
+		{
+			// This file should not have changed in size.
+			TEST_EQUAL_LINE(test_files[f].CurrentSizeInBlocks, en->GetSizeInBlocks(),
+				"Test file " << f << " (id " <<
+				BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
+				") unexpectedly changed size");
+		}
+
+		if(en != 0)
+		{
+			// Update test_files to record new size for next pass:
+			test_files[f].CurrentSizeInBlocks = en->GetSizeInBlocks();
+		}
+	}
+
+	fs.ReleaseLock();
+	return (num_failures == num_failures_initial);
+}
+
 TLSContext context;
 
 bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	SETUP_TEST_SPECIALISED(spec);
 	BackupFileSystem& fs(spec.control().GetFileSystem());
-
-	std::string storeRootDir;
-	int discSet = 0;
 
 	// Open a connection to the server
 	BackupStoreContext context(fs, NULL, // mpHousekeeping
@@ -438,148 +557,17 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 		test_files[f].HasBeenDeleted = false;
 	}
 
+	// Check the initial state. Unlock the store to allow us to lock and access it directly:
+	protocol.QueryFinished();
+	TEST_THAT(check_current_state(spec, -1)); // just_deleted
+
 	// Check the stuff on the server
 	int deleteIndex = 0;
 	for(int i = 0; ; i++)
 	{
-		// Unlock the store to allow us to lock and access it directly:
-		protocol.QueryFinished();
-
-		// Load up the root directory
-		BackupStoreDirectory dir;
-		{
-			// Take a lock before actually reading files from disk,
-			// to avoid them changing under our feet.
-			fs.GetLock(30); // try for up to 30 seconds
-
-			std::auto_ptr<IOStream> dirStream(
-				fs.GetObject(BACKUPSTORE_ROOT_DIRECTORY_ID)
-			);
-			dir.ReadFromStream(*dirStream, SHORT_TIMEOUT);
-			dir.Dump(std::cout, true);
-
-			// Find the test_files entry for the file that was just deleted:
-			int just_deleted = deleteIndex == 0 ? -1 : test_file_remove_order[deleteIndex - 1];
-
-			file_info* p_just_deleted;
-			if(just_deleted == 0 || just_deleted == -1)
-			{
-				p_just_deleted = NULL;
-			}
-			else
-			{
-				p_just_deleted = test_files + just_deleted;
-				set_refcount(test_files[just_deleted].IDOnServer, 0);
-			}
-
-			// Check that dependency info is correct
-			for(unsigned int f = 1; f < NUMBER_FILES; ++f)
-			{
-				//TRACE1("t f = %d\n", f);
-				BackupStoreDirectory::Entry *en = dir.FindEntryByID(test_files[f].IDOnServer);
-				if(en == 0)
-				{
-					TEST_LINE(test_files[f].HasBeenDeleted,
-						"Test file " << f << " (id " <<
-						BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-						") was unexpectedly deleted by housekeeping");
-					// check that unreferenced object was removed by
-					// housekeeping
-					std::string filenameOut;
-					StoreStructure::MakeObjectFilename(
-						test_files[f].IDOnServer,
-						storeRootDir, discSet,
-						filenameOut,
-						false /* don't bother ensuring the directory exists */);
-					std::ostringstream msg;
-					msg << "Unreferenced object " <<
-						test_files[f].IDOnServer <<
-						" was not deleted by housekeeping";
-					TEST_LINE(!fs.ObjectExists(test_files[f].IDOnServer),
-						msg.str());
-				}
-				else
-				{
-					TEST_LINE(!test_files[f].HasBeenDeleted,
-						"Test file " << f << " (id " <<
-						BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-						") was unexpectedly not deleted by housekeeping");
-					TEST_EQUAL_LINE(test_files[f].DependsOn, en->GetDependsOnObject(),
-						"Test file " << f << " (id " <<
-						BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-						") depends on unexpected object after housekeeping");
-					TEST_EQUAL_LINE(test_files[f].RequiredBy, en->GetRequiredByObject(),
-						"Test file " << f << " (id " <<
-						BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-						") depended on by unexpected object after housekeeping");
-
-					// Test that size is plausible
-#ifdef BOX_RELEASE_BUILD
-					int minimum_size = (spec.name() == "s3" ? 1 : 40);
-#else
-					int minimum_size = (spec.name() == "s3" ? 4 : 40);
-#endif
-					if(en->GetDependsOnObject() == 0)
-					{
-						// Should be a full file
-						TEST_LINE(en->GetSizeInBlocks() >= minimum_size,
-							"Test file " << f << " (id " <<
-							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-							") was smaller than expected: "
-							"wanted a full file with >= " << minimum_size <<
-							" blocks, but found " << en->GetSizeInBlocks());
-					}
-					else
-					{
-						// Should be a patch
-						TEST_LINE(en->GetSizeInBlocks() <= minimum_size,
-							"Test file " << f << " (id " <<
-							BOX_FORMAT_OBJECTID(test_files[f].IDOnServer) <<
-							") was larger than expected: "
-							"wanted a patch file with <= " << minimum_size <<
-							" blocks, but found " << en->GetSizeInBlocks());
-					}
-				}
-
-				// All the files that we've deleted so far should have had
-				// HasBeenDeleted set to true.
-				if(test_files[f].HasBeenDeleted)
-				{
-					TEST_LINE(en == NULL, "File " << f << " should have been "
-						"deleted by this point")
-				}
-				else if(en == 0)
-				{
-					TEST_FAIL_WITH_MESSAGE("File " << f << " has been unexpectedly "
-						"deleted, cannot check its size");
-				}
-				// If the file that was just deleted was a patch that this file depended on,
-				// then it should have been merged with this file, which should have made this
-				// file larger. But that might not translate to a larger number of blocks.
-				else if(test_files[just_deleted].RequiredBy == test_files[f].IDOnServer)
-				{
-					TEST_LINE(en->GetSizeInBlocks() >= test_files[f].CurrentSizeInBlocks,
-						"File " << f << " has been merged with an older patch, "
-						"so it should be larger than its previous size of " <<
-						test_files[f].CurrentSizeInBlocks << " blocks, but it is " <<
-						en->GetSizeInBlocks() << " blocks now");
-				}
-				else
-				{
-					// This file should not have changed in size.
-					TEST_EQUAL_LINE(test_files[f].CurrentSizeInBlocks, en->GetSizeInBlocks(),
-						"File " << f << " unexpectedly changed size");
-				}
-
-				if(en != 0)
-				{
-					// Update test_files to record new size for next pass:
-					test_files[f].CurrentSizeInBlocks = en->GetSizeInBlocks();
-				}
-			}
-
-			fs.ReleaseLock();
-		}
+		int todel = test_file_remove_order[deleteIndex++];
+		std::cout << std::endl << "Pass " << i << ": delete file " << todel <<
+			" (ID " << test_files[todel].IDOnServer << ")" << std::endl;
 
 		// Pull all the files down, and check that they (still) match the files
 		// that we uploaded earlier.
@@ -646,6 +634,7 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 
 		// Take a lock before modifying the directory
 		fs.GetLock();
+		BackupStoreDirectory dir;
 		fs.GetDirectory(BackupProtocolListDirectory::RootDirectory, dir);
 
 		// Mark one of the elements as deleted
@@ -654,11 +643,6 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 			// Nothing left to do
 			break;
 		}
-
-		int todel = test_file_remove_order[deleteIndex++];
-
-		std::cout << std::endl << "Pass " << i << ": delete file " << todel <<
-			" (ID " << test_files[todel].IDOnServer << ")" << std::endl;
 
 		// Modify the entry
 		BackupStoreDirectory::Entry *pentry = dir.FindEntryByID(test_files[todel].IDOnServer);
@@ -691,6 +675,7 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 
 		// Flag for test
 		test_files[todel].HasBeenDeleted = true;
+		set_refcount(test_files[todel].IDOnServer, 0);
 
 		// Update dependency info. When a file is deleted, find the last non-deleted file
 		// before it, and the first non-deleted file after it, and replace one of their
@@ -699,21 +684,8 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 		// the newer version, but s3 files are stored as forward patches, so they depend on
 		// the older version.
 		int older;
-		bool older_is_completely_different;
 		for(older = todel - 1; older >= 0; older--)
 		{
-			// If this file is deleted, but was completely different, then its blocks
-			// have been incorporated into the later file (s3 stores), so that file is
-			// now completely different.
-			if(spec.name() == "store")
-			{
-				older_is_completely_different = test_files[older].IsCompletelyDifferent;
-			}
-			else
-			{
-				older_is_completely_different |= test_files[older].IsCompletelyDifferent;
-			}
-
 			if(!test_files[older].HasBeenDeleted)
 			{
 				break;
@@ -721,22 +693,8 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 		}
 
 		int newer;
-		bool newer_is_completely_different;
 		for(newer = todel + 1; newer < (int)NUMBER_FILES; newer++)
 		{
-			// If this file is deleted, but was completely different, then its blocks
-			// have been incorporated into the older file (backupstore stores), so that
-			// file is now completely different.
-			if(spec.name() == "s3")
-			{
-				newer_is_completely_different = test_files[newer].IsCompletelyDifferent;
-			}
-			else
-			{
-				newer_is_completely_different |= test_files[newer].IsCompletelyDifferent;
-			}
-
-
 			if(!test_files[newer].HasBeenDeleted)
 			{
 				break;
@@ -795,6 +753,8 @@ bool test_housekeeping_patch_merging(RaidAndS3TestSpecs::Specialisation& spec)
 					test_files[older].IDOnServer : 0;
 			}
 		}
+
+		TEST_THAT(check_current_state(spec, todel)); // just_deleted
 	}
 
 	TEARDOWN_TEST_SPECIALISED(spec);
