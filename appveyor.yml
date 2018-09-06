@@ -8,7 +8,7 @@ skip_tags: true
 os: Windows Server 2012
 
 platform:
-  - Win32 # CMake sucks
+  - Win32 # Confusingly, CMake forces us to use this instead of x86
   - x64
 
 configuration:
