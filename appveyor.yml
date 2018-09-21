@@ -54,6 +54,11 @@ install:
 # http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
 before_build:
   - ps: $env:cmake_toolset_args = $(if ($env:build_tool.equals('msbuild')) {'-T $(DefaultPlatformToolset)'} else {''})
+  # Force 64-bit build if necessary: https://cmake.org/pipermail/cmake/2018-September/068257.html
+  - ps: >
+      $env:cmake_toolset_args_2 = $(
+      if ($env:build_tool.equals('msbuild') -and $env:PLATFORM.equals('x64'))
+      {'-T host=x64'} else {''})
 
   - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
   # Install packages here, not in install block, to allow install to be overridden by the
@@ -87,7 +92,7 @@ before_build:
   # the current PATH. We also need to specify -T $(DefaultPlatformToolset) to stop CMake
   # from defaulting to v140 (etc) which AppVeyor says causes problems on some images
   # (and indeed the build often fails with errors about nonexistent toolsets).
-  - echo cmake -G "%generator_name%" %cmake_toolset_args%
+  - echo cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
