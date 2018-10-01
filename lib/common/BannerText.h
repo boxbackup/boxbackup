@@ -15,10 +15,16 @@
 #endif
 
 // How to identify a 64-bit build: https://stackoverflow.com/a/687902/648162
-#if UINTPTR_MAX == 0xffffffff
+#if defined _WIN64
 #	define BOX_BUILD_BITS 64
-#else
+#elif defined _WIN32
 #	define BOX_BUILD_BITS 32
+#elif __SIZEOF_POINTER__ == 8
+#	define BOX_BUILD_BITS 64
+#elif __SIZEOF_POINTER__ == 4
+#	define BOX_BUILD_BITS 32
+#else
+#	error Cannot determine 32/64-bitness
 #endif
 
 #ifdef BOX_RELEASE_BUILD
