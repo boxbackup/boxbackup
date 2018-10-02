@@ -49,7 +49,7 @@
 #define BOX_BUILD_SIGNATURE STRINGIFY2(BOX_COMPILER " " STRINGIFY2(BOX_BUILD_BITS) "bit " BOX_BUILD_TYPE)
 
 #define BANNER_TEXT(UtilityName) \
-	"Box Backup " UtilityName " v" BOX_VERSION "\n" \
+	"Box Backup " UtilityName " v" BOX_VERSION " (" BOX_BUILD_SIGNATURE ")\n" \
 	"(c) Ben Summers and contributors 2003-2018"
 
 #endif // BANNERTEXT__H

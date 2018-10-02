@@ -49,6 +49,8 @@ install:
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
+  # generator_args can be overridden for NMake builds, below:
+  - ps: $env:generator_args=""
 
 # Remove Xamarin to remove 500 lines of junk from build logs
 # http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
@@ -93,11 +95,13 @@ before_build:
   # from defaulting to v140 (etc) which AppVeyor says causes problems on some images
   # (and indeed the build often fails with errors about nonexistent toolsets).
   - echo cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
+    %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%" %cmake_toolset_args%
+  - cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
+    %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
@@ -123,9 +127,10 @@ for:
 
   install:
   - ps: $env:generator_name="NMake Makefiles"
+  - ps: $env:generator_args="-DCMAKE_BUILD_TYPE=$env:CONFIGURATION"
 
   build_script:
-  - cmd: nmake
+  - cmd: nmake -DCMAKE_BUILD_TYPE=%CONFIGURATION%
 
 on_failure:
   - dir %CMAKE_UNIBUILD_DIR%\install\openssl
