@@ -55,7 +55,7 @@ install:
 # Remove Xamarin to remove 500 lines of junk from build logs
 # http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
 before_build:
-  - ps: $env:cmake_toolset_args = $(if ($env:build_tool.equals('msbuild')) {'-T $(DefaultPlatformToolset)'} else {''})
+  # - ps: $env:cmake_toolset_args = $(if ($env:build_tool.equals('msbuild')) {'-T $(DefaultPlatformToolset)'} else {''})
   # Force 64-bit build if necessary: https://cmake.org/pipermail/cmake/2018-September/068257.html
   - ps: >
       $env:cmake_toolset_args_2 = $(
@@ -130,7 +130,7 @@ for:
   - ps: $env:generator_args="-DCMAKE_BUILD_TYPE=$env:CONFIGURATION"
 
   build_script:
-  - cmd: nmake -DCMAKE_BUILD_TYPE=%CONFIGURATION%
+  - cmd: nmake
 
 on_failure:
   - dir %CMAKE_UNIBUILD_DIR%\install\openssl

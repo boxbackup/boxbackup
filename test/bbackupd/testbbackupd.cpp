@@ -2610,7 +2610,8 @@ bool test_store_error_reporting()
 			TEST_THAT(close(fd1) == 0);
 		}
 
-		wait_for_operation(6, "bbackupd to try to access the store");
+		// 4 seconds should really be enough, but AppVeyor is sometimes slow.
+		wait_for_operation(8, "bbackupd to try to access the store");
 
 		// Check that an error was reported just once
 		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
@@ -2667,8 +2668,9 @@ bool test_store_error_reporting()
 		// Should not have backed up, should still get errors
 		TEST_COMPARE(Compare_Different);
 
-		// wait another 2 seconds, bbackup should have run
-		wait_for_operation(2, "bbackupd to recover");
+		// Wait another 3 seconds, bbackup should have run (allowing 4 seconds for it to
+		// complete):
+		wait_for_operation(7, "bbackupd to recover");
 		TEST_THAT(TestFileExists("testfiles/"
 			"notifyran.backup-start.wait-snapshot.1"));
 
