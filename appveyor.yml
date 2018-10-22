@@ -28,7 +28,7 @@ environment:
     - build_tool: nmake
 
 cache:
-  - '%CMAKE_UNIBUILD_DIR%\cache -> infrastructure\cmake\windows\CMakeLists.txt'
+  - '%CMAKE_UNIBUILD_DIR%\cache -> appveyor.yml, infrastructure\cmake\windows\CMakeLists.txt'
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
@@ -97,13 +97,13 @@ before_build:
   - echo cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
     %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
-    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
+    -DSUB_CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE:STRING=%CONFIGURATION% -- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
   - cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
     %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
-    -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
+    -DSUB_CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE:STRING=%CONFIGURATION% -- /verbosity:minimal"
     -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
@@ -127,7 +127,7 @@ for:
 
   install:
   - ps: $env:generator_name="NMake Makefiles"
-  - ps: $env:generator_args="-DCMAKE_BUILD_TYPE=$env:CONFIGURATION"
+  - ps: $env:generator_args="-DCMAKE_BUILD_TYPE:STRING=$env:CONFIGURATION"
 
   build_script:
   - cmd: nmake
