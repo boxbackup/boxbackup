@@ -904,11 +904,6 @@ bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 		encoded->CopyStreamTo(out);
 	}
 
-	// TODO FIXME move most of the code immediately below into
-	// test_server_commands.
-
-	// TODO FIXME use COMMAND macro for all commands to check the returned
-	// object ID.
 	#define COMMAND(command, objectid) \
 		TEST_EQUAL(objectid, protocol.command->GetObjectID());
 
@@ -976,8 +971,7 @@ bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 
 		// Retrieve the block index, by ID
 		{
-			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByID(store1objid));
-			TEST_THAT(getblockindex->GetObjectID() == store1objid);
+			COMMAND(QueryGetBlockIndexByID(store1objid), store1objid);
 			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
 			// Check against uploaded file
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
@@ -985,8 +979,8 @@ bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 
 		// and again, by name
 		{
-			std::auto_ptr<BackupProtocolSuccess> getblockindex(protocol.QueryGetBlockIndexByName(BACKUPSTORE_ROOT_DIRECTORY_ID, store1name));
-			TEST_THAT(getblockindex->GetObjectID() == store1objid);
+			COMMAND(QueryGetBlockIndexByName(BACKUPSTORE_ROOT_DIRECTORY_ID, store1name),
+				store1objid);
 			std::auto_ptr<IOStream> blockIndexStream(protocol.ReceiveStream());
 			// Check against uploaded file
 			TEST_THAT(check_block_index("testfiles/file1_upload1", *blockIndexStream));
@@ -1160,9 +1154,7 @@ bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
 
 	// Check that deleting files is accounted for as well
-	protocol.QueryDeleteFile(
-		BACKUPSTORE_ROOT_DIRECTORY_ID, // InDirectory
-		store1name); // Filename
+	COMMAND(QueryDeleteFile(BACKUPSTORE_ROOT_DIRECTORY_ID, store1name), replaced_id);
 
 	// The old version file is deleted as well!
 	TEST_THAT(check_num_files(fs, 0, 1, 2, 1));
@@ -1189,6 +1181,8 @@ bool test_server_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 	TEST_THAT(check_num_files(fs, 0, 0, 0, 1));
 	TEST_THAT(check_num_blocks(protocol, 0, 0, 0, root_dir_blocks, root_dir_blocks));
 	TEST_THAT(check_reference_counts(fs.GetPermanentRefCountDatabase(true))); // ReadOnly
+
+	#undef COMMAND
 
 	// Close the protocol, so we can housekeep the account
 	protocol.QueryFinished();
