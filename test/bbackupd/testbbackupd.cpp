@@ -1027,28 +1027,6 @@ public:
 	}
 };
 
-bool test_readdirectory_on_nonexistent_dir()
-{
-	SETUP_WITH_BBSTORED();
-
-	{
-		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
-			sTlsContext, 0 /* read-write */);
-
-		{
-			Logger::LevelGuard(Logging::GetConsole(), Log::ERROR);
-			TEST_CHECK_THROWS(ReadDirectory(*client, 0x12345678),
-				ConnectionException,
-				Protocol_UnexpectedReply);
-			TEST_PROTOCOL_ERROR_OR(*client, Err_DoesNotExist,);
-		}
-
-		client->QueryFinished();
-	}
-
-	TEARDOWN_TEST_BBACKUPD();
-}
-
 bool test_bbackupquery_parser_escape_slashes()
 {
 	SETUP_WITH_BBSTORED();
@@ -3931,7 +3909,6 @@ int test(int argc, const char *argv[])
 			"testfiles/clientTrustedCAs.pem");
 
 	TEST_THAT(test_basics());
-	TEST_THAT(test_readdirectory_on_nonexistent_dir());
 	TEST_THAT(test_bbackupquery_parser_escape_slashes());
 	TEST_THAT(test_getobject_on_nonexistent_file());
 	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());

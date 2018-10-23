@@ -1527,6 +1527,11 @@ bool test_server_commands(RaidAndS3TestSpecs::Specialisation& spec)
 			Err_DoesNotExist);
 	}
 
+	{
+		TEST_COMMAND_RETURNS_ERROR(protocol, QueryListDirectory(2, false, 0, false),
+			Err_DoesNotExist);
+	}
+
 	// Try using GetFile on an object ID that doesn't exist in the directory.
 	{
 		TEST_COMMAND_RETURNS_ERROR(protocol,
