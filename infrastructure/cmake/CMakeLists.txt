@@ -194,9 +194,10 @@ endforeach()
 set(testmain_template_cpp
 	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
 )
-set(release_or_debug_dir
-	"${base_dir}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
+set(release_or_debug
+	"$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
 )
+set(release_or_debug_dir "${base_dir}/${release_or_debug}")
 
 if(WIN32)
 	set(time_test_command_prefix "")
@@ -288,12 +289,10 @@ foreach(module_dep ${module_deps})
 
 			if(generator_is_multi_config)
 				set(runtest_pl_test_mode_arg
-					$<$<CONFIG:Debug>:DEBUG>
-					$<$<CONFIG:Release>:RELEASE>
-					$<$<CONFIG:RelWithDebInfo>:RELEASE>
+					$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
 				)
 			else()
-				set(runtest_pl_test_mode_arg ${CMAKE_BUILD_TYPE})
+				set(runtest_pl_test_mode_arg ${release_or_debug})
 			endif()
 
 			if(WIN32)
