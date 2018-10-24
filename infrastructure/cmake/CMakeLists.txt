@@ -286,6 +286,16 @@ foreach(module_dep ${module_deps})
 				set(appveyor_runtest_pl_switch)
 			endif()
 
+			if(generator_is_multi_config)
+				set(runtest_pl_test_mode_arg
+					$<$<CONFIG:Debug>:DEBUG>
+					$<$<CONFIG:Release>:RELEASE>
+					$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				)
+			else()
+				set(runtest_pl_test_mode_arg ${CMAKE_BUILD_TYPE})
+			endif()
+
 			if(WIN32)
 				set(test_command_internal "$<TARGET_FILE_NAME:${module_name}>")
 			else()
@@ -298,7 +308,7 @@ foreach(module_dep ${module_deps})
 				COMMAND ${time_test_command_prefix}
 				${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -c ${test_name}
-				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				${runtest_pl_test_mode_arg}
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 
