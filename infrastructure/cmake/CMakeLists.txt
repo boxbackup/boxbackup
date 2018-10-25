@@ -928,17 +928,17 @@ target_compile_features(lib_backupclient PRIVATE cxx_auto_type)
 
 # Configure test timeouts:
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
-# https://ci.appveyor.com/project/qris/boxbackup/build/job/xm10itascygtu93j
-set_tests_properties(common PROPERTIES TIMEOUT 20)
-set_tests_properties(crypto PROPERTIES TIMEOUT 10)
+# https://ci.appveyor.com/project/qris/boxbackup/builds/19768384/job/5179303ia65dlsrh?fullLog=true
+set_tests_properties(common PROPERTIES TIMEOUT 40)
+set_tests_properties(crypto PROPERTIES TIMEOUT 20)
 set_tests_properties(compress PROPERTIES TIMEOUT 80)
-set_tests_properties(raidfile PROPERTIES TIMEOUT 56)
+set_tests_properties(raidfile PROPERTIES TIMEOUT 24)
 set_tests_properties(basicserver PROPERTIES TIMEOUT 100)
-set_tests_properties(backupstore PROPERTIES TIMEOUT 400)
-set_tests_properties(backupstorefix PROPERTIES TIMEOUT 320)
-set_tests_properties(backupstorepatch PROPERTIES TIMEOUT 80)
-set_tests_properties(backupdiff PROPERTIES TIMEOUT 32)
-set_tests_properties(bbackupd PROPERTIES TIMEOUT 1200)
+set_tests_properties(backupstore PROPERTIES TIMEOUT 680)
+set_tests_properties(backupstorefix PROPERTIES TIMEOUT 720)
+set_tests_properties(backupstorepatch PROPERTIES TIMEOUT 100)
+set_tests_properties(backupdiff PROPERTIES TIMEOUT 80)
+set_tests_properties(bbackupd PROPERTIES TIMEOUT 1320)
 set_tests_properties(s3store PROPERTIES TIMEOUT 20)
 set_tests_properties(httpserver PROPERTIES TIMEOUT 40)
 
