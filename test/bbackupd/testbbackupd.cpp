@@ -1408,11 +1408,23 @@ bool test_backup_hardlinked_files()
 
 bool test_backup_pauses_when_store_is_full()
 {
+	// Temporarily enable timestamp logging, to help debug race conditions causing
+	// test failures:
+	Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::TRACE);
+	Console::SettingsGuard save_old_settings;
+	Console::SetShowTime(true);
+	Console::SetShowTimeMicros(true);
+
 	SETUP_WITHOUT_FILES();
+
 	unpack_files("spacetest1", "testfiles/TestDir1");
-	TEST_THAT_OR(StartClient(), FAIL);
 
 	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+
+	// Start the bbackupd client. Also enable logging with milliseconds, for the same reason:
+	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
+		"-kU -Wnotice -tbbackupd");
+	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
 
 	// TODO FIXME dedent
 	{
