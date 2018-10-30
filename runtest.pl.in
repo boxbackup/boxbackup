@@ -205,7 +205,7 @@ sub runtest
 				$line =~ s/#.*//;
 				if (not $line)
 				{
-					continue;
+					next;
 				}
 
 				if ($line =~ m/^mkdir (.*)/)
