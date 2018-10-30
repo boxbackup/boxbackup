@@ -1819,23 +1819,11 @@ bool test_bbackupd_uploads_files()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-#define TEST_BBSTORED_OUT_OF_PROCESS 0
+#define TEST_BBSTORED_OUT_OF_PROCESS 1
 
-void sigchld_handler(int signum)
-{
-	int exit_code;
-	pid_t pid = wait(&exit_code);
-	if(pid > 0)
-	{
-		BOX_INFO("Child process " << pid << " exited with status " << exit_code);
-	}
-	else
-	{
-		BOX_LOG_SYS_WARNING("wait() failed");
-	}
-}
-
-bool test_bbackupd_responds_to_connection_failure()
+// This is unusual: we need to pass the specs auto_ptr to this test case, to allow the forked child
+// to release it before exiting, to avoid triggering the memory leak detection!
+bool test_bbackupd_responds_to_connection_failure(std::auto_ptr<RaidAndS3TestSpecs>& rap_specs)
 {
 	SETUP_TEST_BBACKUPD();
 	TEST_THAT_OR(unpack_files("test_base"), FAIL);
@@ -1850,8 +1838,7 @@ bool test_bbackupd_responds_to_connection_failure()
 		const char* new_file = "testfiles/TestDir1/force-upload-2";
 		int fd = open(new_file, O_CREAT | O_EXCL | O_WRONLY, 0700);
 		TEST_THAT_OR(fd >= 0,
-			BOX_LOG_SYS_ERROR(BOX_FILE_MESSAGE(new_file,
-				"failed to create new file"));
+			BOX_LOG_SYS_ERROR(BOX_FILE_MESSAGE(new_file, "failed to create new file"));
 			FAIL);
 
 		const char* control_string = "whee!\n";
@@ -1861,53 +1848,52 @@ bool test_bbackupd_responds_to_connection_failure()
 		close(fd);
 
 		wait_for_operation(5, "new file to be old enough");
-	}
 
-	// Start a bbstored with a test hook that makes it terminate
-	// on the first StoreFile command, breaking the connection to
-	// bbackupd.
-	class MyHook : public BackupStoreContext::TestHook
-	{
-	public:
-		int trigger_count;
-		MyHook() : trigger_count(0) { }
-
-		virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
-			const BackupProtocolMessage& rCommand)
+		// Start a bbstored with a test hook that makes it terminate
+		// on the first StoreFile command, breaking the connection to
+		// bbackupd.
+		class MyHook : public BackupStoreContext::TestHook
 		{
-			if (rCommand.GetType() ==
-				BackupProtocolStoreFile::TypeID)
+		public:
+			int trigger_count;
+			MyHook() : trigger_count(0) { }
+
+			virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
+				const BackupProtocolMessage& rCommand)
 			{
-				// terminate badly
-				trigger_count++;
-				THROW_EXCEPTION(ConnectionException,
-					TLSReadFailed);
+				if (rCommand.GetType() ==
+					BackupProtocolStoreFile::TypeID)
+				{
+					// terminate badly
+					THROW_EXCEPTION(CommonException,
+						Internal);
+				}
+				return std::auto_ptr<BackupProtocolMessage>();
 			}
-			return std::auto_ptr<BackupProtocolMessage>();
-		}
-	};
-
-	std::auto_ptr<BackupProtocolCallable> apClient;
-
-# if TEST_BBSTORED_OUT_OF_PROCESS // more realistic
-	// bbstored_args always starts with a space
-	if(bbstored_args.length() > 0 &&
-		bbstored_args.substr(1).find(' ') != std::string::npos)
-	{
-		BOX_WARNING("bbstored_args contains multiple arguments, but there is no parser "
-			"built in, they will probably not be handled correctly");
-	}
-
-	{
+		};
 		MyHook hook;
-		bbstored_pid = fork();
-		TEST_THAT_OR(bbstored_pid >= 0, FAIL); // fork() failed
 
-		if(bbstored_pid == 0)
+		// bbstored_args always starts with a space
+		if(bbstored_args.length() > 0 &&
+			bbstored_args.substr(1).find(' ') != std::string::npos)
+		{
+			BOX_WARNING("bbstored_args contains multiple arguments, but there is no parser "
+				"built in, they will probably not be handled correctly");
+		}
+
+		bbstored_pid = fork();
+
+		if (bbstored_pid < 0)
+		{
+			BOX_LOG_SYS_ERROR("failed to fork()");
+			return 1;
+		}
+
+		if (bbstored_pid == 0)
 		{
 			// in fork child
 			TEST_THAT(setsid() != -1);
-			
+
 			// BackupStoreDaemon must be destroyed before exit(),
 			// to avoid memory leaks being reported.
 			{
@@ -1919,73 +1905,53 @@ bool test_bbackupd_responds_to_connection_failure()
 				bbstored.SetTestHook(hook);
 				bbstored.SetDaemonize(false);
 				bbstored.SetForkPerClient(false);
-				bbstored.Main("testfiles/bbstored.conf", 2, bbstored_argv);
+				bbstored.Main("testfiles/bbstored.conf",
+					// Pass argc==1 if bbstored_args_overridden is false, to
+					// ignore the unwanted second item in bbstored_argv above:
+					bbstored_args_overridden ? 2 : 1, bbstored_argv);
 			}
 
 			Timers::Cleanup(); // avoid memory leaks
+			rap_specs.reset();
 			exit(0);
 		}
-		
+
 		// in fork parent
 		TEST_EQUAL(bbstored_pid, WaitForServerStartup("testfiles/bbstored.pid",
 			bbstored_pid));
 
-		// Ignore SIGPIPE so that when the connection is broken, the daemon doesn't terminate.
+		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
+
+		// Ignore SIGPIPE so that when the connection is broken,
+		// the daemon doesn't terminate.
 		::signal(SIGPIPE, SIG_IGN);
 
-		// Ignore SIGCHLD so that we don't need to reap the zombie process.
-		::signal(SIGCHLD, sigchld_handler);
-
-		apClient = connect_and_login(sTlsContext, 0); // !ReadOnly
-	}
-# else // !TEST_BBSTORED_OUT_OF_PROCESS // easier to debug
-	class MockBackupProtocolLocal : public BackupProtocolLocal2
-	{
-	public:
-		MyHook hook;
-		MockBackupProtocolLocal(int32_t AccountNumber,
-			const std::string& ConnectionDetails,
-			const std::string& AccountRootDir, int DiscSetNumber,
-			bool ReadOnly)
-		: BackupProtocolLocal2(AccountNumber, ConnectionDetails,
-			AccountRootDir, DiscSetNumber, ReadOnly)
 		{
-			GetContext().SetTestHook(hook);
-		}
-		virtual ~MockBackupProtocolLocal() { }
-	};
+			Console& console(Logging::GetConsole());
+			Logger::LevelGuard guard(console);
 
-	apClient.reset(new MockBackupProtocolLocal(0x01234567, "test", "backup/01234567/",
-		0, false));
-	MockBackupProtocolLocal& r_mock_client(dynamic_cast<MockBackupProtocolLocal &>(*apClient));
-# endif // TEST_BBSTORED_OUT_OF_PROCESS
+			if (console.GetLevel() < Log::TRACE)
+			{
+				console.Filter(Log::NOTHING);
+			}
 
-	MockBackupDaemon bbackupd(*apClient);
-	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
-
-	TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
-
-	{
-		Console& console(Logging::GetConsole());
-		Logger::LevelGuard guard(console);
-
-		if (console.GetLevel() < Log::TRACE)
-		{
-			console.Filter(Log::NOTHING);
+			BackupDaemon bbackupd;
+			bbackupd.Configure("testfiles/bbackupd.conf");
+			bbackupd.InitCrypto();
+			bbackupd.RunSyncNowWithExceptionHandling();
 		}
 
-		bbackupd.RunSyncNowWithExceptionHandling();
+		::signal(SIGPIPE, SIG_DFL);
+
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
 	}
-
-# if !TEST_BBSTORED_OUT_OF_PROCESS // more realistic
-	// Should only have been triggered once
-	TEST_EQUAL(1, r_mock_client.hook.trigger_count);
-# endif
-
-	TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
-	TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
-	TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
 #endif // !WIN32
+
+	// It's very important to wait() for the server when using fork, otherwise the zombie never
+	// dies and the test fails:
+	TEST_THAT(bbstored_pid == 0 || StopServer(true)); // wait_for_process
 
 	TEARDOWN_TEST_BBACKUPD();
 }
@@ -4016,7 +3982,7 @@ int test(int argc, const char *argv[])
 	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());
 	TEST_THAT(test_ssl_keepalives());
 	TEST_THAT(test_bbackupd_uploads_files());
-	TEST_THAT(test_bbackupd_responds_to_connection_failure());
+	TEST_THAT(test_bbackupd_responds_to_connection_failure(specs));
 	TEST_THAT(test_absolute_symlinks_not_followed_during_restore());
 	TEST_THAT(test_initially_missing_locations_are_not_forgotten());
 	TEST_THAT(test_redundant_locations_deleted_on_time());

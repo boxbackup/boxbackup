@@ -335,16 +335,14 @@ bool Daemon::Configure(const std::string& rConfigFileName)
 
 	try
 	{
-		if (!FileExists(rConfigFileName))
+		if(!FileExists(rConfigFileName))
 		{
-			BOX_FATAL("The main configuration file for " <<
-				DaemonName() << " was not found: " <<
-				rConfigFileName);
-			if (!mHaveConfigFile)
+			BOX_FATAL("The main configuration file for " << DaemonName() << " was not "
+				"found: '" << rConfigFileName << "'");
+			if(!mHaveConfigFile)
 			{
-				BOX_WARNING("The default configuration "
-					"directory has changed from /etc/box "
-					"to /etc/boxbackup");
+				BOX_WARNING("The default configuration directory has changed from "
+					"/etc/box to /etc/boxbackup");
 			}
 			return false;
 		}

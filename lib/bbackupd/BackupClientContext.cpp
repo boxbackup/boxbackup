@@ -72,7 +72,26 @@ BackupClientContext::BackupClientContext
 // --------------------------------------------------------------------------
 BackupClientContext::~BackupClientContext()
 {
-	CloseAnyOpenConnection();
+	try
+	{
+		// Quit nicely:
+		CloseAnyOpenConnection();
+	}
+	catch(BoxException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, ConnectionException, TLSReadFailed))
+		{
+			// Since we are closing anyway, we don't care if the connection was
+			// unusable, and in fact we may be closing it in response to having
+			// tried and failed to use it anyway, so don't rethrow.
+		}
+		else
+		{
+			// Do not throw exceptions in destructors, regardless!
+			BOX_WARNING("Caught exception while cleaning up BackupClientContext: " <<
+				e.what());
+		}
+	}
 	
 	// Delete delete list
 	if(mpDeleteList != 0)

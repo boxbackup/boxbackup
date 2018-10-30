@@ -55,6 +55,7 @@ public:
 	// GetOpenConnection() will not open a connection, just return NULL if there is
 	// no connection already open.
 	virtual BackupProtocolCallable* GetOpenConnection() const;
+	// CloseAnyOpenConnection is public for TEST use ONLY, it is NOT an API!
 	void CloseAnyOpenConnection();
 	int GetTimeout() const;
 	BackupClientDeleteList &GetDeleteList();

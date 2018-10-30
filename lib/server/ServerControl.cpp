@@ -214,13 +214,13 @@ bool KillServerInternal(int pid)
 
 bool KillServer(int pid, bool WaitForProcess)
 {
-	if (!KillServerInternal(pid))
+	if(!KillServerInternal(pid))
 	{
 		return false;
 	}
 
-	#ifdef HAVE_WAITPID
-	if (WaitForProcess)
+#ifdef HAVE_WAITPID
+	if(WaitForProcess)
 	{
 		int status, result;
 
@@ -242,7 +242,7 @@ bool KillServer(int pid, bool WaitForProcess)
 			TEST_THAT(WEXITSTATUS(status) == 0);
 		}
 	}
-	#endif
+#endif
 
 	BOX_INFO("Waiting for server to die (pid " << pid << ")");
 	printf("Waiting for server to die (pid %d): ", pid);
