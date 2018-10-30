@@ -69,10 +69,8 @@ bool create_test_account_specialised(const std::string& spec_name,
 bool setup_test_specialised(const std::string& spec_name,
 	BackupAccountControl& control)
 {
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), FAIL);
-	}
+	TEST_THAT(bbackupd_pid == 0 || StopClient());
+	TEST_THAT(bbstored_pid == 0 || StopServer());
 
 	ExpectedRefCounts.resize(BACKUPSTORE_ROOT_DIRECTORY_ID + 1);
 	set_refcount(BACKUPSTORE_ROOT_DIRECTORY_ID, 1);
@@ -88,10 +86,8 @@ bool teardown_test_specialised(const std::string& spec_name,
 {
 	bool status = true;
 
-	if (ServerIsAlive(bbstored_pid))
-	{
-		TEST_THAT_OR(StopServer(), status = false);
-	}
+	TEST_THAT_OR(bbackupd_pid == 0 || StopClient(), status = false);
+	TEST_THAT_OR(bbstored_pid == 0 || StopServer(), status = false);
 
 	BackupFileSystem& fs(control.GetFileSystem());
 	if(check_for_errors)
