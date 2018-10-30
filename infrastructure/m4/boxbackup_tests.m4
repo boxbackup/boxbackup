@@ -340,7 +340,7 @@ AX_CHECK_MALLOC_WORKAROUND
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid getpwuid gettimeofday lchown])
+AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid getpwuid gettimeofday lchown waitpid])
 AC_CHECK_FUNCS([setproctitle utimensat stat64 lstat64 __lxstat __lxstat64])
 AC_SEARCH_LIBS([setproctitle], [bsd])
 
