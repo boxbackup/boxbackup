@@ -35,7 +35,6 @@ protected:
 	{
 		return mapFileSystem->GetBlockSize();
 	}
-	virtual int SetLimit(int64_t softlimit, int64_t hardlimit);
 
 public:
 	BackupAccountControl(const Configuration& config,
@@ -47,6 +46,7 @@ public:
 	void CheckSoftHardLimits(int64_t SoftLimit, int64_t HardLimit);
 	int64_t SizeStringToBlocks(const char *string, int BlockSize);
 	std::string BlockSizeToString(int64_t Blocks, int64_t MaxBlocks, int BlockSize);
+	virtual int SetLimit(int64_t softlimit, int64_t hardlimit);
 	virtual int SetLimit(const char *SoftLimitStr, const char *HardLimitStr);
 	virtual int SetAccountName(const std::string& rNewAccountName);
 	virtual int PrintAccountInfo();
