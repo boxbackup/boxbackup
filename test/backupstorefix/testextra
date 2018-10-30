@@ -3,3 +3,5 @@ mkdir testfiles/0_1
 mkdir testfiles/0_2
 mkdir testfiles/bbackupd-data
 cp ../../../test/bbackupd/testfiles/*.* testfiles/
+# Overwrite bbackupd.s3.conf from test/bbackupd with our own (different MinimumFileAge):
+cp ../../../test/backupstorefix/testfiles/bbackupd.s3.conf testfiles/

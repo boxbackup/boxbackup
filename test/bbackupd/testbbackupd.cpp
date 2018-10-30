@@ -65,6 +65,7 @@
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
 #include "BoxTimeToUnix.h"
+#include "ClientTestUtils.h"
 #include "CollectInBufferStream.h"
 #include "CommonException.h"
 #include "Configuration.h"
@@ -407,7 +408,8 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 }
 
 bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_files = true,
-	bool do_start_bbstored = true)
+	bool do_start_bbstored = true,
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	Timers::Cleanup(false); // don't throw exception if not initialised
 	Timers::Init();
@@ -448,8 +450,7 @@ bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_file
 		#endif
 	}
 
-	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
-		FAIL);
+	TEST_THAT_OR(configure_bbackupd(bbackupd, bbackupd_conf_file), FAIL);
 	return true;
 }
 
@@ -458,7 +459,6 @@ bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_file
 	SETUP(); \
 	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
 	TEST_THAT(bbstored_pid == 0 || StopServer()); \
-	TEST_THAT(kill_running_daemons()); \
 	TEST_THAT(create_account(10000, 20000));
 
 #define SETUP_WITHOUT_FILES() \
@@ -475,12 +475,51 @@ bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_file
 #define TEARDOWN_TEST_BBACKUPD() \
 	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
 	TEST_THAT(bbstored_pid == 0 || StopServer()); \
-	TEST_THAT(kill_running_daemons()); \
 	TEARDOWN();
 
-bool test_basics()
+bool setup_test_specialised_bbstored(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_BBACKUPD();
+	if(spec.name() == "store")
+	{
+		TEST_THAT_OR(StartServer(), FAIL);
+	}
+
+	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
+
+	return true;
+}
+
+#define SETUP_TEST_SPECIALISED_BBSTORED(spec) \
+	SETUP_TEST_SPECIALISED(spec); \
+	TEST_THAT(setup_test_specialised_bbstored(spec)); \
+	spec.control().GetFileSystem().ReleaseLock(); \
+	std::string bbackupd_conf_file = (spec.name() == "s3") ? "testfiles/bbackupd.s3.conf" : \
+			"testfiles/bbackupd.conf";
+
+bool setup_test_specialised_bbackupd(RaidAndS3TestSpecs::Specialisation& spec,
+	BackupDaemon& bbackupd, const std::string& bbackupd_conf_file)
+{
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, true, // do_unpack_files
+		false, // do_start_bbstored
+		bbackupd_conf_file),
+		FAIL);
+
+	return true;
+}
+
+#define SETUP_TEST_SPECIALISED_BBACKUPD(spec) \
+	SETUP_TEST_SPECIALISED_BBSTORED(spec); \
+	BackupDaemon bbackupd; \
+	TEST_THAT(setup_test_specialised_bbackupd(spec, bbackupd, bbackupd_conf_file));
+
+#define TEST_COMPARE_SPECIALISED(spec, expected_status) \
+	BOX_INFO("Running external compare, expecting " #expected_status); \
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status, \
+		"", "-acQ", bbackupd_conf_file));
+
+bool test_file_attribute_storage()
+{
+	SETUP();
 	TEST_THAT_OR(unpack_files("test_base"), FAIL);
 
 	// Read attributes from files
@@ -600,7 +639,7 @@ bool test_basics()
 	finish_with_write_xattr_test();
 #endif // HAVE_SYS_XATTR_H
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEARDOWN();
 }
 
 int64_t GetDirID(BackupProtocolCallable &protocol, const char *name, int64_t InDirectory)
@@ -771,13 +810,14 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 
 bool compare_external(BackupQueries::ReturnCode::Type expected_status,
 	const std::string& bbackupquery_options = "",
-	const std::string& compare_options = "-acQ")
+	const std::string& compare_options = "-acQ",
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	std::string cmd = BBACKUPQUERY;
 	cmd += " ";
 	cmd += (expected_status == BackupQueries::ReturnCode::Compare_Same)
 		? "-Wwarning" : "-Werror";
-	cmd += " -c testfiles/bbackupd.conf ";
+	cmd += " -c " + bbackupd_conf_file;
 	cmd += " " + bbackupquery_options;
 	cmd += " \"compare " + compare_options + "\" quit";
 
@@ -998,18 +1038,15 @@ bool test_bbackupquery_parser_escape_slashes()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-bool test_getobject_on_nonexistent_file()
+bool test_bbackupquery_getobject_on_nonexistent_file(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_TEST_SPECIALISED_BBSTORED(spec);
 
 	{
-		std::auto_ptr<Configuration> config =
-			load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
-		TEST_THAT_OR(config.get(), return false);
+		BackupFileSystem& fs(spec.control().GetFileSystem());
+		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, false); // !ReadOnly
+		BackupQueries query(protocol, spec.config(), false); // read-only
 
-		std::auto_ptr<BackupProtocolCallable> connection =
-			connect_and_login(sTlsContext, 0 /* read-write */);
-		BackupQueries query(*connection, *config, false); // read-only
 		std::vector<std::string> args;
 		args.push_back("2"); // object ID
 		args.push_back("testfiles/2.obj"); // output file
@@ -1033,7 +1070,7 @@ bool test_getobject_on_nonexistent_file()
 		TEST_LINE(found, "Last log message was: " << messages.back().message);
 	}
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
 // ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
@@ -1072,9 +1109,9 @@ bool test_replace_zero_byte_file_with_nonzero_byte_file()
 // email to the Box Backup list on Mon, 21 Apr 2014 at 18:44:38. If the
 // directory disappears then we used to try to send an empty attributes block
 // to the server, which is illegal.
-bool test_backup_disappearing_directory()
+bool test_backup_disappearing_directory(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
 
 	class BackupClientDirectoryRecordHooked : public BackupClientDirectoryRecord
 	{
@@ -1142,7 +1179,7 @@ bool test_backup_disappearing_directory()
 	int64_t oid = dirCreate->GetObjectID();
 	BackupClientDirectoryRecordHooked record(oid, "Test1");
 
-	TEST_COMPARE(Compare_Different);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Different);
 
 	Location fakeLocation;
 	record.SyncDirectory(params,
@@ -1151,7 +1188,7 @@ bool test_backup_disappearing_directory()
 		"/whee", // remotePath
 		fakeLocation);
 	clientContext.CloseAnyOpenConnection();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// Run another backup, check that we haven't got an inconsistent
 	// state that causes a crash.
@@ -1161,13 +1198,13 @@ bool test_backup_disappearing_directory()
 		"/whee", // remotePath
 		fakeLocation);
 	clientContext.CloseAnyOpenConnection();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// Now recreate it and run another backup, check that we haven't got
 	// an inconsistent state that causes a crash or prevents us from
 	// creating the directory if it appears later.
 	TEST_THAT(::mkdir("testfiles/TestDir1/dir23", 0755) == 0);
-	TEST_COMPARE(Compare_Different);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Different);
 
 	record.SyncDirectory(params,
 		BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -1175,9 +1212,9 @@ bool test_backup_disappearing_directory()
 		"/whee", // remotePath
 		fakeLocation);
 	clientContext.CloseAnyOpenConnection();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
 class KeepAliveBackupProtocolLocal : public BackupProtocolLocal2
@@ -1303,40 +1340,40 @@ bool test_ssl_keepalives()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
-bool test_backup_hardlinked_files()
+bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_WITH_BBSTORED();
+	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
 
 	bbackupd.RunSyncNow();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// Create some hard links. First in the same directory:
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x1/hardlink1") == 0);
 	bbackupd.RunSyncNow();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// Now in a different directory
 	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x2/hardlink2") == 0);
 	bbackupd.RunSyncNow();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// Now delete one of them
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 	bbackupd.RunSyncNow();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	// And another.
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/hardlink1") == 0);
 	bbackupd.RunSyncNow();
-	TEST_COMPARE(Compare_Same);
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
-bool test_backup_pauses_when_store_is_full()
+bool test_backup_pauses_when_store_is_full(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	// Temporarily enable timestamp logging, to help debug race conditions causing
 	// test failures:
@@ -1345,16 +1382,20 @@ bool test_backup_pauses_when_store_is_full()
 	Console::SetShowTime(true);
 	Console::SetShowTimeMicros(true);
 
-	SETUP_WITHOUT_FILES();
+	SETUP_TEST_SPECIALISED_BBSTORED(spec);
+
+	BackupFileSystem& fs(spec.control().GetFileSystem());
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
+	protocol.QueryFinished();
 
 	unpack_files("spacetest1", "testfiles/TestDir1");
-
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
 
 	// Start the bbackupd client. Also enable logging with milliseconds, for the same reason:
 	std::string daemon_args(bbackupd_args_overridden ? bbackupd_args :
 		"-kU -Wnotice -tbbackupd");
-	TEST_THAT_OR(StartClient("testfiles/bbackupd.conf", daemon_args), FAIL);
+	TEST_THAT_OR(StartClient(bbackupd_conf_file, daemon_args), FAIL);
+
+	int block_multiplier = (spec.name() == "s3" ? 1 : 2);
 
 	// TODO FIXME dedent
 	{
@@ -1362,22 +1403,22 @@ bool test_backup_pauses_when_store_is_full()
 		BOX_TRACE("Waiting for all outstanding files to be uploaded...")
 		wait_for_sync_end();
 		BOX_TRACE("Done. Comparing to check that it worked...")
-		TEST_COMPARE(Compare_Same);
+		TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext, 0 /* read-write */);
+			protocol.Reopen();
 			TEST_THAT(check_num_files(fs, 5, 0, 0, 9));
-			TEST_THAT(check_num_blocks(*client, 10, 0, 0, 18, 28));
-			client->QueryFinished();
+			TEST_THAT(check_num_blocks(protocol, 5 * block_multiplier, 0, 0,
+				9 * block_multiplier, 14 * block_multiplier));
+			protocol.QueryFinished();
 		}
 
-		// Set limit to something very small.
-		// 28 blocks are used at this point.
-		// set soft limit to 0 to ensure that all deleted files
-		// are deleted immediately by housekeeping
-		TEST_THAT(change_account_limits("0B", "20B"));
+		// Set limit to something very small. 14/28 blocks are used at this point.
+		// Set soft limit to 0 to ensure that all deleted files are deleted immediately
+		// by housekeeping when it runs.
+		TEST_EQUAL(0, spec.control().SetLimit(0, 10 * block_multiplier));
+		fs.ReleaseLock();
 
 		// Unpack some more files
 		unpack_files("spacetest2", "testfiles/TestDir1");
@@ -1421,13 +1462,12 @@ bool test_backup_pauses_when_store_is_full()
 		// won't bring it back under the hard limit, so no files from
 		// spacetest2 should be uploaded.
 
-		BOX_TRACE("Waiting for sync for bbackupd to notice that the "
-			"store is full");
+		BOX_TRACE("Waiting for sync for bbackupd to notice that the store is full");
 		wait_for_sync_end();
 		BOX_TRACE("Sync finished.");
 
 		BOX_TRACE("Compare to check that there are differences");
-		TEST_COMPARE(Compare_Different);
+		TEST_COMPARE_SPECIALISED(spec, Compare_Different);
 
 		// Check that the notify script was run
 		TEST_THAT(TestFileExists("testfiles/notifyran.store-full.1"));
@@ -1439,34 +1479,44 @@ bool test_backup_pauses_when_store_is_full()
 		// client first, otherwise it might be connected when housekeeping tries
 		// to run, and that would prevent it from running, causing test to fail.
 		TEST_THAT_OR(StopClient(), FAIL);
-		wait_for_operation(5, "housekeeping to run");
+
+		if(spec.name() == "s3")
+		{
+			// Housekeeping only runs explicitly, so force it to run now:
+			std::string cmd = BBSTOREACCOUNTS " -3 -c " + bbackupd_conf_file +
+				" housekeep test";
+			TEST_RETURN(system(cmd.c_str()), 0)
+		}
+		else
+		{
+			// bbstored will run housekeeping if we wait long enough:
+			wait_for_operation(5, "housekeeping to run");
+		}
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext,
-					BackupProtocolLogin::Flags_ReadOnly);
+			protocol.Reopen();
 			std::auto_ptr<BackupStoreDirectory> root_dir =
-				ReadDirectory(*client, BACKUPSTORE_ROOT_DIRECTORY_ID);
+				ReadDirectory(protocol, BACKUPSTORE_ROOT_DIRECTORY_ID);
 
 			int64_t test_dir_id = SearchDir(*root_dir, "Test1");
 			TEST_THAT_OR(test_dir_id, FAIL);
 			std::auto_ptr<BackupStoreDirectory> test_dir =
-				ReadDirectory(*client, test_dir_id);
+				ReadDirectory(protocol, test_dir_id);
 
 			int64_t spacetest_dir_id = SearchDir(*test_dir, "spacetest");
 			TEST_THAT_OR(spacetest_dir_id, FAIL);
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
-				ReadDirectory(*client, spacetest_dir_id);
+				ReadDirectory(protocol, spacetest_dir_id);
 
 			int64_t d2_id = SearchDir(*spacetest_dir, "d2");
 			int64_t d6_id = SearchDir(*spacetest_dir, "d6");
 			TEST_THAT_OR(d2_id != 0, FAIL);
 			TEST_THAT_OR(d6_id != 0, FAIL);
 			std::auto_ptr<BackupStoreDirectory> d2_dir =
-				ReadDirectory(*client, d2_id);
+				ReadDirectory(protocol, d2_id);
 			std::auto_ptr<BackupStoreDirectory> d6_dir =
-				ReadDirectory(*client, d6_id);
+				ReadDirectory(protocol, d6_id);
 
 			// None of the new files should have been uploaded
 			TEST_EQUAL(SearchDir(*d2_dir, "f6"), 0);
@@ -1477,26 +1527,37 @@ bool test_backup_pauses_when_store_is_full()
 			TEST_EQUAL(SearchDir(*spacetest_dir, "d7"), 0);
 
 			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
-			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
-			client->QueryFinished();
+			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
+				8 * block_multiplier, 12 * block_multiplier));
+			protocol.QueryFinished();
 		}
 	}
 
 	// Increase the limit again, check that all files are backed up on the
 	// next run.
-	TEST_THAT(change_account_limits("0B", "34B"));
-	TEST_THAT_OR(StartClient(), FAIL);
-	wait_for_sync_end();
-	TEST_COMPARE(Compare_Same);
+	TEST_EQUAL(0, spec.control().SetLimit(0, 17 * block_multiplier));
+	fs.ReleaseLock();
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEST_THAT_OR(StartClient(bbackupd_conf_file), FAIL);
+	wait_for_sync_end();
+	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
-bool test_bbackupd_exclusions()
+bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_WITHOUT_FILES();
+	SETUP_TEST_SPECIALISED_BBSTORED(spec);
 
-	RaidBackupFileSystem fs(0x01234567, "backup/01234567/", 0);
+	BackupDaemon bbackupd; \
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, // !do_unpack_files
+		false, // do_start_bbstored
+		bbackupd_conf_file),
+		FAIL);
+
+	BackupFileSystem& fs(spec.control().GetFileSystem());
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, true); // ReadOnly
+	protocol.QueryFinished();
 
 	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 	// Delete a file and a directory
@@ -1508,23 +1569,24 @@ bool test_bbackupd_exclusions()
 	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
 #endif
 
-	// We need to be OVER the limit, i.e. >24 blocks, or
-	// BackupClientContext will mark us over limit immediately on
-	// connection.
-	TEST_THAT(change_account_limits("0B", "25B"));
+	// We need just enough space to upload the initial files (>24 blocks), but not enough to
+	// create another directory. That must be the thing that pushes us over the limit:
+	int block_multiplier = (spec.name() == "s3" ? 1 : 2);
+	TEST_EQUAL(0, spec.control().SetLimit(0, 12 * block_multiplier));
+	fs.ReleaseLock();
 
-	// Initial run to get the files backed up
+	// Backup the initial files:
 	{
 		bbackupd.RunSyncNow();
 		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext, 0 /* read-write */);
+			protocol.Reopen();
 			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
-			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
-			client->QueryFinished();
+			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
+				8 * block_multiplier, 12 * block_multiplier));
+			protocol.QueryFinished();
 		}
 	}
 
@@ -1545,13 +1607,17 @@ bool test_bbackupd_exclusions()
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext, 0 /* read-write */);
+			protocol.Reopen();
 			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
-			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 16, 24));
-			client->QueryFinished();
+			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
+				8 * block_multiplier, 12 * block_multiplier));
+			protocol.QueryFinished();
 		}
 	}
+
+	std::string bbackupd_conf_exclude = (spec.name() == "s3")
+		? "testfiles/bbackupd-exclude.s3.conf"
+		: "testfiles/bbackupd-exclude.conf";
 
 	// TODO FIXME dedent
 	{
@@ -1561,7 +1627,7 @@ bool test_bbackupd_exclusions()
 		// making space to upload the new files.
 		// total required: (13-2-4+3)*2 = 20 blocks
 
-		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd-exclude.conf"));
+		TEST_THAT(configure_bbackupd(bbackupd, bbackupd_conf_exclude));
 		// Should be marked as deleted by this run. Hold onto the
 		// BackupClientContext to stop housekeeping from running.
 		std::auto_ptr<BackupClientContext> apClientContext =
@@ -1591,33 +1657,40 @@ bool test_bbackupd_exclusions()
 		// housekeeping has run recently enough that it doesn't need to
 		// run again when we disconnect.
 
-		BOX_INFO("Finding out whether bbackupd marked files as deleted");
-
-		// TODO FIXME dedent
+		if(spec.name() == "s3")
+		{
+			// We can't access the store simultaneously, even using a read-only context,
+			// because we can't lock the cache directory. But also we don't need to,
+			// because there's no housekeeping, so just release the context now.
+			apClientContext.reset();
+		}
+		else
 		{
 #ifdef WIN32
 			apClientContext.reset();
 #endif
+		}
 
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext,
-					BackupProtocolLogin::Flags_ReadOnly);
+		BOX_INFO("Finding out whether bbackupd marked files as deleted");
 
+		// TODO FIXME dedent
+		{
+			protocol.Reopen();
 			std::auto_ptr<BackupStoreDirectory> rootDir =
-				ReadDirectory(*client);
+				ReadDirectory(protocol);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
 			TEST_THAT(testDirId != 0);
 
 			std::auto_ptr<BackupStoreDirectory> Test1_dir =
-				ReadDirectory(*client, testDirId);
+				ReadDirectory(protocol, testDirId);
 
 			int64_t spacetestDirId = SearchDir(*Test1_dir,
 				"spacetest");
 			TEST_THAT(spacetestDirId != 0);
 
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
-				ReadDirectory(*client, spacetestDirId);
+				ReadDirectory(protocol, spacetestDirId);
 
 			// these files were deleted before, they should be
 			// long gone by now
@@ -1636,14 +1709,14 @@ bool test_bbackupd_exclusions()
 			TEST_THAT_OR(d3_id != 0, FAIL);
 
 			std::auto_ptr<BackupStoreDirectory> d3_dir =
-				ReadDirectory(*client, d3_id);
+				ReadDirectory(protocol, d3_id);
 			TEST_THAT(test_entry_deleted(*d3_dir, "d4"));
 
 			int64_t d4_id = SearchDir(*d3_dir, "d4");
 			TEST_THAT_OR(d4_id != 0, FAIL);
 
 			std::auto_ptr<BackupStoreDirectory> d4_dir =
-				ReadDirectory(*client, d4_id);
+				ReadDirectory(protocol, d4_id);
 			TEST_THAT(test_entry_deleted(*d4_dir, "f5"));
 
 			// d1/f3 and d1/f4 are the only two files on the
@@ -1651,37 +1724,34 @@ bool test_bbackupd_exclusions()
 			// each, the rest is directories and 2 deleted files
 			// (f2 and d3/d4/f5)
 			TEST_THAT(check_num_files(fs, 2, 0, 2, 8));
-			TEST_THAT(check_num_blocks(*client, 4, 0, 4, 16, 24));
+			TEST_THAT(check_num_blocks(protocol, 2 * block_multiplier, 0,
+				2 * block_multiplier, 8 * block_multiplier, 12 * block_multiplier));
 
 			// Log out.
-			client->QueryFinished();
+			protocol.QueryFinished();
 		}
 
 		// Release our BackupClientContext and open connection, and
 		// force housekeeping to run now.
 		apClientContext.reset();
-		TEST_THAT(run_housekeeping_and_check_account());
+		TEST_THAT(run_housekeeping_and_check_account(fs));
 
 		BOX_INFO("Checking that the files were removed");
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext, 0 /* read-write */);
-
-			std::auto_ptr<BackupStoreDirectory> rootDir =
-				ReadDirectory(*client);
+			protocol.Reopen();
+			std::auto_ptr<BackupStoreDirectory> rootDir = ReadDirectory(protocol);
 
 			int64_t testDirId = SearchDir(*rootDir, "Test1");
 			TEST_THAT(testDirId != 0);
 
 			std::auto_ptr<BackupStoreDirectory> Test1_dir =
-				ReadDirectory(*client, testDirId);
+				ReadDirectory(protocol, testDirId);
 
-			int64_t spacetestDirId = SearchDir(*Test1_dir,
-				"spacetest");
+			int64_t spacetestDirId = SearchDir(*Test1_dir, "spacetest");
 			TEST_THAT(spacetestDirId != 0);
 
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
-				ReadDirectory(*client, spacetestDirId);
+				ReadDirectory(protocol, spacetestDirId);
 
 			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "f2") == 0);
@@ -1692,17 +1762,16 @@ bool test_bbackupd_exclusions()
 			// The files were counted as deleted files before, the
 			// deleted directories just as directories.
 			TEST_THAT(check_num_files(fs, 2, 0, 0, 6));
-			TEST_THAT(check_num_blocks(*client, 4, 0, 0, 12, 16));
+			TEST_THAT(check_num_blocks(protocol, 2 * block_multiplier, 0, 0,
+				6 * block_multiplier, 8 * block_multiplier));
 
 			// Log out.
-			client->QueryFinished();
+			protocol.QueryFinished();
 		}
 
 		// Need 22 blocks free to upload everything
-		TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS " -c "
-			"testfiles/bbstored.conf setlimit 01234567 0B 22B")
-			== 0);
-		TestRemoteProcessMemLeaks("bbstoreaccounts.memleaks");
+		TEST_EQUAL(0, spec.control().SetLimit(0, 11 * block_multiplier));
+		fs.ReleaseLock();
 
 		// Run another backup, now there should be enough space
 		// for everything we want to upload.
@@ -1711,25 +1780,24 @@ bool test_bbackupd_exclusions()
 
 		// Check that the contents of the store are the same
 		// as the contents of the disc
-		TEST_COMPARE_EXTRA(Compare_Same, "-c testfiles/bbackupd-exclude.conf");
+		TEST_COMPARE_EXTRA(Compare_Same, ("-c " + bbackupd_conf_exclude).c_str());
 		BOX_TRACE("done.");
 
 		// BLOCK
 		{
-			std::auto_ptr<BackupProtocolCallable> client =
-				connect_and_login(sTlsContext, 0 /* read-write */);
-
+			protocol.Reopen();
 			TEST_THAT(check_num_files(fs, 4, 0, 0, 7));
-			TEST_THAT(check_num_blocks(*client, 8, 0, 0, 14, 22));
+			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
+				7 * block_multiplier, 11 * block_multiplier));
 
 			// d2/f6, d6/d8 and d6/d8/f7 are new
 			// i.e. 2 new files, 1 new directory
 
-			client->QueryFinished();
+			protocol.QueryFinished();
 		}
 	}
 
-	TEARDOWN_TEST_BBACKUPD();
+	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
 bool test_bbackupd_uploads_files()
@@ -1751,12 +1819,28 @@ bool test_bbackupd_uploads_files()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+#define TEST_BBSTORED_OUT_OF_PROCESS 0
+
+void sigchld_handler(int signum)
+{
+	int exit_code;
+	pid_t pid = wait(&exit_code);
+	if(pid > 0)
+	{
+		BOX_INFO("Child process " << pid << " exited with status " << exit_code);
+	}
+	else
+	{
+		BOX_LOG_SYS_WARNING("wait() failed");
+	}
+}
+
 bool test_bbackupd_responds_to_connection_failure()
 {
 	SETUP_TEST_BBACKUPD();
 	TEST_THAT_OR(unpack_files("test_base"), FAIL);
 
-#ifdef WIN32
+#if defined WIN32 && TEST_BBSTORED_OUT_OF_PROCESS
 	BOX_NOTICE("skipping test on this platform"); // requires fork
 #else // !WIN32
 	// TODO FIXME dedent
@@ -1777,72 +1861,130 @@ bool test_bbackupd_responds_to_connection_failure()
 		close(fd);
 
 		wait_for_operation(5, "new file to be old enough");
+	}
 
-		// Start a bbstored with a test hook that makes it terminate
-		// on the first StoreFile command, breaking the connection to
-		// bbackupd.
-		class MyHook : public BackupStoreContext::TestHook
+	// Start a bbstored with a test hook that makes it terminate
+	// on the first StoreFile command, breaking the connection to
+	// bbackupd.
+	class MyHook : public BackupStoreContext::TestHook
+	{
+	public:
+		int trigger_count;
+		MyHook() : trigger_count(0) { }
+
+		virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
+			const BackupProtocolMessage& rCommand)
 		{
-		public:
-			int trigger_count;
-			MyHook() : trigger_count(0) { }
-
-			virtual std::auto_ptr<BackupProtocolMessage> StartCommand(
-				const BackupProtocolMessage& rCommand)
+			if (rCommand.GetType() ==
+				BackupProtocolStoreFile::TypeID)
 			{
-				if (rCommand.GetType() ==
-					BackupProtocolStoreFile::TypeID)
-				{
-					// terminate badly
-					trigger_count++;
-					THROW_EXCEPTION(ConnectionException,
-						TLSReadFailed);
-				}
-				return std::auto_ptr<BackupProtocolMessage>();
+				// terminate badly
+				trigger_count++;
+				THROW_EXCEPTION(ConnectionException,
+					TLSReadFailed);
 			}
-		};
+			return std::auto_ptr<BackupProtocolMessage>();
+		}
+	};
 
-		class MockBackupProtocolLocal : public BackupProtocolLocal2
+	std::auto_ptr<BackupProtocolCallable> apClient;
+
+# if TEST_BBSTORED_OUT_OF_PROCESS // more realistic
+	// bbstored_args always starts with a space
+	if(bbstored_args.length() > 0 &&
+		bbstored_args.substr(1).find(' ') != std::string::npos)
+	{
+		BOX_WARNING("bbstored_args contains multiple arguments, but there is no parser "
+			"built in, they will probably not be handled correctly");
+	}
+
+	{
+		MyHook hook;
+		bbstored_pid = fork();
+		TEST_THAT_OR(bbstored_pid >= 0, FAIL); // fork() failed
+
+		if(bbstored_pid == 0)
 		{
-		public:
-			MyHook hook;
-			MockBackupProtocolLocal(int32_t AccountNumber,
-				const std::string& ConnectionDetails,
-				const std::string& AccountRootDir, int DiscSetNumber,
-				bool ReadOnly)
-			: BackupProtocolLocal2(AccountNumber, ConnectionDetails,
-				AccountRootDir, DiscSetNumber, ReadOnly)
+			// in fork child
+			TEST_THAT(setsid() != -1);
+			
+			// BackupStoreDaemon must be destroyed before exit(),
+			// to avoid memory leaks being reported.
 			{
-				GetContext().SetTestHook(hook);
+				const char *bbstored_argv[] = {
+					"bbstored",
+					bbstored_args.c_str() + 1,
+				};
+				BackupStoreDaemon bbstored;
+				bbstored.SetTestHook(hook);
+				bbstored.SetDaemonize(false);
+				bbstored.SetForkPerClient(false);
+				bbstored.Main("testfiles/bbstored.conf", 2, bbstored_argv);
 			}
-			virtual ~MockBackupProtocolLocal() { }
-		};
 
-		MockBackupProtocolLocal client(0x01234567, "test",
-			"backup/01234567/", 0, false);
-		MockBackupDaemon bbackupd(client);
-		TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
+			Timers::Cleanup(); // avoid memory leaks
+			exit(0);
+		}
+		
+		// in fork parent
+		TEST_EQUAL(bbstored_pid, WaitForServerStartup("testfiles/bbstored.pid",
+			bbstored_pid));
 
-		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
+		// Ignore SIGPIPE so that when the connection is broken, the daemon doesn't terminate.
+		::signal(SIGPIPE, SIG_IGN);
 
+		// Ignore SIGCHLD so that we don't need to reap the zombie process.
+		::signal(SIGCHLD, sigchld_handler);
+
+		apClient = connect_and_login(sTlsContext, 0); // !ReadOnly
+	}
+# else // !TEST_BBSTORED_OUT_OF_PROCESS // easier to debug
+	class MockBackupProtocolLocal : public BackupProtocolLocal2
+	{
+	public:
+		MyHook hook;
+		MockBackupProtocolLocal(int32_t AccountNumber,
+			const std::string& ConnectionDetails,
+			const std::string& AccountRootDir, int DiscSetNumber,
+			bool ReadOnly)
+		: BackupProtocolLocal2(AccountNumber, ConnectionDetails,
+			AccountRootDir, DiscSetNumber, ReadOnly)
 		{
-			Console& console(Logging::GetConsole());
-			Logger::LevelGuard guard(console);
+			GetContext().SetTestHook(hook);
+		}
+		virtual ~MockBackupProtocolLocal() { }
+	};
 
-			if (console.GetLevel() < Log::TRACE)
-			{
-				console.Filter(Log::NOTHING);
-			}
+	apClient.reset(new MockBackupProtocolLocal(0x01234567, "test", "backup/01234567/",
+		0, false));
+	MockBackupProtocolLocal& r_mock_client(dynamic_cast<MockBackupProtocolLocal &>(*apClient));
+# endif // TEST_BBSTORED_OUT_OF_PROCESS
 
-			bbackupd.RunSyncNowWithExceptionHandling();
+	MockBackupDaemon bbackupd(*apClient);
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
+
+	TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
+
+	{
+		Console& console(Logging::GetConsole());
+		Logger::LevelGuard guard(console);
+
+		if (console.GetLevel() < Log::TRACE)
+		{
+			console.Filter(Log::NOTHING);
 		}
 
-		// Should only have been triggered once
-		TEST_EQUAL(1, client.hook.trigger_count);
-		TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
-		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
-		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
+		bbackupd.RunSyncNowWithExceptionHandling();
 	}
+
+# if !TEST_BBSTORED_OUT_OF_PROCESS // more realistic
+	// Should only have been triggered once
+	TEST_EQUAL(1, r_mock_client.hook.trigger_count);
+# endif
+
+	TEST_THAT(TestFileExists("testfiles/notifyran.backup-error.1"));
+	TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
+	TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
 #endif // !WIN32
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -3850,15 +3992,29 @@ int test(int argc, const char *argv[])
 			"testfiles/clientPrivKey.pem",
 			"testfiles/clientTrustedCAs.pem");
 
-	TEST_THAT(test_basics());
+	std::auto_ptr<RaidAndS3TestSpecs> specs(
+		new RaidAndS3TestSpecs("testfiles/bbackupd.s3.conf"));
+
+	TEST_THAT(kill_running_daemons());
+	TEST_THAT(StartSimulator());
+
+	TEST_THAT(test_file_attribute_storage());
+
+	// Run all tests that take a RaidAndS3TestSpecs::Specialisation argument twice, once with
+	// each specialisation that we have (S3 and BackupStore).
+
+	for(auto i = specs->specs().begin(); i != specs->specs().end(); i++)
+	{
+		TEST_THAT(test_bbackupquery_getobject_on_nonexistent_file(*i));
+		TEST_THAT(test_backup_disappearing_directory(*i));
+		TEST_THAT(test_backup_hardlinked_files(*i));
+		TEST_THAT(test_backup_pauses_when_store_is_full(*i));
+		TEST_THAT(test_bbackupd_exclusions(*i));
+	}
+
 	TEST_THAT(test_bbackupquery_parser_escape_slashes());
-	TEST_THAT(test_getobject_on_nonexistent_file());
 	// TEST_THAT(test_replace_zero_byte_file_with_nonzero_byte_file());
-	TEST_THAT(test_backup_disappearing_directory());
 	TEST_THAT(test_ssl_keepalives());
-	TEST_THAT(test_backup_hardlinked_files());
-	TEST_THAT(test_backup_pauses_when_store_is_full());
-	TEST_THAT(test_bbackupd_exclusions());
 	TEST_THAT(test_bbackupd_uploads_files());
 	TEST_THAT(test_bbackupd_responds_to_connection_failure());
 	TEST_THAT(test_absolute_symlinks_not_followed_during_restore());
@@ -3901,14 +4057,15 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_parse_incomplete_command());
 	TEST_THAT(test_parse_syncallowscript_output());
 
-	TEST_THAT(kill_running_daemons());
-
 #ifndef WIN32
 	if(::getuid() == 0)
 	{
 		BOX_WARNING("This test was run as root. Some tests have been omitted.");
 	}
 #endif
+
+	TEST_THAT(StopSimulator());
+	TEST_THAT(kill_running_daemons());
 
 	return finish_test_suite();
 }

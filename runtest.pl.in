@@ -200,6 +200,14 @@ sub runtest
 			foreach my $line (<EXTRA>)
 			{
 				chomp $line;
+
+				# Remove comments and skip blank lines:
+				$line =~ s/#.*//;
+				if (not $line)
+				{
+					continue;
+				}
+
 				if ($line =~ m/^mkdir (.*)/)
 				{
 					push @commands, "cmake -E make_directory $test_dst_dir/$1";

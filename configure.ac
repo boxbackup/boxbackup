@@ -89,7 +89,7 @@ AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
                  contrib/solaris/bbstored-manifest.xml
                  lib/common/BoxPortsAndFiles.h
                  test/bbackupd/testfiles/bbackupd.conf
-                 test/bbackupd/testfiles/bbackupd-exclude.conf
+                 test/bbackupd/testfiles/bbackupd.s3.conf
                  test/bbackupd/testfiles/bbackupd-snapshot.conf
                  test/bbackupd/testfiles/bbackupd-symlink.conf
                  test/bbackupd/testfiles/bbackupd-temploc.conf
