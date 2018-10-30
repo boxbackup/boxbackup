@@ -60,6 +60,8 @@ BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations, -Wdeprecated-declarations)
 BOX_CHECK_CXX_FLAG(-Wno-deprecated-register, -Wdeprecated-register)
 # Silence a ton of unexplained Clang warnings about unused command-line arguments (-I):
 BOX_CHECK_CXX_FLAG(-Wno-unused-command-line-argument, -Wunused-command-line-argument)
+# We deliberately use #pragma pack in separate headers, whether wise or not, so don't warn about it:
+BOX_CHECK_CXX_FLAG(-Wno-pragma-pack, -Wpragma-pack)
 AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
 
 if test "x$GXX" = "xyes"; then
