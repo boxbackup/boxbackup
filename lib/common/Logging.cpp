@@ -697,7 +697,8 @@ int Logging::OptionParser::ProcessOption(signed int option)
 			}
 
 			sLogLevelOverrideByFileGuards.push_back(
-				LogLevelOverrideByFileGuard(filename, category, level, false) // !OverrideAllButSelected
+				LogLevelOverrideByFileGuard(filename, category, level,
+					false) // !OverrideAllButSelected
 			);
 		}
 		break;
@@ -718,9 +719,7 @@ int Logging::OptionParser::ProcessOption(signed int option)
 		{
 			if(mCurrentLevel == Log::NOTHING)
 			{
-				BOX_FATAL("Too many '-q': "
-					"Cannot reduce logging "
-					"level any more");
+				BOX_FATAL("Too many '-q': Cannot reduce logging level any more");
 				return 2;
 			}
 			mCurrentLevel--;
@@ -757,9 +756,7 @@ int Logging::OptionParser::ProcessOption(signed int option)
 		{
 			if(mCurrentLevel == Log::EVERYTHING)
 			{
-				BOX_FATAL("Too many '-v': "
-					"Cannot increase logging "
-					"level any more");
+				BOX_FATAL("Too many '-v': Cannot increase logging level any more");
 				return 2;
 			}
 			mCurrentLevel++;
@@ -785,16 +782,14 @@ int Logging::OptionParser::ProcessOption(signed int option)
 
 		case '?':
 		{
-			BOX_FATAL("Unknown option on command line: " 
-				<< "'" << (char)optopt << "'");
+			BOX_FATAL("Unknown option on command line: '" << (char)option << "'");
 			return 2;
 		}
 		break;
 
 		default:
 		{
-			BOX_FATAL("Unknown error in getopt: returned "
-				<< "'" << option << "'");
+			BOX_FATAL("Unknown error in getopt: returned " << option);
 			return 1;
 		}
 	}
