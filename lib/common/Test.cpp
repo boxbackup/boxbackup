@@ -131,6 +131,7 @@ void cleanup_test_environment(bool delete_pid_files)
 			filename == "bbackupd-data" ||
 			filename == "store" ||
 			filename == "syncallowscript.control" ||
+			filename == "test_map.db" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
 			EndsWith("testfile", filename) ||
@@ -256,6 +257,11 @@ void cleanup_test_environment(bool delete_pid_files)
 
 bool tearDown()
 {
+#ifndef WIN32
+	// Reset SIGCHLD handler, in case the test has changed it:
+	::signal(SIGCHLD, SIG_DFL);
+#endif
+
 	box_time_t elapsed_time = GetCurrentBoxTime() - current_test_start;
 	std::ostringstream buf;
 	buf.setf(std::ios_base::fixed);
