@@ -974,19 +974,22 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	}
 	
 	// Does file exist?
-	EMU_STRUCT_STAT st;
-	if(EMU_STAT(args[1].c_str(), &st) == 0 || errno != ENOENT)
+	if(FileExists(args[1]))
 	{
 		BOX_ERROR("The local file '" << args[1] << " already exists.");
 		return;
 	}
-	
-	// Open file
-	FileStream out(args[1].c_str(), O_WRONLY | O_CREAT | O_EXCL);
+
+	bool success = false;
+	bool file_created = false;
 	
 	// Request that object
 	try
 	{
+		// Open file
+		FileStream out(args[1], O_WRONLY | O_CREAT | O_EXCL);
+		file_created = true;
+
 		// Request object
 		std::auto_ptr<BackupProtocolSuccess> getobj(mrConnection.QueryGetObject(id));
 
@@ -996,6 +999,8 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 			
 		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 			" fetched successfully.");
+
+		success = true;
 	}
 	catch(ConnectionException &e)
 	{
@@ -1003,18 +1008,21 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 		{
 			BOX_ERROR("Object ID " << BOX_FORMAT_OBJECTID(id) <<
 				" does not exist on store.");
-			EMU_UNLINK(args[1].c_str());
 		}
 		else
 		{
 			BOX_ERROR("Error occured fetching object.");
-			EMU_UNLINK(args[1].c_str());
 		}
 	}
 	catch(...)
 	{
-		EMU_UNLINK(args[1].c_str());
 		BOX_ERROR("Error occured fetching object.");
+	}
+
+	if(file_created && !success && EMU_UNLINK(args[1].c_str()) != 0)
+	{
+		BOX_LOG_SYS_ERROR(
+			BOX_FILE_MESSAGE(args[1], "Failed to delete incomplete download file"));
 	}
 }
 
