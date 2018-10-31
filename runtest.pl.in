@@ -222,6 +222,12 @@ sub runtest
 					push @commands, "cmake -E copy_directory ".
 						"$test_dst_dir/$src $test_dst_dir/$dst";
 				}
+				elsif ($line =~ m/^cp (.*) (.*)/)
+				{
+					my ($src, $dst) = ($1, $2);
+					push @commands, "cmake -E copy $test_dst_dir/$src ".
+						"$test_dst_dir/$dst";
+				}
 				else
 				{
 					die "Unsupported command in ".
