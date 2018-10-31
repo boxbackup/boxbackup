@@ -121,6 +121,7 @@ void cleanup_test_environment(bool delete_pid_files)
 		std::string filename = pEntry->d_name;
 		if(StartsWith("TestDir", filename) ||
 			StartsWith("0_", filename) ||
+			filename == "2.obj" ||
 			filename == "accounts.txt" ||
 			filename == "bbackupd-cache" ||
 			filename == "bbackupd-cache-2" ||
