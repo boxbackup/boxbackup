@@ -25,6 +25,7 @@
 #include "Configuration.h"
 #include "RaidFileController.h"
 #include "ServerControl.h"
+#include "StoreTestUtils.h"
 #include "SSLLib.h"
 #include "Test.h"
 #include "Utils.h"
@@ -32,36 +33,6 @@
 #include "MemLeakFindOn.h"
 
 #define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
-
-int s3simulator_pid = 0;
-
-bool StartSimulator()
-{
-	s3simulator_pid = StartDaemon(s3simulator_pid,
-		"../../bin/s3simulator/s3simulator " + bbstored_args +
-		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
-	return s3simulator_pid != 0;
-}
-
-bool StopSimulator()
-{
-	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
-		"s3simulator.memleaks", true);
-	s3simulator_pid = 0;
-	return result;
-}
-
-bool kill_running_daemons()
-{
-	if(FileExists("testfiles/s3simulator.pid"))
-	{
-		return KillServer("testfiles/s3simulator.pid", true);
-	}
-	else
-	{
-		return true;
-	}
-}
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_S3SIMULATOR() \

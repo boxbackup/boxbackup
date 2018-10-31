@@ -55,7 +55,7 @@ test/s3store		lib/backupclient	bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system
 lib/httpserver          lib/server
-test/httpserver         lib/httpserver bin/s3simulator
+test/httpserver         lib/httpserver bin/s3simulator	lib/backupstore
 
 # END_IF_DISTRIBUTION
 

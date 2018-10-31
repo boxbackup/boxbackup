@@ -122,17 +122,17 @@ void cleanup_test_environment(bool delete_pid_files)
 		if(StartsWith("TestDir", filename) ||
 			StartsWith("0_", filename) ||
 			filename == "accounts.txt" ||
+			filename == "bbackupd-cache" ||
+			filename == "bbackupd-cache-2" ||
+			filename == "bbackupd-data" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
 			StartsWith("restore", filename) ||
-			filename == "bbackupd-cache" ||
-			filename == "bbackupd-cache-2" ||
-			filename == "bbackupd-data" ||
 			filename == "store" ||
 			filename == "syncallowscript.control" ||
-			filename == "test_map.db" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
+			filename == "test_map.db" ||
 			filename == "test2.downloaded" ||
 			EndsWith("testfile", filename) ||
 			EndsWith(".qdbm", filename) ||

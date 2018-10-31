@@ -49,7 +49,7 @@ bool teardown_test_unified();
 extern std::vector<uint32_t> ExpectedRefCounts;
 
 //! Holds the PID of the currently running bbstored test server.
-extern int bbstored_pid, bbackupd_pid;
+extern int bbstored_pid, bbackupd_pid, s3simulator_pid;
 
 //! Sets the expected refcount of an object, resizing vector if necessary.
 void set_refcount(int64_t ObjectID, uint32_t RefCount = 1);

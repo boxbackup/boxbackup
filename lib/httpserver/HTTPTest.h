@@ -10,8 +10,6 @@
 #ifndef HTTPTEST__H
 #define HTTPTEST__H
 
-bool StartSimulator();
-bool StopSimulator();
 bool kill_simulator_if_running();
 
 #endif // HTTPTEST__H

@@ -1068,6 +1068,7 @@ bool test_bbackupquery_getobject_on_nonexistent_file(RaidAndS3TestSpecs::Special
 			}
 		}
 		TEST_LINE(found, "Last log message was: " << messages.back().message);
+		TEST_THAT(!TestFileExists("testfiles/2.obj"));
 	}
 
 	TEARDOWN_TEST_SPECIALISED(spec);

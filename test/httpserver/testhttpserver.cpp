@@ -37,6 +37,7 @@
 #include "S3Simulator.h"
 #include "ServerControl.h"
 #include "SimpleDBClient.h"
+#include "StoreTestUtils.h"
 #include "Test.h"
 #include "ZeroStream.h"
 #include "decode.h"
@@ -934,7 +935,7 @@ bool test_httpserver()
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/httpserver.pid",
-		"generic-httpserver.memleaks", true));
+		"generic-httpserver.memleaks", false)); // !wait_for_process
 
 	// Copy testfiles/puppy.jpg to testfiles/store/photos/puppy.jpg
 	{
@@ -1621,7 +1622,7 @@ bool test_httpserver()
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",
-		"s3simulator.memleaks", true));
+		"s3simulator.memleaks", false)); // !wait_for_process
 
 	TEST_THAT(StartSimulator());
 
