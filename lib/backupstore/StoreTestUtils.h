@@ -136,7 +136,7 @@ bool StopClient(bool wait_for_process = false);
 
 bool StartSimulator();
 
-bool StopSimulator();
+bool StopSimulator(bool wait_for_process = false);
 
 bool kill_running_daemons();
 
