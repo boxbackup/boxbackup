@@ -457,7 +457,7 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 		SendInternalErrorResponse(s.str().c_str(), rResponse);
 	}
 
-	BOX_NOTICE(rResponse.GetResponseCode() << " " << rRequest.GetMethodName() << " " <<
+	BOX_TRACE(rResponse.GetResponseCode() << " " << rRequest.GetMethodName() << " " <<
 		rRequest.GetRequestURI(true)); // with_parameters_for_get_request
 
 	return;
