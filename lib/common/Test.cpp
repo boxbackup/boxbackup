@@ -509,21 +509,16 @@ void terminate_bbackupd(int pid)
 
 
 // Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds, const char* message)
+void wait_for_operation(float seconds, const char* message)
 {
 	BOX_INFO("Waiting " << seconds << " seconds for " << message);
-
-	for(int l = 0; l < seconds; ++l)
-	{
-		sleep(1);
-	}
-
+	ShortSleep(MilliSecondsToBoxTime(seconds * 1000), true); // logDuration
 	BOX_TRACE("Finished waiting for " << message);
 }
 
 void safe_sleep(int seconds)
 {
-	ShortSleep(SecondsToBoxTime(seconds), true);
+	ShortSleep(SecondsToBoxTime(seconds), true); // logDuration
 }
 
 std::auto_ptr<Configuration> load_config_file(const std::string& config_file,

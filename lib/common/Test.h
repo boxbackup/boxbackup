@@ -268,7 +268,7 @@ void sync_and_wait();
 void terminate_bbackupd(int pid);
 
 // Wait a given number of seconds for something to complete
-void wait_for_operation(int seconds, const char* message);
+void wait_for_operation(float seconds, const char* message);
 void safe_sleep(int seconds);
 std::auto_ptr<Configuration> load_config_file(const std::string& config_file,
 	const ConfigurationVerify& verify);

@@ -43,6 +43,7 @@ set(files_to_configure
 	test/bbackupd/testfiles/bbackupd.conf
 	test/bbackupd/testfiles/bbackupd.s3.conf
 	test/bbackupd/testfiles/bbackupd-snapshot.conf
+	test/bbackupd/testfiles/bbackupd-snapshot.s3.conf
 	test/bbackupd/testfiles/bbackupd-symlink.conf
 	test/bbackupd/testfiles/bbackupd-temploc.conf
 	test/bbackupd/testfiles/extcheck1.pl

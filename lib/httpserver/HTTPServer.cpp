@@ -162,6 +162,16 @@ void HTTPServer::Connection(std::auto_ptr<SocketStream> apConn)
 		}
 		catch(BoxException &e)
 		{
+			if(EXCEPTION_IS_TYPE(e, HTTPException, TerminateWorkerNow) ||
+				EXCEPTION_IS_TYPE(e, HTTPException, TerminateServerNow))
+			{
+				if(EXCEPTION_IS_TYPE(e, HTTPException, TerminateServerNow))
+				{
+					SetTerminateWanted();
+				}
+				throw;
+			}
+
 			char exceptionCode[256];
 			::sprintf(exceptionCode, "%s (%d/%d)", e.what(),
 				e.GetType(), e.GetSubType());

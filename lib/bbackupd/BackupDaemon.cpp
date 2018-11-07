@@ -2751,8 +2751,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			BackupStoreFilenameClear clear(en->GetName());
 			const std::string &name(clear.GetClearFilename());
 			mUnusedRootDirEntries.push_back(
-				std::pair<int64_t,std::string>
-				(en->GetObjectID(), name));
+				std::pair<int64_t,std::string>(en->GetObjectID(), name));
 			// Log this
 			BOX_INFO("Unused location in root: " << name);
 		}

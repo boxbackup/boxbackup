@@ -212,7 +212,7 @@ bool KillServerInternal(int pid)
 
 #endif // WIN32
 
-bool KillServer(int pid, bool WaitForProcess)
+bool KillServer(int pid, bool wait_for_process)
 {
 	if(!KillServerInternal(pid))
 	{
@@ -220,7 +220,7 @@ bool KillServer(int pid, bool WaitForProcess)
 	}
 
 #ifdef HAVE_WAITPID
-	if(WaitForProcess)
+	if(wait_for_process)
 	{
 		int status, result;
 
