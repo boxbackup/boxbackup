@@ -404,6 +404,12 @@ void S3Simulator::Handle(HTTPRequest &rRequest, HTTPResponse &rResponse)
 	}
 	catch (BoxException &ce)
 	{
+		if(EXCEPTION_IS_TYPE(ce, HTTPException, TerminateWorkerNow) ||
+			EXCEPTION_IS_TYPE(ce, HTTPException, TerminateServerNow))
+		{
+			throw;
+		}
+
 		SendInternalErrorResponse(ce.what(), rResponse);
 
 		// Override the default status code 500 for a few specific exceptions.

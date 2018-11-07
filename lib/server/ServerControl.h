@@ -6,8 +6,9 @@
 #include "Test.h"
 
 bool HUPServer(int pid);
-bool KillServer(int pid, bool WaitForProcess = false);
+bool KillServer(int pid, bool wait_for_process = false);
 bool KillServer(const std::string& pid_file, bool WaitForProcess = false);
+bool KillServerInternal(int pid);
 int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file, int port = 0,
 	const std::string& socket_path = "");
 bool StopDaemon(int current_pid, const std::string& pid_file,

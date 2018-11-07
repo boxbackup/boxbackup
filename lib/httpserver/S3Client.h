@@ -65,6 +65,8 @@ class S3Client
 	  mNetworkTimeout(600000)
 	{ }
 
+	virtual ~S3Client() { }
+
 	class BucketEntry {
 	public:
 		BucketEntry(const std::string& name, const std::string& etag,
@@ -81,20 +83,20 @@ class S3Client
 		int64_t mSize;
 	};
 
-	int ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
+	virtual int ListBucket(std::vector<S3Client::BucketEntry>* p_contents_out,
 		std::vector<std::string>* p_common_prefixes_out,
 		const std::string& prefix = "", const std::string& delimiter = "/",
 		bool* p_truncated_out = NULL, int max_keys = -1,
 		const std::string& marker = "");
-	HTTPResponse GetObject(const std::string& rObjectURI,
+	virtual HTTPResponse GetObject(const std::string& rObjectURI,
 		const std::string& MD5Checksum = "");
-	HTTPResponse HeadObject(const std::string& rObjectURI);
-	HTTPResponse PutObject(const std::string& rObjectURI,
+	virtual HTTPResponse HeadObject(const std::string& rObjectURI);
+	virtual HTTPResponse PutObject(const std::string& rObjectURI,
 		IOStream& rStreamToSend, const char* pContentType = NULL);
-	HTTPResponse DeleteObject(const std::string& rObjectURI);
-	bool DeleteObjectChecked(const std::string& rObjectURI, const std::string& message,
+	virtual HTTPResponse DeleteObject(const std::string& rObjectURI);
+	virtual bool DeleteObjectChecked(const std::string& rObjectURI, const std::string& message,
 		bool missing_ok = false);
-	void CheckResponse(const HTTPResponse& response, const std::string& message,
+	virtual void CheckResponse(const HTTPResponse& response, const std::string& message,
 		bool ExpectNoContent = false) const;
 	int GetNetworkTimeout() const { return mNetworkTimeout; }
 	const std::string& GetAccessKey() const { return mAccessKey; }
