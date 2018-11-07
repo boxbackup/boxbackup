@@ -60,6 +60,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
   mpFileSystem(NULL),
+  mpRefCount(NULL),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
@@ -88,6 +89,7 @@ BackupStoreContext::BackupStoreContext(BackupFileSystem& rFileSystem,
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
   mpFileSystem(&rFileSystem),
+  mpRefCount(NULL),
   mpTestHook(NULL)
 // If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
@@ -229,6 +231,9 @@ void BackupStoreContext::CleanUp()
 		// BackupFileSystem (in case it's modified before reopening).
 		if(mpRefCount)
 		{
+			// The filesystem lock may have been released under our feet, in which case
+			// CloseRefCountDatabase() will fail with a non-obvious error, so check it:
+			ASSERT(mpFileSystem->GetCurrentRefCountDatabase() != NULL);
 			mpFileSystem->CloseRefCountDatabase(mpRefCount);
 			mpRefCount = NULL;
 		}
