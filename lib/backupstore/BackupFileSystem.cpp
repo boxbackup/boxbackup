@@ -2021,22 +2021,38 @@ void S3BackupFileSystem::TryGetLock()
 
 	// Create the domain, to ensure that it exists. This is idempotent.
 	mapSimpleDBClient->CreateDomain(mSimpleDBDomain);
-	SimpleDBClient::str_map_t conditional;
+	SimpleDBClient::str_map_t attributes, conditional;
+	bool lock_exists = false;
 
 	// Check to see whether someone already holds the lock
 	try
 	{
-		SimpleDBClient::str_map_t attributes;
+		HideSpecificExceptionGuard hex(HTTPException::ExceptionType,
+			HTTPException::SimpleDBItemNotFound);
+		attributes = mapSimpleDBClient->GetAttributes(mSimpleDBDomain,
+			mLockName);
+		lock_exists = true;
+	}
+	catch(HTTPException &e)
+	{
+		if(EXCEPTION_IS_TYPE(e, HTTPException, SimpleDBItemNotFound))
 		{
-			HideSpecificExceptionGuard hex(HTTPException::ExceptionType,
-				HTTPException::SimpleDBItemNotFound);
-			attributes = mapSimpleDBClient->GetAttributes(mSimpleDBDomain,
-				mLockName);
+			// The lock doesn't exist, so it's safe to create it. We can't
+			// make this request conditional, so there is a race condition
+			// here! We deal with that by reading back the attributes with
+			// a ConsistentRead after writing them.
 		}
+		else
+		{
+			// Something else went wrong.
+			throw;
+		}
+	}
 
-		// This succeeded, which means that someone once held the lock. If the
-		// locked attribute is empty, then they released it cleanly, and we can
-		// access the account safely.
+	if(lock_exists)
+	{
+		// Someone once held the lock. If the locked attribute is empty, then they released
+		// it cleanly, and we can access the account safely.
 		box_time_t since_time = box_strtoui64(attributes["since"].c_str(), NULL, 10);
 
 		if(attributes["locked"] == "")
@@ -2045,10 +2061,9 @@ void S3BackupFileSystem::TryGetLock()
 			// way, to avoid a race condition.
 			conditional = attributes;
 		}
-		// Otherwise, someone holds the lock right now. If the lock is held by
-		// this computer (same hostname) and the PID is no longer running, then
-		// it's reasonable to assume that we can override it because the original
-		// process is dead.
+		// Otherwise, someone holds the lock right now. If the lock is held by this computer
+		// (same hostname) and the PID is no longer running, then it's reasonable to assume
+		// that we can override it because the original process is dead.
 		else if(attributes["hostname"] == mCurrentHostName)
 		{
 			char* end_ptr;
@@ -2086,39 +2101,25 @@ void S3BackupFileSystem::TryGetLock()
 		}
 		else
 		{
-			// If the account is locked by a process on a different host, then
-			// we have no way to check whether it is still running, so we can
-			// only give up.
+			// If the account is locked by a process on a different host, then we have
+			// no way to check whether it is still running, so we can only give up.
 			THROW_EXCEPTION_MESSAGE(BackupStoreException,
 				CouldNotLockStoreAccount, "Lock on '" << mLockName <<
 				"' is held by '" << attributes["locker"] << " since " <<
 				FormatTime(since_time, true)); // includeDate
 		}
 	}
-	catch(HTTPException &e)
-	{
-		if(EXCEPTION_IS_TYPE(e, HTTPException, SimpleDBItemNotFound))
-		{
-			// The lock doesn't exist, so it's safe to create it. We can't
-			// make this request conditional, so there is a race condition
-			// here! We deal with that by reading back the attributes with
-			// a ConsistentRead after writing them.
-		}
-		else
-		{
-			// Something else went wrong.
-			throw;
-		}
-	}
 
 	mLockAttributes["locked"] = "true";
 	mLockAttributes["locker"] = mLockValue;
 	mLockAttributes["hostname"] = mCurrentHostName;
+
 	{
 		std::ostringstream pid_buf;
 		pid_buf << getpid();
 		mLockAttributes["pid"] = pid_buf.str();
 	}
+
 	{
 		std::ostringstream since_buf;
 		since_buf << GetCurrentBoxTime();
