@@ -387,10 +387,10 @@ bool StartSimulator()
 	return s3simulator_pid != 0;
 }
 
-bool StopSimulator()
+bool StopSimulator(bool wait_for_process)
 {
 	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
-		"s3simulator.memleaks", false); // !wait_for_process
+		"s3simulator.memleaks", wait_for_process);
 	s3simulator_pid = 0;
 	return result;
 }
