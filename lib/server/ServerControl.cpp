@@ -383,7 +383,7 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 #else
 	// On other platforms there is no other way to get the PID, so a NULL pidFile doesn't
 	// make sense.
-	ASSERT(pidFile != NULL);
+	ASSERT(pidIfKnown != 0 || pidFile != NULL);
 #endif
 
 	// time for it to start up
@@ -460,29 +460,37 @@ int WaitForServerStartup(const char *pidFile, int pidIfKnown, int port,
 
 	BOX_TRACE("Server started");
 
-	// read pid file
-	int pid = ReadPidFile(pidFile);
-
-	// On Win32 we can check whether the PID in the pidFile matches
-	// the one returned by the system, which it always should.
-	if (pidIfKnown && pid != pidIfKnown)
+	if(pidFile != NULL)
 	{
-		BOX_ERROR("Server wrote wrong pid to file (" << pidFile <<
-			"): expected " << pidIfKnown << " but found " <<
-			pid);
-		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");
-		// We want to return the actual PID, not the one in the PID file, so that if the
-		// server was started, it is always stopped at the end of the test.
+		// read pid file
+		int pid = ReadPidFile(pidFile);
+
+		// In some cases, where the PID is already known when this function is called, we
+		/// can check whether the PID in the pidFile matches the known PID:
+		if (pidIfKnown && pid != pidIfKnown)
+		{
+			BOX_ERROR("Server wrote wrong pid to file (" << pidFile <<
+				"): expected " << pidIfKnown << " but found " <<
+				pid);
+			TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");
+			// We want to return the actual PID, not the one in the PID file, so that if the
+			// server was started, it is always stopped at the end of the test.
+			return pidIfKnown;
+		}
+
+		return pid;
+	}
+	else
+	{
+		ASSERT(pidIfKnown != 0);
 		return pidIfKnown;
 	}
-
-	return pid;
 }
 
 int StartDaemon(int current_pid, const std::string& cmd_line, const char* pid_file, int port,
 	const std::string& socket_path)
 {
-	TEST_THAT_OR(current_pid == 0, return 0);
+	TEST_EQUAL_OR(0, current_pid, return 0);
 
 	int new_pid = LaunchServer(cmd_line, pid_file, port, socket_path);
 	TEST_THAT_OR(new_pid != -1 && new_pid != 0, return 0);
