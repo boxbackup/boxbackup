@@ -126,6 +126,7 @@ void cleanup_test_environment(bool delete_pid_files)
 			filename == "bbackupd-cache" ||
 			filename == "bbackupd-cache-2" ||
 			filename == "bbackupd-data" ||
+			filename == "ca" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
@@ -136,6 +137,7 @@ void cleanup_test_environment(bool delete_pid_files)
 			filename == "test_map.db" ||
 			filename == "test2.downloaded" ||
 			EndsWith("testfile", filename) ||
+			filename == "tmp" ||
 			EndsWith(".qdbm", filename) ||
 			(delete_pid_files && EndsWith(".pid", filename)))
 		{
