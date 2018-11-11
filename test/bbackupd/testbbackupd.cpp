@@ -694,13 +694,14 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 	// For once, Windows makes things easier. We can start a process without blocking (waiting
 	// for it to finish) using CreateProcess, wrapped by LaunchServer:
 
-	std::string cmd = BBACKUPQUERY;
-	cmd += " -c " + bbackupd_conf_file + " restore "
-		"testfiles/restore-interrupt " /* remote */
-		"testfiles/restore-interrupt " /* local */
+	std::ostringstream cmd;
+	cmd << BBACKUPQUERY << " " <<
+		"-c " << bbackupd_conf_file << " \"restore "
+		"-i " << restoredirid << " " /* remote dir ID */
+		"testfiles/restore-interrupt\" " /* local */
 		"quit";
 
-	int pid = LaunchServer(cmd, NULL /* pid_file */);
+	int pid = LaunchServer(cmd.str(), NULL /* pid_file */);
 #else // !WIN32
 	int pid = 0;
 	switch((pid = fork()))
@@ -720,14 +721,16 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 				GetConfiguredBackupClient(*apConfig, true); // read_only
 
 			// Test the restoration
-			TEST_THAT(BackupClientRestore(*apClient, restoredirid,
-				"testfiles/restore-interrupt", /* remote */
-				"testfiles/restore-interrupt", /* local */
-				true /* print progress dots */,
-				false /* restore deleted */,
-				false /* undelete after */,
-				false /* resume */,
-				false /* keep going */) == Restore_Complete);
+			TEST_THAT(BackupClientRestore(*apClient,
+					restoredirid, // ID of remote directory to restore
+					"Test1", // remote (source) name, for display (logging) only
+					"testfiles/restore-interrupt", // local (destination) name
+					true, // print progress dots
+					false, // restore deleted
+					false, // undelete after
+					false, // resume
+					false // keep going
+				) == Restore_Complete);
 
 			// Log out
 			apClient->QueryFinished();
@@ -2149,7 +2152,6 @@ bool test_bbackupd_responds_to_connection_failure_out_of_process(
 		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-error.2"));
 		TEST_THAT(!TestFileExists("testfiles/notifyran.store-full.1"));
 	}
-#endif // !WIN32
 
 	// It's very important to wait() for the server when using fork, otherwise the zombie never
 	// dies and the test fails:
@@ -2161,6 +2163,7 @@ bool test_bbackupd_responds_to_connection_failure_out_of_process(
 	{
 		StopServer(true); // wait_for_process
 	}
+#endif // !WIN32
 
 	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
@@ -4164,7 +4167,7 @@ bool test_bbackupd_config_script()
 	TEST_RETURN(system(cmd.c_str()), 0)
 
 	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
-		"-e 's@PidFile = /var/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
+		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
 		"testfiles/tmp/bbstored.conf";
 	TEST_RETURN(system(cmd.c_str()), 0)
 
