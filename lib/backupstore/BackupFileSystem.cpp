@@ -231,6 +231,8 @@ std::auto_ptr<IOStream> BackupFileSystem::GetBlockIndexReconstructed(int64_t Obj
 
 		// TODO: we shouldn't have to fetch the entire file just to build its block index
 		// on S3 stores.
+		BOX_WARNING("Fetching entire file just for its block index: " <<
+			BOX_FORMAT_OBJECTID(patchID));
 		std::auto_ptr<IOStream> diff(GetFile(patchID));
 
 		// Store the reconstructed metadata (not block data) in a buffer in memory,
