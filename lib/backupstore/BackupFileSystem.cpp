@@ -105,7 +105,7 @@ void BackupFileSystem::GetLock(int max_tries)
 			{
 				BOX_LOG_CATEGORY(Log::INFO, LOCKING, "Failed to lock account " <<
 					GetAccountIdentifier() << " after " << (i + 1) << " "
-					"attempts, giving up");
+					"attempts, giving up: " << e.GetMessage());
 				throw;
 			}
 			else
@@ -382,9 +382,8 @@ void RaidBackupFileSystem::TryGetLock()
 	if(!mWriteLock.TryAndGetLock(writeLockFile.c_str(),
 		0600 /* restrictive file permissions */))
 	{
-		THROW_EXCEPTION_MESSAGE(BackupStoreException,
-			CouldNotLockStoreAccount, "Failed to get exclusive "
-			"lock on account");
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, CouldNotLockStoreAccount,
+			"Another process has an exclusive lock on " << writeLockFile);
 	}
 }
 
