@@ -301,7 +301,7 @@ IOStream::pos_type RaidFileWrite::GetPosition() const
 //		Created: 2003/07/10
 //
 // --------------------------------------------------------------------------
-void RaidFileWrite::Seek(IOStream::pos_type SeekTo, int SeekType)
+void RaidFileWrite::Seek(pos_type SeekTo, seek_type SeekType)
 {
 	// open?
 	if(mOSFileHandle == -1)

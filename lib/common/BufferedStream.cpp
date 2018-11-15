@@ -125,7 +125,7 @@ IOStream::pos_type BufferedStream::GetPosition() const
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedStream::Seek(IOStream::pos_type Offset, int SeekType)
+void BufferedStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	switch (SeekType)
 	{

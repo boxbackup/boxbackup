@@ -64,7 +64,7 @@ public:
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
 	}
-	virtual void Seek(pos_type Offset, int SeekType)
+	virtual void Seek(pos_type Offset, seek_type SeekType)
 	{
 		THROW_EXCEPTION(CommonException, NotSupported);
 	}
@@ -99,10 +99,6 @@ public:
 	}
 	void Flush(int Timeout = IOStream::TimeOutInfinite)
 	{ }
-	static int ConvertSeekTypeToOSWhence(int SeekType)
-	{
-		THROW_EXCEPTION(CommonException, NotSupported);
-	}
 	virtual std::string ToString() const
 	{
 		return "TeeStream";

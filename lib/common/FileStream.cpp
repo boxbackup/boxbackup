@@ -605,7 +605,7 @@ IOStream::pos_type FileStream::GetPosition() const
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void FileStream::Seek(IOStream::pos_type Offset, int SeekType)
+void FileStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	if(mOSFileHandle == INVALID_FILE)
 	{

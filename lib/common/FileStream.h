@@ -85,7 +85,7 @@ public:
 		int Timeout = IOStream::TimeOutInfinite);
 	using IOStream::Write;
 	virtual pos_type GetPosition() const;
-	virtual void Seek(IOStream::pos_type Offset, int SeekType);
+	virtual void Seek(pos_type Offset, seek_type SeekType);
 	virtual void Truncate(IOStream::pos_type length);
 	virtual void Close();
 	

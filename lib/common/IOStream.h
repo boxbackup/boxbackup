@@ -37,7 +37,7 @@ public:
 		SizeOfStreamUnknown = -1
 	};
 	
-	enum
+	enum seek_type
 	{
 		SeekType_Absolute = 0,
 		SeekType_Relative = 1,
@@ -55,7 +55,7 @@ public:
 		int Timeout = IOStream::TimeOutInfinite);
 	virtual void WriteAllBuffered(int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
-	virtual void Seek(pos_type Offset, int SeekType);
+	virtual void Seek(pos_type Offset, seek_type SeekType);
 	virtual void Close();
 
 	// Has all data that can be read been read?
@@ -70,7 +70,7 @@ public:
 		int Timeout = IOStream::TimeOutInfinite, int BufferSize = 1024);
 	void Flush(int Timeout = IOStream::TimeOutInfinite);
 
-	static int ConvertSeekTypeToOSWhence(int SeekType);
+	static int ConvertSeekTypeToOSWhence(seek_type SeekType);
 	virtual std::string ToString() const;
 };
 

@@ -44,7 +44,7 @@ public:
 	{
 		return mrSink.GetPosition();
 	}
-	virtual void Seek(IOStream::pos_type Offset, int SeekType)
+	virtual void Seek(pos_type Offset, seek_type SeekType)
 	{
 		mrSink.Seek(Offset, SeekType);
 	}

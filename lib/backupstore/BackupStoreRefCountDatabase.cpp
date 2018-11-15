@@ -522,7 +522,7 @@ refcount_t BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t ObjectID) const
 			BackupStoreException, UnknownObjectRefCountRequested);
 	}
 
-	mapDatabaseFile->Seek(offset, SEEK_SET);
+	mapDatabaseFile->Seek(offset, IOStream::SeekType_Absolute);
 
 	refcount_t refcount;
 	if (mapDatabaseFile->Read(&refcount, sizeof(refcount)) !=
@@ -568,7 +568,7 @@ void BackupStoreRefCountDatabaseImpl::SetRefCount(int64_t ObjectID,
 {
 	ASSERT(mapDatabaseFile.get());
 	IOStream::pos_type offset = GetOffset(ObjectID);
-	mapDatabaseFile->Seek(offset, SEEK_SET);
+	mapDatabaseFile->Seek(offset, IOStream::SeekType_Absolute);
 	refcount_t RefCountNetOrder = htonl(NewRefCount);
 	mapDatabaseFile->Write(&RefCountNetOrder, sizeof(RefCountNetOrder));
 	mIsModified = true;

@@ -124,7 +124,7 @@ IOStream::pos_type ReadLoggingStream::GetPosition() const
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ReadLoggingStream::Seek(IOStream::pos_type Offset, int SeekType)
+void ReadLoggingStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	mrSource.Seek(Offset, SeekType);
 
