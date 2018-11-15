@@ -62,7 +62,7 @@ void IOStream::Close()
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void IOStream::Seek(IOStream::pos_type Offset, int SeekType)
+void IOStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	THROW_EXCEPTION(CommonException, NotSupported)
 }
@@ -89,7 +89,7 @@ IOStream::pos_type IOStream::GetPosition() const
 //		Created: 2003/08/21
 //
 // --------------------------------------------------------------------------
-int IOStream::ConvertSeekTypeToOSWhence(int SeekType)
+int IOStream::ConvertSeekTypeToOSWhence(seek_type SeekType)
 {
 	// Should be nicely optimised out as values are choosen in header file to match OS values.
 	int ostype = SEEK_SET;

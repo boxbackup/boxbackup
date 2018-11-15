@@ -156,7 +156,7 @@ public:
 	{
 		return mapSocket->GetPosition();
 	}
-	virtual void Seek(IOStream::pos_type Offset, int SeekType)
+	virtual void Seek(pos_type Offset, seek_type SeekType)
 	{
 		mapSocket->Seek(Offset, SeekType);
 	}

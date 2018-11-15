@@ -168,7 +168,7 @@ IOStream::pos_type CollectInBufferStream::GetPosition() const
 //		Created: 2003/08/26
 //
 // --------------------------------------------------------------------------
-void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
+void CollectInBufferStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	int newPos = 0;
 	switch(SeekType)
@@ -181,9 +181,6 @@ void CollectInBufferStream::Seek(pos_type Offset, int SeekType)
 		break;
 	case IOStream::SeekType_End:
 		newPos = mBytesInBuffer + Offset;
-		break;
-	default:
-		THROW_EXCEPTION(CommonException, IOStreamBadSeekType)
 		break;
 	}
 	

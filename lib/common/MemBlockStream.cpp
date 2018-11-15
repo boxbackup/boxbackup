@@ -208,7 +208,7 @@ IOStream::pos_type MemBlockStream::GetPosition() const
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void MemBlockStream::Seek(pos_type Offset, int SeekType)
+void MemBlockStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	int newPos = 0;
 	switch(SeekType)
@@ -222,9 +222,6 @@ void MemBlockStream::Seek(pos_type Offset, int SeekType)
 	case IOStream::SeekType_End:
 		newPos = mBytesInBuffer + Offset;
 		break;
-	default:
-		THROW_EXCEPTION(CommonException, IOStreamBadSeekType)
-		break;
 	}
 	
 	// Make sure it doesn't go over
@@ -233,7 +230,7 @@ void MemBlockStream::Seek(pos_type Offset, int SeekType)
 		newPos = mBytesInBuffer;
 	}
 	// or under
-	if(newPos < 0)
+	else if(newPos < 0)
 	{
 		newPos = 0;
 	}

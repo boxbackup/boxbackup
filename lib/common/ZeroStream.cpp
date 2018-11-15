@@ -95,7 +95,7 @@ IOStream::pos_type ZeroStream::GetPosition() const
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void ZeroStream::Seek(IOStream::pos_type Offset, int SeekType)
+void ZeroStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	switch (SeekType)
 	{

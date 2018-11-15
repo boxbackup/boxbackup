@@ -114,7 +114,7 @@ IOStream::pos_type BufferedWriteStream::GetPosition() const
 //		Created: 2003/07/31
 //
 // --------------------------------------------------------------------------
-void BufferedWriteStream::Seek(IOStream::pos_type Offset, int SeekType)
+void BufferedWriteStream::Seek(pos_type Offset, seek_type SeekType)
 {
 	// Always flush the buffer before seeking
 	Flush();

@@ -72,7 +72,7 @@ private:
 public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
-	virtual void Seek(IOStream::pos_type Offset, int SeekType);
+	virtual void Seek(pos_type Offset, seek_type SeekType);
 	virtual void Close();
 	virtual pos_type GetFileSize() const;
 	virtual bool StreamDataLeft();
@@ -178,7 +178,7 @@ RaidFileRead::pos_type RaidFileRead_NonRaid::GetPosition() const
 //		Created: 2003/07/13
 //
 // --------------------------------------------------------------------------
-void RaidFileRead_NonRaid::Seek(IOStream::pos_type Offset, int SeekType)
+void RaidFileRead_NonRaid::Seek(pos_type Offset, seek_type SeekType)
 {
 	// open?
 	if(mOSFileHandle == -1)
@@ -285,7 +285,7 @@ private:
 public:
 	virtual int Read(void *pBuffer, int NBytes, int Timeout = IOStream::TimeOutInfinite);
 	virtual pos_type GetPosition() const;
-	virtual void Seek(IOStream::pos_type Offset, int SeekType);
+	virtual void Seek(pos_type Offset, seek_type SeekType);
 	virtual void Close();
 	virtual pos_type GetFileSize() const;
 	virtual bool StreamDataLeft();
@@ -800,7 +800,7 @@ IOStream::pos_type RaidFileRead_Raid::GetPosition() const
 //		Created: 2003/07/13
 //
 // --------------------------------------------------------------------------
-void RaidFileRead_Raid::Seek(IOStream::pos_type Offset, int SeekType)
+void RaidFileRead_Raid::Seek(pos_type Offset, seek_type SeekType)
 {
 	pos_type newpos = mCurrentPosition;
 	switch(SeekType)

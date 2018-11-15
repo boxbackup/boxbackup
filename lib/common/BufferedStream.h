@@ -32,7 +32,7 @@ public:
 	using IOStream::Write;
 
 	virtual pos_type GetPosition() const;
-	virtual void Seek(IOStream::pos_type Offset, int SeekType);
+	virtual void Seek(pos_type Offset, seek_type SeekType);
 	virtual void Close();
 	
 	virtual bool StreamDataLeft();
