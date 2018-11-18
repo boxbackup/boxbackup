@@ -3413,14 +3413,14 @@ bool test_continuously_updated_file()
 		wait_for_sync_end();
 
 		{
-			// The file will be uploaded after 3 seconds (until the next sync) +
-			// 7 seconds (MaxUploadWait) + 2 seconds (the next sync after that, at which
-			// point it's been pending for >MaxUploadWait seconds). We wait, still
-			// touching the file, for 2 seconds less than that:
+			// The file will be uploaded after 3-4 seconds (until the next sync) +
+			// 7 seconds (MaxUploadWait) + 0-2 seconds (the next sync after that,
+			// at which point it's been pending for >MaxUploadWait seconds). We wait,
+			// still touching the file, for 2 seconds less than that (8 seconds):
 			BOX_NOTICE("Open a file, then save something to it "
-				"every second for 10 seconds");
+				"every second for 8 seconds");
 
-			for(int l = 0; l < 10; ++l)
+			for(int l = 0; l < 8; ++l)
 			{
 				FileStream fs("testfiles/TestDir1/continousupdate",
 					O_CREAT | O_WRONLY);
@@ -3431,17 +3431,16 @@ bool test_continuously_updated_file()
 
 			// Check there's a difference
 			BOX_NOTICE("Comparing all files to check that it was not uploaded yet");
-			int compareReturnValue = ::system("perl testfiles/"
-				"extcheck1.pl");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(::system("perl testfiles/extcheck1.pl"),
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 
-			// And then another 4 seconds, until 2 seconds after it should have been
-			// synced:
+			// And then another 7 seconds, until 2 seconds after the last time that a
+			// sync could have run that would have uploaded it (15 seconds)
 			BOX_NOTICE("Keep on continuously updating file for "
 				"another 4 seconds, check it is uploaded eventually");
 
-			for(int l = 0; l < 4; ++l)
+			for(int l = 0; l < 7; ++l)
 			{
 				FileStream fs("testfiles/TestDir1/continousupdate", O_WRONLY);
 				fs.Write("a", 1);
@@ -3450,9 +3449,8 @@ bool test_continuously_updated_file()
 			}
 
 			BOX_NOTICE("Comparing all files to check that it was uploaded by now");
-			compareReturnValue = ::system("perl testfiles/"
-				"extcheck2.pl");
-			TEST_RETURN(compareReturnValue, 1);
+			TEST_RETURN(::system("perl testfiles/extcheck2.pl"),
+				BackupQueries::ReturnCode::Compare_Same);
 			TestRemoteProcessMemLeaks("bbackupquery.memleaks");
 		}
 	}
