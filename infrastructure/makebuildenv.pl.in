@@ -329,14 +329,14 @@ my %hfiles;
 for my $mod (@modules, @implicit_deps)
 {
 	opendir DIR,$mod;
-	my @items = readdir DIR;
+	my @sources = readdir DIR;
 	closedir DIR;
 
 	# add in items from autogen directories, and create output directories
 	{
-		my @autogen_items;
+		my @autogen_sources;
 
-		for my $di (@items)
+		for my $di (@sources)
 		{
 			if($di =~ m/\Aautogen/ && -d "$mod/$di")
 			{
@@ -348,14 +348,14 @@ for my $mod (@modules, @implicit_deps)
 				for(@i)
 				{
 					next if m/\A\./;
-					push @autogen_items,"$di/$_"
+					push @autogen_sources, "$di/$_"
 				}
 			}
 		}
-		@items = (@items, @autogen_items);
+		@sources = (@sources, @autogen_sources);
 	}
 
-	for(grep /\.h\Z/i, @items)
+	for(grep /\.h\Z/i, @sources)
 	{
 		next if /\A\._/;	# Temp Mac OS Resource hack
 		die "Header file $_ already used in module ".$hfiles{$_}.
@@ -754,17 +754,17 @@ __E
 	opendir DIR, $mod;
 	my @files = readdir DIR;
 	closedir DIR;
-	my @items = map {"$mod/$_"} @files;
+	my @sources = map {"$mod/$_"} @files;
 
 	if($type eq 'test')
 	{
-		push @items, $test_template_file;
+		push @sources, $test_template_file;
 	}
 
 	# add in items from autogen directories, and create output directories
 	{
-		my @autogen_items;
-		for my $di (@items)
+		my @autogen_sources;
+		for my $di (@sources)
 		{
 			if($di =~ m/\Aautogen/ && -d "$mod/$di")
 			{
@@ -776,7 +776,7 @@ __E
 				for (@i)
 				{
 					next if m/\A\./;
-					push @autogen_items,"$di/$_"
+					push @autogen_sources,"$di/$_"
 				}
 
 				# output directories
@@ -784,12 +784,12 @@ __E
 				mkdir "debug/$mod/$di",0755;
 			}
 		}
-		@items = (@items, @autogen_items);
+		@sources = (@sources, @autogen_sources);
 	}
 
 	# first, obtain a list of dependencies within the .h files
 	my %headers;
-	for my $h (grep /\.h\Z/i, @items)
+	for my $h (grep /\.h\Z/i, @sources)
 	{
 		open FL,"$h" or die "$h: $!";
 		my $f;
@@ -865,18 +865,18 @@ __E
 		# first in the output dependencies (@objs), since any changed to their own
 		# dependencies (e.g. a Protocol.txt file) must cause them to be rebuilt before we
 		# attempt to compile any other source files, otherwise those other files might not
-		# compile (due to newly defined Commands not existing in the autogen_Protocol.h
+		# compile (e.g. due to newly defined Commands not existing in the autogen_Protocol.h
 		# file yet) which could cause us to fail to even try to build the later dependencies
 		# that would fix the problem.
 		my @objs = @objs_extra;
 
-		for my $file (@items)
+		for my $file (@sources)
 		{
 			my $is_c   = $file =~ m@(([^/]+)\.c)\Z@i;
 			my $is_cpp = $file =~ m@(([^/]+)\.cpp)\Z@i;
 			my $is_rc  = $file =~ m@(([^/]+)\.rc)\Z@i;
 			my $basename = $1;
-			my $base = $2;
+			my $base = $2; # Filename, without extension
 
 			# Don't try to compile .rc files except on Windows:
 			next if not $is_c and not $is_cpp and not ($is_rc and $target_windows);
