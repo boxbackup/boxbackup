@@ -18,6 +18,9 @@
 #include "BackupStoreConstants.h"
 #include "FileStream.h"
 
+#define REFCOUNT_MAGIC_VALUE	0x52656643 // RefC
+#define REFCOUNT_MAGIC_VALUE_2	0x52656632 // Ref2
+
 class BackupStoreCheck;
 class BackupStoreContext;
 
@@ -61,6 +64,12 @@ public:
 	virtual void Reopen() = 0;
 	virtual bool IsReadOnly() = 0;
 
+	enum Version
+	{
+		Version_1 = 1,
+		Version_2 = 2,
+	};
+
 	// These static methods actually create instances of
 	// BackupStoreRefCountDatabaseImpl.
 
@@ -71,7 +80,8 @@ public:
 	// be Discard()ed, or potential if !reuse_existing_file (you can Discard() or Commit() it,
 	// the latter of which makes it permanent):
 	static std::auto_ptr<BackupStoreRefCountDatabase> Create
-		(const std::string& Filename, int64_t AccountID, bool reuse_existing_file = false);
+		(const std::string& Filename, int64_t AccountID, bool reuse_existing_file = false,
+		Version version = Version_2);
 	// Load it from the store
 	static std::auto_ptr<BackupStoreRefCountDatabase> Load(
 		const BackupStoreAccountDatabase::Entry& rAccount, bool ReadOnly);
@@ -93,6 +103,9 @@ public:
 	virtual bool RemoveReference(int64_t ObjectID) = 0;
 	virtual int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs,
 		int64_t ignore_object_id = 0) = 0;
+
+	virtual int64_t GetClientStoreMarker() const = 0;
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker) = 0;
 };
 
 #endif // BACKUPSTOREREFCOUNTDATABASE__H

@@ -831,6 +831,102 @@ bool run_housekeeping_and_check_account(BackupProtocolLocal2& protocol)
 	return check_account_status & check_refcount_status;
 }
 
+bool test_refcount_db_versions()
+{
+	SETUP_TEST_UNIFIED();
+
+	// Old version
+	std::auto_ptr<BackupStoreRefCountDatabase> db = BackupStoreRefCountDatabase::Create(
+		"testfiles/refcount.db.1", 0x123456, false, // !reuse_existing_file
+		BackupStoreRefCountDatabase::Version_1);
+	TEST_CHECK_THROWS(db->GetClientStoreMarker(), CommonException, NotSupported);
+	TEST_CHECK_THROWS(db->SetClientStoreMarker(10), CommonException, NotSupported);
+	db->Commit();
+	db.reset();
+
+	{
+		FileStream file1("testfiles/refcount.db.1", O_RDONLY | O_BINARY);
+		file1.Seek(0, IOStream::SeekType_End);
+		TEST_EQUAL(12, file1.GetPosition());
+		file1.Seek(0, IOStream::SeekType_Absolute);
+		uint32_t dword;
+		Archive arc(file1, IOStream::TimeOutInfinite);
+		arc.ReadExact(dword); TEST_EQUAL(dword, REFCOUNT_MAGIC_VALUE);
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x123456); // account number
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x1); // refcount of object 1 (root dir)
+
+		db = BackupStoreRefCountDatabase::Load(file1.GetFileName(), 0x123456,
+			false); // !ReadOnly
+		db->AddReference(3);
+		db->AddReference(3);
+		db->AddReference(3);
+		db.reset();
+
+		file1.Seek(0, IOStream::SeekType_End);
+		TEST_EQUAL(20, file1.GetPosition());
+		file1.Seek(0, IOStream::SeekType_Absolute);
+		arc.ReadExact(dword); TEST_EQUAL(dword, REFCOUNT_MAGIC_VALUE);
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x123456); // account number
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x1); // refcount of object 1 (root dir)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x0); // refcount of object 2
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x3); // refcount of object 3
+
+		db = BackupStoreRefCountDatabase::Load(file1.GetFileName(), 0x123456,
+			true); // ReadOnly
+		TEST_EQUAL(3, db->GetRefCount(3));
+		db.reset();
+	}
+
+	// New version
+	db = BackupStoreRefCountDatabase::Create("testfiles/refcount.db.2", 0x123456,
+		false, // !reuse_existing_file
+		BackupStoreRefCountDatabase::Version_2);
+	TEST_EQUAL(0, db->GetClientStoreMarker());
+	db->Commit();
+	db.reset();
+
+	{
+		FileStream file1("testfiles/refcount.db.2", O_RDONLY | O_BINARY);
+		file1.Seek(0, IOStream::SeekType_End);
+		TEST_EQUAL(20, file1.GetPosition());
+		file1.Seek(0, IOStream::SeekType_Absolute);
+		uint32_t dword;
+		Archive arc(file1, IOStream::TimeOutInfinite);
+		arc.ReadExact(dword); TEST_EQUAL(dword, REFCOUNT_MAGIC_VALUE_2);
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x123456); // account number
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x0); // client store marker (1/2)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x0); // client store marker (2/2)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x1); // refcount of object 1 (root dir)
+
+		db = BackupStoreRefCountDatabase::Load(file1.GetFileName(), 0x123456,
+			false); // !ReadOnly
+		db->AddReference(3);
+		db->AddReference(3);
+		db->AddReference(3);
+		db->SetClientStoreMarker(0x123456789LL);
+		db.reset();
+
+		file1.Seek(0, IOStream::SeekType_End);
+		TEST_EQUAL(28, file1.GetPosition());
+		file1.Seek(0, IOStream::SeekType_Absolute);
+		arc.ReadExact(dword); TEST_EQUAL(dword, REFCOUNT_MAGIC_VALUE_2);
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x123456); // account number
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x1); // client store marker (1/2)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x23456789); // client store marker (2/2)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x1); // refcount of object 1 (root dir)
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x0); // refcount of object 2
+		arc.ReadExact(dword); TEST_EQUAL(dword, 0x3); // refcount of object 3
+
+		db = BackupStoreRefCountDatabase::Load(file1.GetFileName(), 0x123456,
+			true); // ReadOnly
+		TEST_EQUAL(3, db->GetRefCount(3));
+		TEST_EQUAL(0x123456789LL, db->GetClientStoreMarker());
+		db.reset();
+	}
+
+	TEARDOWN_TEST_UNIFIED();
+}
+
 bool test_temporary_refcount_db_is_independent()
 {
 	SETUP_TEST_UNIFIED();
@@ -3662,6 +3758,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_simpledb_locking(specs->s3()));
 
 	TEST_THAT(test_filename_encoding());
+	TEST_THAT(test_refcount_db_versions());
 	TEST_THAT(test_temporary_refcount_db_is_independent());
 	TEST_THAT(test_backupstore_directory());
 
