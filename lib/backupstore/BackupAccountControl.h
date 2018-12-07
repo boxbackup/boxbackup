@@ -58,6 +58,7 @@ public:
 	virtual int DeleteAccount(bool AskForConfirmation) = 0;
 	virtual int CheckAccount(bool FixErrors, bool Quiet, bool ReturnNumErrorsFound = false);
 	virtual int HousekeepAccountNow();
+	virtual void CloseAccount();
 };
 
 
