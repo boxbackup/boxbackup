@@ -185,6 +185,7 @@ int BackupAccountControl::SetLimit(int64_t softlimit, int64_t hardlimit)
 
 	BOX_NOTICE("Limits on account " << mapFileSystem->GetAccountIdentifier() << " "
 		"changed to " << softlimit << " blocks soft, " << hardlimit << " hard.");
+	CloseAccount();
 
 	return 0;
 }
@@ -199,6 +200,7 @@ int BackupAccountControl::SetAccountName(const std::string& rNewAccountName)
 
 	BOX_NOTICE("Name of account " << mapFileSystem->GetAccountIdentifier() << " "
 		"changed to " << rNewAccountName);
+	CloseAccount();
 
 	return 0;
 }
@@ -213,6 +215,7 @@ int BackupAccountControl::SetAccountEnabled(bool enabled)
 
 	BOX_NOTICE("Account " << mapFileSystem->GetAccountIdentifier() << " is now " <<
 		(enabled ? "enabled" : "disabled"));
+	CloseAccount();
 
 	return 0;
 }
@@ -222,6 +225,7 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	int32_t HardLimit, const std::string& AccountName)
 {
 	// We definitely need a lock to do something this destructive!
+
 	{
 		// Taking the lock will try to GetAccountIdentifier() (for the log message) which
 		// will throw an exception because the BackupStoreInfo file does not exist yet.
@@ -327,7 +331,7 @@ int BackupStoreAccountControl::DeleteAccount(bool AskForConfirmation)
 	// NamedLock will throw an exception if it can't delete the lockfile,
 	// which it can't if it doesn't exist. Now that we've deleted the account,
 	// nobody can open it anyway, so it's safe to unlock.
-	mapFileSystem->ReleaseLock();
+	CloseAccount(); // calls ReleaseLock() which calls DiscardBackupStoreInfo()
 
 	int retcode = 0;
 
@@ -389,6 +393,20 @@ void BackupStoreAccountControl::SwitchToUnprivilegedUser(bool temporary)
 	}
 }
 
+
+void BackupAccountControl::CloseAccount()
+{
+	if(mapFileSystem->HaveLock())
+	{
+		mapFileSystem->ReleaseLock();
+	}
+	else
+	{
+		mapFileSystem->DiscardBackupStoreInfo();
+	}
+}
+
+
 void BackupStoreAccountControl::OpenAccount(bool readWrite)
 {
 	if(mapFileSystem.get())
@@ -443,6 +461,7 @@ int BackupAccountControl::CheckAccount(bool FixErrors, bool Quiet,
 	// Check it
 	BackupStoreCheck check(*mapFileSystem, FixErrors, Quiet);
 	check.Check();
+	CloseAccount();
 
 	if(ReturnNumErrorsFound)
 	{
@@ -506,17 +525,18 @@ int BackupAccountControl::HousekeepAccountNow()
 
 	HousekeepStoreAccount housekeeping(*mapFileSystem, NULL);
 	bool success = housekeeping.DoHousekeeping();
+	std::string id = mapFileSystem->GetAccountIdentifier();
+	CloseAccount();
 
 	if(!success)
 	{
-		BOX_ERROR("Failed to lock account " << mapFileSystem->GetAccountIdentifier() << " "
-			"for housekeeping: perhaps a client is still connected?");
+		BOX_ERROR("Failed to lock account " << id << " for housekeeping: perhaps a client "
+			"is still connected?");
 		return 1;
 	}
 	else
 	{
-		BOX_TRACE("Finished housekeeping on account " <<
-			mapFileSystem->GetAccountIdentifier());
+		BOX_TRACE("Finished housekeeping on account " << id);
 		return 0;
 	}
 }
@@ -658,6 +678,8 @@ int S3BackupAccountControl::DeleteAccount(bool AskForConfirmation)
 			throw;
 		}
 	}
+
+	CloseAccount();
 
 	// Success!
 	return ret;

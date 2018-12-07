@@ -75,6 +75,10 @@ public:
 	virtual void DiscardBackupStoreInfo(BackupStoreInfo& rInfo)
 	{
 		ASSERT(mapBackupStoreInfo.get() == &rInfo);
+		DiscardBackupStoreInfo();
+	}
+	virtual void DiscardBackupStoreInfo()
+	{
 		mapBackupStoreInfo.reset();
 	}
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoUncached()

@@ -132,7 +132,7 @@ void BackupFileSystem::ReleaseLock()
 			GetAccountIdentifier());
 	}
 
-	mapBackupStoreInfo.reset();
+	DiscardBackupStoreInfo();
 
 	if(mapPotentialRefCountDatabase.get())
 	{
@@ -157,7 +157,7 @@ BackupStoreInfo& BackupFileSystem::GetBackupStoreInfo(bool ReadOnly, bool Refres
 		else
 		{
 			// Need to reopen to change from read-only to read-write.
-			mapBackupStoreInfo.reset();
+			DiscardBackupStoreInfo();
 		}
 	}
 
