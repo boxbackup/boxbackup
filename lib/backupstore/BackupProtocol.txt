@@ -63,6 +63,8 @@ LoginConfirmed	3	Reply
 
 Finished	4	Command(Finished)	Reply	EndsConversation
 
+# New Finished command, returns new client store marker
+Finished2	47	Command(Success)	Reply	EndsConversation
 
 # generic success object
 Success		5	Reply
@@ -274,3 +276,4 @@ AccountUsage2	45	Reply
 	int64	NumDirectories
 
 # 46 is CreateDirectory2
+# 47 is Finished2

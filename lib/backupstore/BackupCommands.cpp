@@ -207,6 +207,41 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 // --------------------------------------------------------------------------
 //
 // Function
+//		Name:    BackupProtocolFinished2::DoCommand(Protocol &,
+//		         BackupStoreContext &)
+//		Purpose: Marks end of conversation (Protocol framework handles this).
+//		         Returns a Success object containing the new client
+//		         store marker.
+//		Created: 2018/11/19
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished2::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	// can be called only when logged in
+	CHECK_PHASE(Phase_Commands)
+
+	BOX_NOTICE("Session finished for account " << rContext.GetAccountIdentifier() << ": " <<
+		(rContext.SessionIsReadOnly() ? "read-only" : "read-write") << " from " <<
+		rContext.GetConnectionDetails());
+
+	// We can only get the current marker if we have a lock. Otherwise it doesn't make sense.
+	int64_t marker = BackupFileSystem::ClientStoreMarker_NotKnown;
+	if(!rContext.SessionIsReadOnly())
+	{
+		marker = rContext.GetClientStoreMarker();
+	}
+
+	// Let the context know that the client has disconnected:
+	rContext.CleanUp();
+
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(marker));
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
 //		Name:    BackupProtocolListDirectory::DoCommand(Protocol &, BackupStoreContext &)
 //		Purpose: Command to list a directory
 //		Created: 2003/09/02
