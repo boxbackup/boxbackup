@@ -708,6 +708,7 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 	{
 	case 0:
 		// child process
+		try
 		{
 			Logging::SetProgramName("bbackupquery");
 			Logging::ShowTagOnConsole show_tag_on_console;
@@ -734,8 +735,18 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 
 			// Log out
 			apClient->QueryFinished();
+			exit(0);
 		}
-		exit(0);
+		catch(std::exception &e)
+		{
+			printf("FAILED: Forked daemon caught exception: %s\n", e.what());
+			exit(1);
+		}
+		catch(...)
+		{
+			printf("FAILED: Forked daemon caught unknown exception\n");
+			exit(1);
+		}
 		break;
 
 	case -1:
@@ -750,34 +761,55 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 #endif // !WIN32
 
 	// Wait until a resume file is written, then terminate the child
+	box_time_t deadline = GetCurrentBoxTime() + SecondsToBoxTime(10);
+
 	while(true)
 	{
+		TEST_THAT(GetCurrentBoxTime() <= deadline); // restore took too long
+
 		// Test for existence of the result file
 		int64_t resumesize = 0;
-		if(FileExists("testfiles/restore-interrupt.boxbackupresume", &resumesize) && resumesize > 16)
+		if((FileExists("testfiles/restore-interrupt.boxbackupresume", &resumesize) &&
+		    resumesize > 16) || GetCurrentBoxTime() > deadline)
 		{
-			// It's done something. Terminate it.
-			TEST_THAT(KillServerInternal(pid));
+			// It's done something. Terminate it. If it forked, then we need to wait()
+			// for it as well, otherwise the zombie process will never die.
+			// If the restore process returned 0, then it actually finished, so we
+			// haven't tested anything. So check that it doesn't (assume 1 instead):
+#ifdef WIN32
+			TEST_THAT(KillServer(pid,
+				true, // wait_for_process
+				0, // expected_exit_status
+				0 // expected_signal: no signals on Windows, and not used
+			));
+#else
+			TEST_THAT(KillServer(pid,
+				true, // wait_for_process
+				0, // expected_exit_status
+				SIGTERM // expected_signal: no SIGTERM handler installed
+			));
+#endif
 			break;
 		}
 
-		// Process finished?
+		// Process finished unexpectedly? We were too slow?
+
+#ifdef HAVE_WAITPID
+		WaitForProcessExit(pid, SIGTERM, 1); // expected_exit_status
+		// If successful, then ServerIsAlive will return false below.
+#endif
+
 		if(!ServerIsAlive(pid))
 		{
+			// Even though we forked a child process, if it was a zombie waiting for us
+			// to reap it then it would still be alive, so we know that it's not, so we
+			// don't have to wait for it.
 			break;
 		}
 
 		// Give up timeslot so as not to hog the processor
 		::sleep(0);
 	}
-
-#ifdef HAVE_WAITPID
-	// Clean up zombie process
-	int status = 0;
-	waitpid(pid, &status, 0);
-	// If the restore process returned 0, then it actually finished, so we haven't tested anything.
-	TEST_EQUAL(SIGTERM, status);
-#endif
 }
 
 #ifdef WIN32
@@ -3782,7 +3814,6 @@ bool test_changing_client_store_marker_pauses_daemon(RaidAndS3TestSpecs::Special
 	// Wait for the end of another sync, to give us ~3 seconds to change
 	// the client store marker.
 	wait_for_sync_end();
-
 
 	// TODO FIXME dedent
 	{
