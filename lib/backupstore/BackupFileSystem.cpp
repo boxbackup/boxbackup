@@ -365,6 +365,14 @@ public:
 	{
 		return mapUnderlying->ReportChangesTo(rOldRefs, ignore_object_id);
 	}
+	virtual int64_t GetClientStoreMarker() const
+	{
+		return mapUnderlying->GetClientStoreMarker();
+	}
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker)
+	{
+		mapUnderlying->SetClientStoreMarker(new_client_store_marker);
+	}
 };
 
 

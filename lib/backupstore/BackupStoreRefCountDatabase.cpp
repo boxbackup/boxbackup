@@ -9,6 +9,7 @@
 
 #include "Box.h"
 
+#include <stddef.h> // for offsetof
 #include <stdio.h>
 
 #include <algorithm>
@@ -24,7 +25,6 @@
 
 #include "MemLeakFindOn.h"
 
-#define REFCOUNT_MAGIC_VALUE	0x52656643 // RefC
 #define REFCOUNT_FILENAME	"refcount"
 
 typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
@@ -41,6 +41,13 @@ typedef struct
 	uint32_t mMagicValue;	// also the version number
 	uint32_t mAccountID;
 } refcount_StreamFormat;
+
+typedef struct
+{
+	uint32_t mMagicValue;	// also the version number
+	uint32_t mAccountID;
+	int64_t mClientStoreMarker;
+} refcount_2_StreamFormat;
 
 // Use default packing
 #ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
@@ -65,7 +72,8 @@ public:
 
 	BackupStoreRefCountDatabaseImpl(const std::string& Filename, int64_t AccountID,
 		bool ReadOnly, bool PotentialDB, bool TemporaryDB,
-		std::auto_ptr<FileStream> apDatabaseFile);
+		std::auto_ptr<FileStream> apDatabaseFile,
+		Version version = Version_2, int64_t client_store_marker = 0);
 
 private:
 	// No copying allowed
@@ -127,11 +135,24 @@ public:
 	int ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs,
 		int64_t ignore_object_id = 0);
 
+	virtual int64_t GetClientStoreMarker() const;
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker);
+
 private:
 	IOStream::pos_type GetSize() const
 	{
 		return mapDatabaseFile->GetPosition() +
 			mapDatabaseFile->BytesLeftToRead();
+	}
+	IOStream::pos_type GetHeaderSize() const
+	{
+		switch(mVersion)
+		{
+		case Version_1: return sizeof(refcount_StreamFormat);
+		case Version_2: return sizeof(refcount_2_StreamFormat);
+		}
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
+			"Unknown refcount DB version: " << mVersion);
 	}
 	IOStream::pos_type GetEntrySize() const
 	{
@@ -139,13 +160,14 @@ private:
 	}
 	IOStream::pos_type GetOffset(int64_t ObjectID) const
 	{
-		return ((ObjectID - 1) * GetEntrySize()) +
-			sizeof(refcount_StreamFormat);
+		return GetHeaderSize() + ((ObjectID - 1) * GetEntrySize());
 	}
 	void Truncate();
 
 	// Location information
+	Version mVersion;
 	int64_t mAccountID;
+	int64_t mClientStoreMarker;
 	std::string mFilename, mFinalFilename;
 	bool mReadOnly;
 	bool mIsModified;
@@ -170,8 +192,11 @@ private:
 // --------------------------------------------------------------------------
 BackupStoreRefCountDatabaseImpl::BackupStoreRefCountDatabaseImpl(
 	const std::string& Filename, int64_t AccountID, bool ReadOnly, bool PotentialDB,
-	bool TemporaryDB, std::auto_ptr<FileStream> apDatabaseFile)
-: mAccountID(AccountID),
+	bool TemporaryDB, std::auto_ptr<FileStream> apDatabaseFile, Version version,
+	int64_t client_store_marker)
+: mVersion(version),
+  mAccountID(AccountID),
+  mClientStoreMarker(client_store_marker),
   mFilename(Filename + (PotentialDB ? "X" : "")),
   mFinalFilename(TemporaryDB ? "" : Filename),
   mReadOnly(ReadOnly),
@@ -302,8 +327,7 @@ void BackupStoreRefCountDatabaseImpl::Truncate()
 		}
 	}
 
-	IOStream::pos_type new_length = sizeof(refcount_StreamFormat) +
-		(last_referenced_object_id * sizeof(refcount_t));
+	IOStream::pos_type new_length = GetOffset(last_referenced_object_id + 1);
 	mapDatabaseFile->Truncate(new_length);
 }
 
@@ -354,7 +378,7 @@ BackupStoreRefCountDatabase::Create(const BackupStoreAccountDatabase::Entry& rAc
 // --------------------------------------------------------------------------
 std::auto_ptr<BackupStoreRefCountDatabase>
 BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t AccountID,
-	bool reuse_existing_file)
+	bool reuse_existing_file, Version version)
 {
 	// Open the file for writing
 	std::string temp_filename = Filename + (reuse_existing_file ? "" : "X");
@@ -388,10 +412,25 @@ BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t Account
 	std::auto_ptr<FileStream> database_file(new FileStream(temp_filename, flags));
 
 	// Write header
-	refcount_StreamFormat hdr;
-	hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE);
-	hdr.mAccountID = htonl(AccountID);
-	database_file->Write(&hdr, sizeof(hdr));
+	if(version == Version_1)
+	{
+		refcount_StreamFormat hdr;
+		hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE);
+		hdr.mAccountID = htonl(AccountID);
+		database_file->Write(&hdr, sizeof(hdr));
+	}
+	else if(version == Version_2)
+	{
+		refcount_2_StreamFormat hdr;
+		hdr.mMagicValue = htonl(REFCOUNT_MAGIC_VALUE_2);
+		hdr.mAccountID = htonl(AccountID);
+		hdr.mClientStoreMarker = 0;
+		database_file->Write(&hdr, sizeof(hdr));
+	}
+	else
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, Internal, "Unknown refcount DB version");
+	}
 
 	// Make new object
 	BackupStoreRefCountDatabaseImpl* p_impl = new BackupStoreRefCountDatabaseImpl(
@@ -399,7 +438,9 @@ BackupStoreRefCountDatabase::Create(const std::string& Filename, int64_t Account
 		false, // ReadOnly
 		!reuse_existing_file, // PotentialDB
 		reuse_existing_file, // TemporaryDB
-		database_file);
+		database_file,
+		version,
+		0); // client_store_marker
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(p_impl);
 
 	// The root directory must always have one reference for a database
@@ -430,7 +471,8 @@ std::auto_ptr<BackupStoreRefCountDatabase> BackupStoreRefCountDatabase::Load(
 }
 
 std::auto_ptr<FileStream> OpenDatabaseFile(const std::string& Filename, int64_t AccountID,
-	bool ReadOnly)
+	bool ReadOnly, BackupStoreRefCountDatabase::Version* p_version,
+	int64_t* p_client_store_marker)
 {
 	int flags = ReadOnly ? O_RDONLY : O_RDWR;
 	std::auto_ptr<FileStream> database_file(new FileStream(Filename, flags | O_BINARY));
@@ -445,13 +487,36 @@ std::auto_ptr<FileStream> OpenDatabaseFile(const std::string& Filename, int64_t 
 			CouldNotLoadStoreInfo);
 	}
 
-	// Check it
-	if(ntohl(hdr.mMagicValue) != REFCOUNT_MAGIC_VALUE ||
-		(int32_t)ntohl(hdr.mAccountID) != AccountID)
+	if(ntohl(hdr.mMagicValue) == REFCOUNT_MAGIC_VALUE)
+	{
+		*p_version = BackupStoreRefCountDatabase::Version_1;
+	}
+	else if(ntohl(hdr.mMagicValue) == REFCOUNT_MAGIC_VALUE_2)
+	{
+		if(!database_file->ReadFullBuffer(p_client_store_marker,
+			sizeof(*p_client_store_marker),
+			0 /* not interested in bytes read if this fails */))
+		{
+			THROW_FILE_ERROR("Failed to read refcount database: "
+				"short read of ClientStoreMarker", Filename, BackupStoreException,
+				CouldNotLoadStoreInfo);
+		}
+		*p_client_store_marker = box_ntoh64(*p_client_store_marker);
+		*p_version = BackupStoreRefCountDatabase::Version_2;
+	}
+	else
 	{
 		THROW_FILE_ERROR("Failed to read refcount database: "
-			"bad magic number", Filename, BackupStoreException,
-			BadStoreInfoOnLoad);
+			"bad magic number: " << ntohl(hdr.mMagicValue), Filename,
+			BackupStoreException, BadStoreInfoOnLoad);
+	}
+
+	// Check it
+	if((int32_t)ntohl(hdr.mAccountID) != AccountID)
+	{
+		THROW_FILE_ERROR("Failed to read refcount database: "
+			"wrong account number: " << BOX_FORMAT_ACCOUNT(ntohl(hdr.mAccountID)),
+			Filename, BackupStoreException, BadStoreInfoOnLoad);
 	}
 
 	return database_file;
@@ -466,12 +531,19 @@ BackupStoreRefCountDatabase::Load(const std::string& Filename, int64_t AccountID
 	// so no need to append an X to it.
 	ASSERT(Filename.size() > 0 && Filename[Filename.size() - 1] != 'X');
 
-	std::auto_ptr<FileStream> database_file = OpenDatabaseFile(Filename, AccountID, ReadOnly);
+	BackupStoreRefCountDatabase::Version version;
+	int64_t client_store_marker;
+
+	std::auto_ptr<FileStream> database_file = OpenDatabaseFile(Filename, AccountID, ReadOnly,
+		&version, &client_store_marker);
+
 	std::auto_ptr<BackupStoreRefCountDatabase> refcount(
 		new BackupStoreRefCountDatabaseImpl(Filename, AccountID, ReadOnly,
 			false, // PotentialDB
 			false, // TemporaryDB
-			database_file));
+			database_file,
+			version,
+			client_store_marker));
 
 	// return it to caller
 	return refcount;
@@ -495,7 +567,8 @@ void BackupStoreRefCountDatabaseImpl::Reopen()
 	// so no need to append an X to it.
 	ASSERT(mFilename.size() > 0 && mFilename[mFilename.size() - 1] != 'X');
 
-	mapDatabaseFile = OpenDatabaseFile(mFilename, mAccountID, mReadOnly);
+	mapDatabaseFile = OpenDatabaseFile(mFilename, mAccountID, mReadOnly, &mVersion,
+		&mClientStoreMarker);
 }
 
 
@@ -538,9 +611,8 @@ refcount_t BackupStoreRefCountDatabaseImpl::GetRefCount(int64_t ObjectID) const
 
 int64_t BackupStoreRefCountDatabaseImpl::GetLastObjectIDUsed() const
 {
-	ASSERT((GetSize() - sizeof(refcount_StreamFormat)) % sizeof(refcount_t) == 0);
-	return (GetSize() - sizeof(refcount_StreamFormat)) /
-		sizeof(refcount_t);
+	ASSERT((GetSize() - GetHeaderSize()) % sizeof(refcount_t) == 0);
+	return (GetSize() - GetHeaderSize()) / sizeof(refcount_t);
 }
 
 void BackupStoreRefCountDatabaseImpl::AddReference(int64_t ObjectID)
@@ -615,4 +687,31 @@ int BackupStoreRefCountDatabaseImpl::ReportChangesTo(BackupStoreRefCountDatabase
 	}
 
 	return ErrorCount;
+}
+
+int64_t BackupStoreRefCountDatabaseImpl::GetClientStoreMarker() const
+{
+	if(mVersion == Version_1)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, NotSupported, "Requires Version_2 DB");
+	}
+	return mClientStoreMarker;
+}
+
+void BackupStoreRefCountDatabaseImpl::SetClientStoreMarker(int64_t new_client_store_marker)
+{
+	if(mVersion == Version_1)
+	{
+		THROW_EXCEPTION_MESSAGE(CommonException, NotSupported, "Requires Version_2 DB");
+	}
+
+	ASSERT(!mReadOnly);
+	mClientStoreMarker = new_client_store_marker;
+
+	ASSERT(mVersion == Version_2);
+	ASSERT(mapDatabaseFile.get());
+	new_client_store_marker = box_hton64(new_client_store_marker);
+	mapDatabaseFile->Seek(offsetof(refcount_2_StreamFormat, mClientStoreMarker),
+		IOStream::SeekType_Absolute);
+	mapDatabaseFile->Write(&new_client_store_marker, sizeof(new_client_store_marker));
 }
