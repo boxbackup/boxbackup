@@ -222,7 +222,17 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	int32_t HardLimit, const std::string& AccountName)
 {
 	// We definitely need a lock to do something this destructive!
-	mapFileSystem->GetLock();
+	{
+		// Taking the lock will try to GetAccountIdentifier() (for the log message) which
+		// will throw an exception because the BackupStoreInfo file does not exist yet.
+		// We expect that! So take the lock early, and silence the exception warning while
+		// we do so.
+		HideSpecificExceptionGuard guard_http(HTTPException::ExceptionType,
+			HTTPException::FileNotFound);
+		HideSpecificExceptionGuard guard_raid(RaidFileException::ExceptionType,
+			RaidFileException::RaidFileDoesntExist);
+		mapFileSystem->GetLock();
+	}
 
 	BackupStoreInfo info(AccountID, SoftLimit, HardLimit);
 	info.SetAccountName(AccountName);
@@ -481,17 +491,6 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
 	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
 
-	{
-		// Taking the lock will try to GetAccountIdentifier() (for the log message) which
-		// will throw a RaidFileException(RaidFileDoesntExist) because the BackupStoreInfo
-		// file does not exist yet. We expect that! So take the lock early (before calling
-		// BackupAccountControl::CreateAccount) and silence the exception warning while we
-		// do so.
-		HideSpecificExceptionGuard guard(RaidFileException::ExceptionType,
-			RaidFileException::RaidFileDoesntExist);
-		mapFileSystem->GetLock();
-	}
-
 	BackupAccountControl::CreateAccount(mAccountID, SoftLimit, HardLimit, "");
 
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(mAccountID) << " created.");
@@ -575,17 +574,6 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 		}
 	}
 
-	{
-		// Taking the lock will try to GetAccountIdentifier() (for the log message) which
-		// will throw a RaidFileException(RaidFileDoesntExist) because the BackupStoreInfo
-		// file does not exist yet. We expect that! So take the lock early (before calling
-		// BackupAccountControl::CreateAccount) and silence the exception warning while we
-		// do so.
-		HideSpecificExceptionGuard guard(HTTPException::ExceptionType,
-			HTTPException::FileNotFound);
-		mapFileSystem->GetLock();
-	}
-
 	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
 	BackupAccountControl::CreateAccount(S3_FAKE_ACCOUNT_ID, SoftLimit, HardLimit, name);
 
@@ -606,8 +594,7 @@ void S3BackupAccountControl::OpenAccount(bool readWrite)
 
 int S3BackupAccountControl::DeleteAccount(bool AskForConfirmation)
 {
-	// Obtain a write lock, as the daemon user
-	// We definitely need a lock to do something this destructive!
+	// We definitely need a write lock to do something this destructive!
 	OpenAccount(true); // readWrite
 
 	// Check user really wants to do this
