@@ -212,37 +212,13 @@ bool KillServerInternal(int pid)
 
 #endif // WIN32
 
-bool KillServer(int pid, bool wait_for_process)
+bool KillServer(int pid, bool wait_for_process, int expected_exit_status,
+	int expected_signal)
 {
 	if(!KillServerInternal(pid))
 	{
 		return false;
 	}
-
-#ifdef HAVE_WAITPID
-	if(wait_for_process)
-	{
-		int status, result;
-
-		result = waitpid(pid, &status, 0);
-		if (result != pid)
-		{
-			BOX_LOG_SYS_ERROR("waitpid failed");
-		}
-		TEST_THAT(result == pid);
-
-		TEST_THAT(WIFEXITED(status));
-		if (WIFEXITED(status))
-		{
-			if (WEXITSTATUS(status) != 0)
-			{
-				BOX_WARNING("process exited with code " <<
-					WEXITSTATUS(status));
-			}
-			TEST_THAT(WEXITSTATUS(status) == 0);
-		}
-	}
-#endif
 
 	BOX_INFO("Waiting for server to die (pid " << pid << ")");
 	printf("Waiting for server to die (pid %d): ", pid);
@@ -254,6 +230,14 @@ bool KillServer(int pid, bool wait_for_process)
 			printf(".");
 			fflush(stdout);
 		}
+
+#ifdef HAVE_WAITPID
+		if(wait_for_process)
+		{
+			WaitForProcessExit(pid, expected_signal, expected_exit_status);
+			// If successful, then ServerIsAlive will return false below.
+		}
+#endif
 
 		if (!ServerIsAlive(pid)) break;
 		ShortSleep(MilliSecondsToBoxTime(100), false);
@@ -273,6 +257,48 @@ bool KillServer(int pid, bool wait_for_process)
 
 	return !ServerIsAlive(pid);
 }
+
+#ifdef HAVE_WAITPID
+bool WaitForProcessExit(int pid, int expected_signal, int expected_exit_status)
+{
+	int status, result;
+
+	result = waitpid(pid, &status, WNOHANG);
+	if(result != 0) // otherwise the process has not exited (yet)
+	{
+		if(result != pid)
+		{
+			BOX_LOG_SYS_ERROR("waitpid failed");
+		}
+
+		TEST_THAT(result == pid);
+
+		if(expected_signal != 0)
+		{
+			TEST_THAT(!WIFEXITED(status));
+			TEST_LINE(WIFSIGNALED(status), "Process " << pid << " was not killed by a "
+				"signal as expected");
+			TEST_EQUAL_LINE(expected_signal, WTERMSIG(status),
+				"Process " << pid << " killed by unexpected signal");
+		}
+		else
+		{
+			TEST_THAT(WIFEXITED(status));
+			TEST_THAT(!WIFSIGNALED(status));
+			TEST_EQUAL_LINE(expected_exit_status, WEXITSTATUS(status),
+				"Process " << pid << " exited with unexpected exit "
+				"status");
+		}
+
+		return true;
+	}
+	else
+	{
+		// otherwise the process has not exited (yet)
+		return false;
+	}
+}
+#endif // HAVE_WAITPID
 
 bool KillServer(const std::string& pid_file, bool WaitForProcess)
 {
