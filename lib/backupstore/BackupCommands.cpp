@@ -226,7 +226,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished2::DoCommand(
 		rContext.GetConnectionDetails());
 
 	// We can only get the current marker if we have a lock. Otherwise it doesn't make sense.
-	int64_t marker = BackupFileSystem::ClientStoreMarker_NotKnown;
+	int64_t marker = ClientStoreMarker::NotKnown;
 	if(!rContext.SessionIsReadOnly())
 	{
 		marker = rContext.GetClientStoreMarker();

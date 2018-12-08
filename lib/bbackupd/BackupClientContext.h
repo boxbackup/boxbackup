@@ -61,11 +61,6 @@ public:
 	BackupClientDeleteList &GetDeleteList();
 	void PerformDeletions();
 
-	enum
-	{
-		ClientStoreMarker_NotKnown = 0
-	};
-
 	void SetClientStoreMarker(int64_t ClientStoreMarker) {mClientStoreMarker = ClientStoreMarker;}
 	int64_t GetClientStoreMarker() const {return mClientStoreMarker;}
 
