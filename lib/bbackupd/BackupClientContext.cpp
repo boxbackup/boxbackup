@@ -17,19 +17,19 @@
 	#include <sys/time.h>
 #endif
 
-#include "BackupConstants.h"
-#include "BoxPortsAndFiles.h"
-#include "BoxTime.h"
+#include "autogen_BackupProtocol.h"
 #include "BackupClientContext.h"
-#include "ConfiguredBackupClient.h"
-#include "SocketStreamTLS.h"
-#include "Socket.h"
+#include "BackupConstants.h"
+#include "BackupDaemon.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreException.h"
-#include "BackupDaemon.h"
-#include "autogen_BackupProtocol.h"
 #include "BackupStoreFile.h"
+#include "BoxPortsAndFiles.h"
+#include "BoxTime.h"
+#include "ConfiguredBackupClient.h"
 #include "Logging.h"
+#include "Socket.h"
+#include "SocketStreamTLS.h"
 
 #include "MemLeakFindOn.h"
 
