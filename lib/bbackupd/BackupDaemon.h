@@ -67,8 +67,7 @@ private:
 	// client state only
 	bool SerializeStoreObjectInfo(box_time_t theLastSyncTime,
 		box_time_t theNextSyncTime) const;
-	bool DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
-		box_time_t & theNextSyncTime);
+	bool DeserializeStoreObjectInfo();
 	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
 
