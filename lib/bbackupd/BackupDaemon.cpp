@@ -221,7 +221,7 @@ BackupDaemon::BackupDaemon()
 	  mDeleteRedundantLocationsAfter(0),
 	  mLastNotifiedEvent(SysadminNotifier::MAX),
 	  mDeleteUnusedRootDirEntriesAfter(0),
-	  mClientStoreMarker(BackupClientContext::ClientStoreMarker_NotKnown),
+	  mClientStoreMarker(ClientStoreMarker::NotKnown),
 	  mStorageLimitExceeded(false),
 	  mReadErrorsOnFilesystemObjects(false),
 	  mLastSyncTime(0),
@@ -896,7 +896,7 @@ void BackupDaemon::ResetCachedState()
 	// Clear state data
 	// Go back to beginning of time
 	mLastSyncTime = 0;
-	mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;	// no store marker, so download everything
+	mClientStoreMarker = ClientStoreMarker::NotKnown;	// no store marker, so download everything
 	DeleteAllLocations();
 	DeleteAllIDMaps();
 }
@@ -3584,7 +3584,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 
 	DeleteAllLocations();
 
-	mClientStoreMarker = BackupClientContext::ClientStoreMarker_NotKnown;
+	mClientStoreMarker = ClientStoreMarker::NotKnown;
 	theLastSyncTime = 0;
 	theNextSyncTime = 0;
 

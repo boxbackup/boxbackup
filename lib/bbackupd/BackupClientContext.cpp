@@ -17,6 +17,7 @@
 	#include <sys/time.h>
 #endif
 
+#include "BackupConstants.h"
 #include "BoxPortsAndFiles.h"
 #include "BoxTime.h"
 #include "BackupClientContext.h"
@@ -49,7 +50,7 @@ BackupClientContext::BackupClientContext
 : mrConfig(rConfig),
   mrResolver(rResolver),
   mrProgressNotifier(rProgressNotifier),
-  mClientStoreMarker(ClientStoreMarker_NotKnown),
+  mClientStoreMarker(ClientStoreMarker::NotKnown),
   mpDeleteList(NULL),
   mpCurrentIDMap(NULL),
   mpNewIDMap(NULL),
@@ -129,7 +130,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 		BackupProtocolLoginConfirmed& login_conf(mapConnection->GetLoginConfirmed());
 
 		// If reconnecting, check that the client store marker is the one we expect:
-		if(mClientStoreMarker != ClientStoreMarker_NotKnown)
+		if(mClientStoreMarker != ClientStoreMarker::NotKnown)
 		{
 			if(login_conf.GetClientStoreMarker() != mClientStoreMarker)
 			{
@@ -152,7 +153,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 					"same account?");
 			}
 		}
-		else // mClientStoreMarker == ClientStoreMarker_NotKnown
+		else // mClientStoreMarker == ClientStoreMarker::NotKnown
 		{
 			// Yes, choose one, the current time will do
 			box_time_t marker = GetCurrentBoxTime();

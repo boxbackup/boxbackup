@@ -26,5 +26,14 @@
 		BackupProtocolError::ErrorType, \
 		BackupProtocolError::code));
 
+namespace ClientStoreMarker
+{
+	enum
+	{
+		NotKnown = -1,
+		Default = 0,
+	};
+};
+
 #endif // BACKUPCONSTANTS__H
 
