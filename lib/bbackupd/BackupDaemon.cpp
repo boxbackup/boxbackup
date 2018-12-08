@@ -611,8 +611,7 @@ void BackupDaemon::Run2()
 
 	// --------------------------------------------------------------------------------------------
  
-	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo(mLastSyncTime,
-		mNextSyncTime);
+	mDeleteStoreObjectInfoFile = DeserializeStoreObjectInfo();
  
 	// --------------------------------------------------------------------------------------------
 	
@@ -896,6 +895,7 @@ void BackupDaemon::ResetCachedState()
 	// Clear state data
 	// Go back to beginning of time
 	mLastSyncTime = 0;
+	mNextSyncTime = 0;
 	mClientStoreMarker = ClientStoreMarker::NotKnown;	// no store marker, so download everything
 	DeleteAllLocations();
 	DeleteAllIDMaps();
@@ -3391,17 +3391,14 @@ bool BackupDaemon::SerializeStoreObjectInfo(box_time_t theLastSyncTime,
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupDaemon::DeserializeStoreObjectInfo(
-//			 box_time_t & theLastSyncTime,
-//			 box_time_t & theNextSyncTime)
+//		Name:    BackupDaemon::DeserializeStoreObjectInfo()
 //		Purpose: Deserializes remote directory and file information
 //			 from a stream of bytes, using an Archive
 //			 abstraction.
 //		Created: 2005/04/11
 //
 // --------------------------------------------------------------------------
-bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
-	box_time_t & theNextSyncTime)
+bool BackupDaemon::DeserializeStoreObjectInfo()
 {
 	//
 	//
@@ -3501,8 +3498,8 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 			// this is it, go at it
 			//
 			anArchive.Read(mClientStoreMarker);
-			anArchive.Read(theLastSyncTime);
-			anArchive.Read(theNextSyncTime);
+			anArchive.Read(mLastSyncTime);
+			anArchive.Read(mNextSyncTime);
 
 			//
 			//
@@ -3582,11 +3579,7 @@ bool BackupDaemon::DeserializeStoreObjectInfo(box_time_t & theLastSyncTime,
 	BOX_NOTICE("No usable cache, will download directory listings from "
 		"server.");
 
-	DeleteAllLocations();
-
-	mClientStoreMarker = ClientStoreMarker::NotKnown;
-	theLastSyncTime = 0;
-	theNextSyncTime = 0;
+	ResetCachedState();
 
 	return false;
 }
