@@ -165,20 +165,24 @@ bool setup_test_backupstorefix_specialised_with_bbstored(RaidAndS3TestSpecs::Spe
 	spec.control().GetFileSystem().ReleaseLock();
 
 	// BackupDaemon bbackupd;
+	// Add extra logging to help debug random test failures on Travis due to inability to
+	// connect to the daemon at StopClient() time:
+	std::string bbackupd_args_final(bbackupd_args_overridden ? bbackupd_args :
+		"-kT -Wnotice -tbbackupd");
 
 	if(spec.name() == "s3")
 	{
-		TEST_THAT(StartClient("testfiles/bbackupd.s3.conf"));
+		TEST_THAT(StartClient("testfiles/bbackupd.s3.conf", bbackupd_args_final));
 		// TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.s3.conf"));
 	}
 	else
 	{
 		// Start the bbstored server. Enable logging to help debug if the store is
 		// unexpectedly locked when we try to check or query it (race conditions):
-		std::string daemon_args(bbstored_args_overridden ? bbstored_args :
+		std::string bbstored_args_final(bbstored_args_overridden ? bbstored_args :
 			"-kT -Winfo -tbbstored -L/FileSystem/Locking=trace");
-		TEST_THAT_OR(StartServer(daemon_args), FAIL);
-		TEST_THAT(StartClient("testfiles/bbackupd.bbstored.conf"));
+		TEST_THAT_OR(StartServer(bbstored_args_final), FAIL);
+		TEST_THAT(StartClient("testfiles/bbackupd.bbstored.conf", bbackupd_args_final));
 		// TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.bbstored.conf"));
 	}
 
