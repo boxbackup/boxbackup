@@ -2189,6 +2189,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 			// Send a response back?
 			if(sendResponse)
 			{
+				HideSpecificExceptionGuard guard(ConnectionException::ExceptionType,
+					ConnectionException::SocketWriteError);
 				std::string response = sendOK ? "ok\n" : "error\n";
 				mapCommandSocketInfo->mpConnectedSocket->Write(
 					response, timeout);
@@ -2200,7 +2202,8 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 	}
 	catch(ConnectionException &ce)
 	{
-		BOX_NOTICE("Failed to write to command socket: " << ce.what());
+		// This probably just means that the client disconnected, which isn't an error.
+		BOX_TRACE("Failed to write to command socket: " << ce.what());
 
 		// If an error occurs, and there is a connection active,
 		// just close that connection and continue. Otherwise,
@@ -3035,12 +3038,15 @@ void BackupDaemon::SetState(int State)
 	// Something connected to the command socket, tell it about the new state
 	try
 	{
+		HideSpecificExceptionGuard guard(ConnectionException::ExceptionType,
+			ConnectionException::SocketWriteError);
 		mapCommandSocketInfo->mpConnectedSocket->Write(msg.str(),
 			1); // very short timeout, it's overlapped anyway
 	}
 	catch(ConnectionException &ce)
 	{
-		BOX_NOTICE("Failed to write state to command socket: " <<
+		// This probably just means that the client disconnected, which isn't an error.
+		BOX_TRACE("Failed to write state to command socket: " <<
 			ce.what());
 		CloseCommandConnection();
 	}
