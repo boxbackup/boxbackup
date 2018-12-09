@@ -10,8 +10,6 @@ cache:
   directories:
   - infrastructure/cmake/build/cache
 
-sudo: false
-
 addons:
   apt:
     # We need cmake > 2.8.7
