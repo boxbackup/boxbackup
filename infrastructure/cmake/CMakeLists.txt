@@ -699,6 +699,8 @@ foreach(m4_filename boxbackup_tests.m4 ax_check_mount_point.m4 ax_func_syscall.m
 				check_library_exists(${library_name} ${function_name} "" HAVE_LIB_${platform_var_name})
 				if(HAVE_LIB_${platform_var_name})
 					target_link_libraries(lib_common PUBLIC ${library_name})
+					# Ensure that subsequent feature tests use it too:
+					list(APPEND CMAKE_REQUIRED_LIBRARIES "${library_name}")
 				endif()
 			endforeach()
 		elseif(m4_function MATCHES "^ *AC_CHECK_MEMBERS\\(\\[([A-Za-z._/ ]+)\\.([[A-Za-z_]+)\\](,,, ..(#include <([^>]+)>)..)?\\)$")
