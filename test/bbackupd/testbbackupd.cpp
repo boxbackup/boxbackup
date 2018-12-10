@@ -1272,6 +1272,13 @@ bool test_getobject_on_nonexistent_file()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+void run_bbackupd_sync_with_logging(BackupDaemon& bbackupd)
+{
+	Logging::Tagger bbackupd_tagger("bbackupd", true); // replace
+	Logging::ShowTagOnConsole temp_enable_tags;
+	bbackupd.RunSyncNow();
+}
+
 // ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
 // BackupStoreFileEncodeStream::Recipe::Recipe once failed, apparently because
 // a zero byte file had a block index but no entries in it. But this test
@@ -1556,20 +1563,21 @@ bool test_backup_hardlinked_files()
 {
 	SETUP_WITH_BBSTORED();
 
+	run_bbackupd_sync_with_logging(bbackupd);
 	bbackupd.RunSyncNow();
 	TEST_COMPARE(Compare_Same);
 
 	// Create some hard links. First in the same directory:
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x1/hardlink1") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
-	// Now in a different directory
+	BOX_NOTICE("Creating a hard-linked file in a different directory (x2/hardlink2)");
 	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x2/hardlink2") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	// Now delete one of them
@@ -1579,7 +1587,7 @@ bool test_backup_hardlinked_files()
 
 	// And another.
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/hardlink1") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	TEARDOWN_TEST_BBACKUPD();
