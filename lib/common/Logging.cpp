@@ -700,6 +700,7 @@ int Logging::OptionParser::ProcessOption(signed int option)
 				LogLevelOverrideByFileGuard(filename, category, level,
 					false) // !OverrideAllButSelected
 			);
+			UpdateLowestCommonLevel();
 		}
 		break;
 
@@ -854,6 +855,7 @@ LogLevelOverrideByFileGuard::~LogLevelOverrideByFileGuard()
 			Logging::sLogLevelOverrideByFileGuards.end(), *this);
 		ASSERT(this_pos != Logging::sLogLevelOverrideByFileGuards.end());
 		Logging::sLogLevelOverrideByFileGuards.erase(this_pos);
+		Logging::UpdateLowestCommonLevel();
 	}
 }
 
@@ -861,6 +863,7 @@ void LogLevelOverrideByFileGuard::Install()
 {
 	ASSERT(!mInstalled);
 	Logging::sLogLevelOverrideByFileGuards.push_back(*this);
+	Logging::UpdateLowestCommonLevel();
 	mInstalled = true;
 }
 
