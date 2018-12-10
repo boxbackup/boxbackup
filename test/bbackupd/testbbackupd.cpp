@@ -1135,6 +1135,13 @@ bool test_bbackupquery_getobject_on_nonexistent_file(RaidAndS3TestSpecs::Special
 	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
+void run_bbackupd_sync_with_logging(BackupDaemon& bbackupd)
+{
+	Logging::Tagger bbackupd_tagger("bbackupd", true); // replace
+	Logging::ShowTagOnConsole temp_enable_tags;
+	bbackupd.RunSyncNow();
+}
+
 // ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
 // BackupStoreFileEncodeStream::Recipe::Recipe once failed, apparently because
 // a zero byte file had a block index but no entries in it. But this test
@@ -1406,30 +1413,41 @@ bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 {
 	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	// Create some hard links. First in the same directory:
+	BOX_NOTICE("Creating a hard-linked file in the same directory (x1/hardlink1)");
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x1/hardlink1") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	// Now in a different directory
+	BOX_NOTICE("Creating a hard-linked file in a different directory (x2/hardlink2)");
 	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x2/hardlink2") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	// Now delete one of them
+	BOX_NOTICE("Deleting one of the hard links to the same inode");
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
-	bbackupd.RunSyncNow();
+	if(spec.name() == "s3")
+	{
+		LogLevelOverrideByFileGuard log_directory_record_trace(
+			"BackupClientDirectoryRecord.cpp", "", Log::TRACE);
+		log_directory_record_trace.Install();
+		bbackupd.Configure("testfiles/bbackupd.logall.s3.conf");
+		run_bbackupd_sync_with_logging(bbackupd);
+	}
+	else
+	{
+		run_bbackupd_sync_with_logging(bbackupd);
+	}
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
-	// And another.
+	BOX_NOTICE("Deleting the other hard link to the same inode");
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/hardlink1") == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
