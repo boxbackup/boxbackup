@@ -156,6 +156,7 @@ public:
 		const Location& rBackupLocation);
 
 	int64_t GetObjectID() const { return mObjectID; }
+	const std::string& GetSubDirName() { return mSubDirName; }
 
 private:
 	void DeleteSubDirectories();
@@ -164,7 +165,14 @@ private:
 		BackupStoreDirectory *pDirOnStore,
 		const std::string &rLocalPath);
 
-protected: // to allow tests to hook in before UpdateItems() runs
+protected:
+	// This exists only so that it can be overridden in subclasses for testing:
+	virtual BackupClientDirectoryRecord* CreateSubdirectoryRecord(int64_t remote_dir_id,
+		const std::string &subdir_name)
+	{
+		return new BackupClientDirectoryRecord(remote_dir_id, subdir_name);
+	}
+	// To allow tests to hook in before UpdateItems() runs:
 	virtual bool UpdateItems(SyncParams &rParams,
 		const std::string &rLocalPath,
 		const std::string &rRemotePath,
@@ -173,6 +181,21 @@ protected: // to allow tests to hook in before UpdateItems() runs
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
 		const std::vector<std::string> &rDirs);
+	// To allow test_backup_hardlinked_files to workaround implementation differences in whether
+	// creating a new hardlink, and thus changing the link count, changes the ctime or not:
+	virtual bool ChecksumIsDifferent(const MD5Digest& new_checksum)
+	{
+		return !mInitialSyncDone || !new_checksum.DigestMatches(mStateChecksum);
+	}
+	// To allow test_backup_hardlinked_files to find and modify subdirectory records:
+	virtual std::map<std::string, BackupClientDirectoryRecord *> GetSubDirectories()
+	{
+		return mSubDirectories;
+	}
+	// To allow test_backup_hardlinked_files to return directory entries in a fixed order:
+	virtual bool ListLocalDirectory(const std::string& local_path,
+		const std::string& local_path_non_vss, ProgressNotifier& notifier,
+		std::vector<struct dirent>& entries_out);
 
 private:
 	BackupStoreDirectory::Entry* CheckForRename(BackupClientContext& context,

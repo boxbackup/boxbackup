@@ -129,6 +129,60 @@ std::string BackupClientDirectoryRecord::ConvertVssPathToRealPath(
 	return rVssPath;
 }
 
+bool BackupClientDirectoryRecord::ListLocalDirectory(const std::string& local_path,
+	const std::string& local_path_non_vss, ProgressNotifier& notifier,
+	std::vector<struct dirent>& entries_out)
+{
+	// read the contents...
+	DIR *dir_handle = NULL;
+
+	try
+	{
+		dir_handle = ::opendir(local_path.c_str());
+		if(dir_handle == 0)
+		{
+			// Report the error (logs and eventual email to administrator)
+			if(errno == EACCES)
+			{
+				notifier.NotifyDirListFailed(this, local_path_non_vss,
+					"Access denied");
+			}
+			else
+			{
+				notifier.NotifyDirListFailed(this, local_path_non_vss,
+					strerror(errno));
+			}
+
+			// Ignore this directory for now.
+			return false;
+		}
+
+		struct dirent *en = 0;
+
+		while((en = ::readdir(dir_handle)) != 0)
+		{
+			entries_out.push_back(*en);
+		}
+
+		if(::closedir(dir_handle) != 0)
+		{
+			THROW_EXCEPTION(CommonException, OSFileError)
+		}
+
+		dir_handle = NULL;
+	}
+	catch(...)
+	{
+		if(dir_handle != NULL)
+		{
+			::closedir(dir_handle);
+		}
+		throw;
+	}
+
+	return true;
+}
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -242,80 +296,43 @@ void BackupClientDirectoryRecord::SyncDirectory(
 	// BLOCK
 	{
 		// read the contents...
-		DIR *dirHandle = 0;
-		try
+		rNotifier.NotifyScanDirectory(this, local_path_non_vss);
+		std::vector<struct dirent> entries;
+
+		if(!ListLocalDirectory(rLocalPath, local_path_non_vss, rNotifier, entries))
 		{
-			rNotifier.NotifyScanDirectory(this, local_path_non_vss);
+			SetErrorWhenReadingFilesystemObject(rParams, local_path_non_vss);
 
-			dirHandle = ::opendir(rLocalPath.c_str());
-			if(dirHandle == 0)
-			{
-				// Report the error (logs and eventual email to administrator)
-				if (errno == EACCES)
-				{
-					rNotifier.NotifyDirListFailed(this, local_path_non_vss,
-						"Access denied");
-				}
-				else
-				{
-					rNotifier.NotifyDirListFailed(this, local_path_non_vss,
-						strerror(errno));
-				}
-
-				SetErrorWhenReadingFilesystemObject(rParams, local_path_non_vss);
-
-				// Ignore this directory for now.
-				return;
-			}
-
-			struct dirent *en = 0;
-			int num_entries_found = 0;
-
-			while((en = ::readdir(dirHandle)) != 0)
-			{
-				num_entries_found++;
-				rParams.mrContext.DoKeepAlive();
-				if(rParams.mpBackgroundTask)
-				{
-					rParams.mpBackgroundTask->RunBackgroundTask(
-						BackgroundTask::Scanning_Dirs,
-						num_entries_found, 0);
-				}
-
-				if (!SyncDirectoryEntry(rParams, rNotifier,
-					rBackupLocation, rLocalPath,
-					currentStateChecksum, en, dest_st, dirs,
-					files, downloadDirectoryRecordBecauseOfFutureFiles))
-				{
-					// This entry is not to be backed up.
-					continue;
-				}
-			}
-	
-			if(::closedir(dirHandle) != 0)
-			{
-				THROW_EXCEPTION(CommonException, OSFileError)
-			}
-			dirHandle = 0;
+			// Ignore this directory for now.
+			return;
 		}
-		catch(...)
+
+		int num_entries_found = 0;
+		for(struct dirent& entry : entries)
 		{
-			if(dirHandle != 0)
+			num_entries_found++;
+			rParams.mrContext.DoKeepAlive();
+			if(rParams.mpBackgroundTask)
 			{
-				::closedir(dirHandle);
+				rParams.mpBackgroundTask->RunBackgroundTask(
+					BackgroundTask::Scanning_Dirs,
+					num_entries_found, 0);
 			}
-			throw;
+
+			if(!SyncDirectoryEntry(rParams, rNotifier,
+				rBackupLocation, rLocalPath,
+				currentStateChecksum, &entry, dest_st, dirs,
+				files, downloadDirectoryRecordBecauseOfFutureFiles))
+			{
+				// This entry is not to be backed up.
+				continue;
+			}
 		}
 	}
 
 	// Finish off the checksum, and compare with the one currently stored
-	bool checksumDifferent = true;
 	currentStateChecksum.Finish();
-	if(mInitialSyncDone && currentStateChecksum.DigestMatches(mStateChecksum))
-	{
-		// The checksum is the same, and there was one to compare with
-		checksumDifferent = false;
-	}
+	bool checksumDifferent = ChecksumIsDifferent(currentStateChecksum);
 
 	// Pointer to potentially downloaded store directory info
 	std::auto_ptr<BackupStoreDirectory> apDirOnStore;
@@ -359,6 +376,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 		}
 		else
 		{
+			// There is a small race condition where changes to files between two runs
+			// in the same second might not be detected. This occurs sometimes in tests,
+			// but is not a realistic scenario, so we don't need to defend against it.
 			BOX_TRACE("Not downloading directory listing of " << local_path_non_vss <<
 				" (" << BOX_FORMAT_OBJECTID(mObjectID) << ") because our cached "
 				"copy appears to still be valid");
@@ -885,17 +905,18 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		}
 		
 		// Check for renaming?
+		bool renamed = false;
 		if(pDirOnStore != 0 && en == NULL)
 		{
 			// We now know...
 			// 1) File has just been added
 			// 2) It's not in the store
 			ASSERT(latestObjectID == 0);
-			en = CheckForRename(rContext, pDirOnStore, storeFilename, inodeNum,
-				nonVssFilePath);
+			en = CheckForRename(rContext, pDirOnStore, storeFilename, inodeNum, nonVssFilePath);
 			if(en != NULL)
 			{
 				latestObjectID = en->GetObjectID();
+				renamed = true;
 			}
 		}
 
@@ -1245,57 +1266,73 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		if(fileSize >= rParams.mFileTrackingSizeThreshold)
 		{
 			// Get the map
-			BackupClientInodeToIDMap &idMap(rContext.GetNewIDMap());
+			BackupClientInodeToIDMap &new_id_map(rContext.GetNewIDMap());
+			const BackupClientInodeToIDMap &old_id_map(rContext.GetCurrentIDMap());
+			int64_t old_object_id = 0, old_dir_id = 0;
+			int64_t new_object_id = 0, new_dir_id = 0;
+			std::string old_local_path, new_local_path;
 		
-			// Need to get an ID from somewhere...
-			if(latestObjectID == 0)
+			// If there is already an entry in the new ID map, then we've seen the same
+			// file multiple times, so they must be hardlinked together. We don't
+			// support this fully, so warn about it. Also don't overwrite the existing
+			// entry in the ID map.
+			if(new_id_map.Lookup(inodeNum, new_object_id, new_dir_id, &new_local_path))
 			{
-				// Don't know it -- haven't sent anything to the store, and didn't get a listing.
-				// Look it up in the current map, and if it's there, use that.
-				const BackupClientInodeToIDMap &currentIDMap(rContext.GetCurrentIDMap());
-				int64_t objid = 0, dirid = 0;
-				if(currentIDMap.Lookup(inodeNum, objid, dirid))
-				{
-					// Found
-					if(dirid != mObjectID)
-					{
-						BOX_WARNING("Found conflicting parent ID for "
-							"file ID " << inodeNum << " (" <<
-							nonVssFilePath << "): expected " <<
-							mObjectID << " but found " << dirid <<
-							" (same directory used in two different "
-							"locations?)");
-					}
-
-					ASSERT(dirid == mObjectID);
-
-					// NOTE: If the above assert fails, an inode number has been reused by the OS,
-					// or there is a problem somewhere. If this happened on a short test run, look
-					// into it. However, in a long running process this may happen occasionally and
-					// not indicate anything wrong.
-					// Run the release version for real life use, where this check is not made.
-
-					latestObjectID = objid;
-				}
+				BOX_WARNING("Uploading the same file multiple times: ID " <<
+					inodeNum << " (" << nonVssFilePath << " and " <<
+					new_local_path << "). Hardlinks are not fully supported.");
 			}
-
-			if(latestObjectID != 0)
+			// If we already have an object ID, then we can create an entry in the new
+			// map using it:
+			else if(latestObjectID != 0)
 			{
-				BOX_TRACE("Storing uploaded file ID " << inodeNum << " (" <<
-					nonVssFilePath << ") in ID map as object " <<
+				std::string file_state;
+				if(doUpload)
+				{
+					file_state = "uploaded";
+				}
+				else if(renamed)
+				{
+					file_state = "renamed";
+				}
+				else
+				{
+					// Must have come from pDirOnStore
+					ASSERT(pDirOnStore != NULL);
+					file_state = "existing";
+				}
+
+				BOX_TRACE("Storing " << file_state << " file ID " << inodeNum << " "
+					"(" << nonVssFilePath << ") in ID map as object " <<
 					BOX_FORMAT_OBJECTID(latestObjectID) << " with parent " <<
 					BOX_FORMAT_OBJECTID(mObjectID));
-				idMap.AddToMap(inodeNum, latestObjectID,
+				new_id_map.AddToMap(inodeNum, latestObjectID,
 					mObjectID /* containing directory */,
 					nonVssFilePath);
 			}
-
+			else if(!old_id_map.Lookup(inodeNum, old_object_id, old_dir_id, &old_local_path))
+			{
+				// It didn't exist before, but we didn't upload it this time either,
+				// so it should be a very new file. Hopefully we will as soon as
+				// it's old enough.
+				BOX_TRACE("New file was not uploaded, so not added to new ID map: "
+					<< inodeNum << " (" << nonVssFilePath << ")");
+			}
+			// We have backed up this file before (it's in the old map), so copy the old
+			// entry: (TODO: implement real hardlink support)
+			else
+			{
+				BOX_TRACE("Copying previous file ID " << inodeNum << " (" <<
+					nonVssFilePath << ") to new ID map: object ID " <<
+					BOX_FORMAT_OBJECTID(old_object_id) << " with parent " <<
+					BOX_FORMAT_OBJECTID(old_dir_id));
+				new_id_map.AddToMap(inodeNum, old_object_id, old_dir_id, old_local_path);
+			}
 		}
 
 		if(fileSynced)
 		{
-			rNotifier.NotifyFileSynchronised(this, nonVssFilePath,
-				fileSize);
+			rNotifier.NotifyFileSynchronised(this, nonVssFilePath, fileSize);
 		}
 	}
 
@@ -1426,7 +1463,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			if(doCreateDirectoryRecord)
 			{
 				// New an object for this
-				psubDirRecord = new BackupClientDirectoryRecord(subDirObjectID, *d);
+				psubDirRecord = CreateSubdirectoryRecord(subDirObjectID, *d);
 
 				// Store in list
 				try
@@ -2150,8 +2187,8 @@ void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
 			std::string strItem;
 			rArchive.Read(strItem);
 
-			BackupClientDirectoryRecord* pSubDirRecord = 
-				new BackupClientDirectoryRecord(0, ""); 
+			BackupClientDirectoryRecord* pSubDirRecord =
+				new BackupClientDirectoryRecord(0, "");
 			// will be deserialized anyway, give it id 0 for now
 
 			if (!pSubDirRecord)

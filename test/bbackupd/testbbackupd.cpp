@@ -48,6 +48,7 @@
 	#include <sys/xattr.h>
 #endif
 
+#include <algorithm>
 #include <map>
 
 #include <boost/scope_exit.hpp>
@@ -527,8 +528,13 @@ bool setup_test_specialised_bbackupd(RaidAndS3TestSpecs::Specialisation& spec,
 
 #define TEST_COMPARE_SPECIALISED(spec, expected_status) \
 	BOX_INFO("Running external compare, expecting " #expected_status); \
-	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status, \
-		"", "-acQ", bbackupd_conf_file));
+	{ \
+		std::string bbackupd_conf_file = (spec.name() == "s3") \
+			? "testfiles/bbackupd.s3.conf" \
+			: "testfiles/bbackupd.conf"; \
+		TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status, \
+			"", "-acQ", bbackupd_conf_file)); \
+	}
 
 bool test_file_attribute_storage()
 {
@@ -655,31 +661,32 @@ bool test_file_attribute_storage()
 	TEARDOWN();
 }
 
-int64_t GetDirID(BackupProtocolCallable &protocol, const char *name, int64_t InDirectory)
+int64_t get_object_id(BackupProtocolCallable &protocol, const char *name, int64_t in_dir_object_id,
+	int required_flags = 0)
 {
 	protocol.QueryListDirectory(
-			InDirectory,
-			BackupProtocolListDirectory::Flags_Dir,
-			BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-			true /* want attributes */);
+		in_dir_object_id,
+		required_flags,
+		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
+		false /* !want_attributes */);
 
 	// Retrieve the directory from the stream following
 	BackupStoreDirectory dir;
 	std::auto_ptr<IOStream> dirstream(protocol.ReceiveStream());
 	dir.ReadFromStream(*dirstream, protocol.GetTimeout());
 
-	BackupStoreDirectory::Iterator i(dir);
-	BackupStoreDirectory::Entry *en = 0;
-	int64_t dirid = 0;
 	BackupStoreFilenameClear dirname(name);
-	while((en = i.Next()) != 0)
+	BackupStoreDirectory::Iterator i(dir);
+	BackupStoreDirectory::Entry *en = i.FindMatchingClearName(dirname);
+
+	if(en != 0)
 	{
-		if(en->GetName() == dirname)
-		{
-			dirid = en->GetObjectID();
-		}
+		return en->GetObjectID();
 	}
-	return dirid;
+	else
+	{
+		return 0;
+	}
 }
 
 void terminate_on_alarm(int sigraised)
@@ -1136,11 +1143,11 @@ bool test_bbackupquery_getobject_on_nonexistent_file(RaidAndS3TestSpecs::Special
 	TEARDOWN_TEST_SPECIALISED(spec);
 }
 
-void run_bbackupd_sync_with_logging(BackupDaemon& bbackupd)
+std::auto_ptr<BackupClientContext> run_bbackupd_sync_with_logging(BackupDaemon& bbackupd)
 {
 	Logging::Tagger bbackupd_tagger("bbackupd", true); // replace
 	Logging::ShowTagOnConsole temp_enable_tags;
-	bbackupd.RunSyncNow();
+	return bbackupd.RunSyncNow();
 }
 
 // ASSERT((mpBlockIndex == 0) || (NumBlocksInIndex != 0)) in
@@ -1410,46 +1417,235 @@ bool test_ssl_keepalives()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+bool assert_found_in_id_map(const BackupClientInodeToIDMap& id_map,
+	InodeRefType hardlinked_file_inode_num, bool expected_found, int64_t expected_object_id = 0,
+	int64_t expected_dir_id = 0, const std::string& expected_path = "")
+{
+	int num_failures_initial = num_failures;
+	int64_t found_object_id, found_dir_id;
+	std::string found_path;
+	TEST_EQUAL_OR(expected_found, id_map.Lookup(hardlinked_file_inode_num, found_object_id,
+		found_dir_id, &found_path), return false);
+	if(expected_found)
+	{
+		TEST_EQUAL(expected_dir_id, found_dir_id);
+		TEST_EQUAL(expected_object_id, found_object_id);
+		TEST_EQUAL(expected_path, found_path);
+	}
+	return (num_failures == num_failures_initial);
+}
+
+class BackupDaemonIDMapPatched : public BackupDaemon
+{
+public:
+	// Don't delete and rename the ID maps during RunSyncNow, so that we can access and
+	// inspect them:
+	void CommitIDMapsAfterSync() { }
+	// Give us a way to really commit them after inspection:
+	void ReallyCommitIDMapsAfterSync()
+	{
+		BackupDaemon::CommitIDMapsAfterSync();
+	}
+};
+
+bool run_backup_compare_and_check_id_map(BackupDaemonIDMapPatched& bbackupd,
+	RaidAndS3TestSpecs::Specialisation& spec, InodeRefType hardlinked_file_inode_num,
+	int64_t file_id_1, int64_t dir_id_1,
+	const std::string& expected_path_before = "testfiles/TestDir1/x1/dsfdsfs98.fd",
+	int64_t file_id_2 = 0, int64_t dir_id_2 = 0,
+	const std::string& expected_path_after = "testfiles/TestDir1/x1/dsfdsfs98.fd")
+{
+	int num_failures_initial = num_failures;
+	std::auto_ptr<BackupClientContext> ap_context = run_bbackupd_sync_with_logging(bbackupd);
+	// TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+	TEST_COMPARE_LOCAL(Compare_Same, ap_context->GetConnection());
+
+	// Old map should contain what the new map did before it was committed:
+	TEST_THAT(assert_found_in_id_map(ap_context->GetCurrentIDMap(), hardlinked_file_inode_num,
+		true, // expected_found
+		file_id_1, // expected_object_id
+		dir_id_1, // expected_dir_id
+		expected_path_before)); // expected_path
+
+	// And the new map should contain the same, since the checksum didn't change, so we didn't
+	// download the directory listing, and copied the existing ID map entry instead:
+	TEST_THAT(assert_found_in_id_map(ap_context->GetNewIDMap(), hardlinked_file_inode_num,
+		true, // expected_found
+		file_id_2 ? file_id_2 : file_id_1, // expected_object_id
+		dir_id_2  ? dir_id_2  : dir_id_1, // expected_dir_id,
+		expected_path_after)); // expected_path
+
+	ap_context.reset();
+	bbackupd.ReallyCommitIDMapsAfterSync();
+	return (num_failures == num_failures_initial);
+}
+
 bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
+	// We could just use a standard BackupDaemon, which requires much less code, but it failed
+	// randomly on some platforms, depending on whether creating hardlinks changes the attribute
+	// modification time of an inode (which invalidates the cache) or not. Here we override it
+	// to force the hash not to change, so the cache is not invalidated, which triggered the bug
+	// reliably. It also allows us to inspect the inode map.
+	//
+	// SETUP_TEST_SPECIALISED_BBACKUPD(spec);
+	SETUP_TEST_SPECIALISED_BBSTORED(spec);
 
-	run_bbackupd_sync_with_logging(bbackupd);
-	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+	class BackupClientDirectoryRecordPatched : public BackupClientDirectoryRecord
+	{
+	public:
+		BackupClientDirectoryRecordPatched(int64_t ObjectID,
+			const std::string &rSubDirName)
+		: BackupClientDirectoryRecord(ObjectID, rSubDirName)
+		{ }
+		// Overridden to create BackupClientDirectoryRecordPatched instead:
+		BackupClientDirectoryRecord* CreateSubdirectoryRecord(
+			int64_t remote_dir_id, const std::string &subdir_name) override
+		{
+			return new BackupClientDirectoryRecordPatched(remote_dir_id,
+				subdir_name);
+		}
+		// Increase visibility:
+		std::map<std::string, BackupClientDirectoryRecord *> GetSubDirectories() override
+		{
+			return BackupClientDirectoryRecord::GetSubDirectories();
+		}
+		// Always return entries in alphabetical order:
+		bool ListLocalDirectory(const std::string& local_path,
+			const std::string& local_path_non_vss, ProgressNotifier& notifier,
+			std::vector<struct dirent>& entries_out) override
+		{
+			if(!BackupClientDirectoryRecord::ListLocalDirectory(local_path,
+				local_path_non_vss, notifier, entries_out))
+			{
+				return false;
+			}
+			// https://en.cppreference.com/w/cpp/algorithm/sort
+			struct
+			{
+				bool operator()(const struct dirent& a, const struct dirent& b) const
+				{
+					return strcmp(a.d_name, b.d_name) < 0;
+				}
+			}
+			sort_by_entry_name;
+			std::sort(entries_out.begin(), entries_out.end(), sort_by_entry_name);
+			return true;
+		}
+	};
+
+	class BackupDaemonPatched : public BackupDaemonIDMapPatched
+	{
+	public:
+		virtual BackupClientDirectoryRecord* CreateLocationRootRecord(
+			int64_t remote_dir_id, const std::string &location_name)
+		{
+			return new BackupClientDirectoryRecordPatched(remote_dir_id,
+				location_name);
+		}
+	};
+
+	BackupDaemonPatched bbackupd;
+	TEST_THAT(setup_test_specialised_bbackupd(spec, bbackupd, bbackupd_conf_file));
+
+	InodeRefType hardlinked_file_inode_num;
+	{
+		EMU_STRUCT_STAT st;
+		TEST_THAT(EMU_STAT("testfiles/TestDir1/x1/dsfdsfs98.fd", &st) == 0);
+		hardlinked_file_inode_num = st.st_ino;
+	}
+
+	BackupFileSystem& fs(spec.control().GetFileSystem());
+	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
+	fs.ReleaseLock();
+
+	std::auto_ptr<BackupClientContext> ap_context = run_bbackupd_sync_with_logging(bbackupd);
+	TEST_COMPARE_LOCAL(Compare_Same, ap_context->GetConnection());
+
+	int64_t test1_dir_id = get_object_id(protocol, "Test1", BACKUPSTORE_ROOT_DIRECTORY_ID);
+	TEST_THAT_OR(test1_dir_id != 0, FAIL);
+	int64_t x1_dir_id = get_object_id(protocol, "x1", test1_dir_id);
+	TEST_THAT_OR(x1_dir_id != 0, FAIL);
+	int64_t file_id_1 = get_object_id(protocol, "dsfdsfs98.fd", x1_dir_id);
+	TEST_THAT_OR(file_id_1 != 0, FAIL);
+
+	TEST_THAT(assert_found_in_id_map(ap_context->GetCurrentIDMap(), hardlinked_file_inode_num,
+		false)); // !expected_found
+	TEST_THAT(assert_found_in_id_map(ap_context->GetNewIDMap(), hardlinked_file_inode_num,
+		true, // expected_found
+		file_id_1, // expected_object_id
+		x1_dir_id, // expected_dir_id = 0,
+		"testfiles/TestDir1/x1/dsfdsfs98.fd")); // expected_path
+
+	ap_context.reset();
+	bbackupd.ReallyCommitIDMapsAfterSync();
 
 	BOX_NOTICE("Creating a hard-linked file in the same directory (x1/hardlink1)");
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x1/hardlink1") == 0);
-	run_bbackupd_sync_with_logging(bbackupd);
-	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+
+	TEST_THAT(run_backup_compare_and_check_id_map(bbackupd, spec, hardlinked_file_inode_num,
+		file_id_1, x1_dir_id));
+
+	protocol.GetContext().ClearDirectoryCache();
+	int64_t file_id_2 = get_object_id(protocol, "hardlink1", x1_dir_id);
+	TEST_THAT_OR(file_id_2 != 0, FAIL);
+	fs.ReleaseLock();
 
 	BOX_NOTICE("Creating a hard-linked file in a different directory (x2/hardlink2)");
 	TEST_THAT(mkdir("testfiles/TestDir1/x2", 0755) == 0);
 	TEST_THAT(EMU_LINK("testfiles/TestDir1/x1/dsfdsfs98.fd",
 		"testfiles/TestDir1/x2/hardlink2") == 0);
-	run_bbackupd_sync_with_logging(bbackupd);
-	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+
+	// Should still point to the first entry, because subsequent ones should not overwrite the
+	// first one added to the new map. Because we enforce directory ordering in this test, we
+	// know that that's x1/dsfdsfs98.fd:
+	TEST_THAT(run_backup_compare_and_check_id_map(bbackupd, spec, hardlinked_file_inode_num,
+		file_id_1, x1_dir_id));
+
+	TEST_EQUAL(0, check_account_and_fix_errors(fs));
+	protocol.GetContext().ClearDirectoryCache();
+	int64_t x2_dir_id = get_object_id(protocol, "x2", test1_dir_id);
+	TEST_THAT_OR(x2_dir_id != 0, FAIL);
+	int64_t file_id_3 = get_object_id(protocol, "hardlink2", x2_dir_id);
+	TEST_THAT_OR(file_id_3 != 0, FAIL);
+	fs.ReleaseLock();
+
+	bbackupd.Configure((spec.name() == "s3") ?
+		"testfiles/bbackupd.logall.s3.conf" : bbackupd_conf_file);
+
+	LogLevelOverrideByFileGuard log_directory_record_trace(
+		"BackupClientDirectoryRecord.cpp", "", Log::TRACE);
+	log_directory_record_trace.Install();
 
 	BOX_NOTICE("Deleting one of the hard links to the same inode");
+	// Sleep to ensure that if this changes the inode (nlink), it will reliably change the
+	// ctime, and thus be detected. There is a small race condition where changes to files
+	// between two runs in the same second might not be detected, which is not a realistic
+	// scenario, so we don't need to defend against it.
+	safe_sleep(1);
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
-	if(spec.name() == "s3")
-	{
-		LogLevelOverrideByFileGuard log_directory_record_trace(
-			"BackupClientDirectoryRecord.cpp", "", Log::TRACE);
-		log_directory_record_trace.Install();
-		bbackupd.Configure("testfiles/bbackupd.logall.s3.conf");
-		run_bbackupd_sync_with_logging(bbackupd);
-	}
-	else
-	{
-		run_bbackupd_sync_with_logging(bbackupd);
-	}
+
+	// Now, after the backup has run, the map should point to hardlink1 instead:
+	TEST_THAT(run_backup_compare_and_check_id_map(bbackupd, spec,
+		hardlinked_file_inode_num, file_id_1, x1_dir_id,
+		"testfiles/TestDir1/x1/dsfdsfs98.fd", file_id_2, x1_dir_id,
+		"testfiles/TestDir1/x1/hardlink1"));
+
+	fs.ReleaseLock();
+	TEST_EQUAL(0, check_account_and_fix_errors(fs));
+	fs.ReleaseLock();
 	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
 
 	BOX_NOTICE("Deleting the other hard link to the same inode");
+	// See comment on safe_sleep above, which applies here too:
+	safe_sleep(1);
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/hardlink1") == 0);
-	run_bbackupd_sync_with_logging(bbackupd);
-	TEST_COMPARE_SPECIALISED(spec, Compare_Same);
+
+	// Now, after the backup has run, the map should point to hardlink2 instead:
+	TEST_THAT(run_backup_compare_and_check_id_map(bbackupd, spec, hardlinked_file_inode_num,
+		file_id_2, x1_dir_id, "testfiles/TestDir1/x1/hardlink1",
+		file_id_3, x2_dir_id, "testfiles/TestDir1/x2/hardlink2"));
 
 	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
@@ -3554,7 +3750,7 @@ bool test_restore_files_and_directories()
 					BackupProtocolLogin::Flags_ReadOnly);
 
 			// Find the ID of the Test1 directory
-			restoredirid = GetDirID(*client, "Test1",
+			restoredirid = get_object_id(*client, "Test1",
 				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT_OR(restoredirid != 0, FAIL);
 
@@ -3583,7 +3779,7 @@ bool test_restore_files_and_directories()
 				== Restore_TargetExists);
 
 			// Find ID of the deleted directory
-			deldirid = GetDirID(*client, "x1", restoredirid);
+			deldirid = get_object_id(*client, "x1", restoredirid);
 			TEST_THAT(deldirid != 0);
 
 			// Just check it doesn't bomb out -- will check this
@@ -3939,7 +4135,7 @@ bool test_interrupted_restore_can_be_recovered(RaidAndS3TestSpecs::Specialisatio
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, true); // ReadOnly
 
 	// Find the ID of the Test1 directory
-	int64_t restoredirid = GetDirID(protocol, "Test1",
+	int64_t restoredirid = get_object_id(protocol, "Test1",
 		BackupProtocolListDirectory::RootDirectory);
 	TEST_THAT_OR(restoredirid != 0, FAIL);
 	fs.ReleaseLock();
@@ -4024,12 +4220,12 @@ bool test_restore_deleted_files()
 				connect_and_login(sTlsContext, 0 /* read-write */);
 
 			// Find the ID of the Test1 directory
-			int64_t restoredirid = GetDirID(*client, "Test1",
+			int64_t restoredirid = get_object_id(*client, "Test1",
 				BackupProtocolListDirectory::RootDirectory);
 			TEST_THAT_OR(restoredirid != 0, FAIL);
 
 			// Find ID of the deleted directory
-			int64_t deldirid = GetDirID(*client, "x1", restoredirid);
+			int64_t deldirid = get_object_id(*client, "x1", restoredirid);
 			TEST_THAT_OR(deldirid != 0, FAIL);
 
 			// Do restore and undelete

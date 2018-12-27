@@ -152,6 +152,11 @@ protected:
 		ProgressNotifier &rProgressNotifier
 	);
 
+	// This exists only so that it can be overridden in subclasses for testing:
+	virtual BackupClientDirectoryRecord* CreateLocationRootRecord(int64_t remote_dir_id,
+		const std::string &location_name);
+	virtual void CommitIDMapsAfterSync();
+
 private:
 	void DeleteAllLocations();
 	void SetupLocations(BackupClientContext &rClientContext, const Configuration &rLocationsConf);
@@ -165,7 +170,6 @@ private:
 	void FillIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVector, bool NewMaps);
 	
 	void SetupIDMapsForSync();
-	void CommitIDMapsAfterSync();
 	void DeleteCorruptBerkelyDbFiles();
 	
 	void MakeMapBaseName(unsigned int MountNumber, std::string &rNameOut) const;
