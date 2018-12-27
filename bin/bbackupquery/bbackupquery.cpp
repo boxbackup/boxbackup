@@ -347,8 +347,7 @@ int main(int argc, const char *argv[])
 
 	// 2. Connect to server
 	BOX_INFO("Connecting to store...");
-	std::auto_ptr<ConfiguredBackupClient> apClient = GetConfiguredBackupClient(*apConfig,
-		!readWrite);
+	std::auto_ptr<ConfiguredBackupClient> apClient = GetConfiguredBackupClient(*apConfig);
 	
 	// logging?
 	if(logFile != 0)
@@ -356,6 +355,8 @@ int main(int argc, const char *argv[])
 		apClient->SetLogToFile(logFile);
 	}
 	
+	apClient->Login(!readWrite);
+
 	// 5. Tell user.
 	BOX_INFO("Login complete.");
 	BOX_INFO("Type \"help\" for a list of commands.");

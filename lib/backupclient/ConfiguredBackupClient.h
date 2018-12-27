@@ -15,6 +15,7 @@
 #include <string>
 
 #include "autogen_BackupProtocol.h"
+#include "BackupConstants.h"
 #include "BackupStoreConstants.h"
 #include "Configuration.h"
 #include "TLSContext.h"
@@ -40,12 +41,14 @@ class ConfiguredBackupClient : public BackupProtocolWrapper
 protected:
 	std::auto_ptr<Configuration> mapConfig;
 	FILE* mpExtendedLogFileHandle;
-	std::auto_ptr<BackupProtocolLoginConfirmed> mapLoginConfirmed;
 	bool mTcpNiceMode;
 
 #ifdef ENABLE_TCP_NICE
 	NiceSocketStream *mpNice;
 #endif
+
+	virtual std::auto_ptr<BackupProtocolLoginConfirmed> Login(int32_t account_number,
+		bool read_only, int64_t expected_current_marker_value = ClientStoreMarker::NotKnown);
 
 public:
 	ConfiguredBackupClient(const Configuration& rConfig)
@@ -62,15 +65,13 @@ public:
 		}
 	}
 
-	BackupProtocolLoginConfirmed& GetLoginConfirmed()
-	{
-		return *mapLoginConfirmed;
-	}
+	// Login to store, lock account (if not read-only), verify client store marker
+	// (if not ClientStoreMarker::NotKnown), and return the LoginConfirmed message,
+	// with its client store marker updated if a new one has been assigned.
+	virtual std::auto_ptr<BackupProtocolLoginConfirmed> Login(bool read_only,
+		int64_t expected_current_marker_value = ClientStoreMarker::NotKnown) = 0;
 
 	void SetNiceMode(bool enabled);
-
-	// Login() is not an API, it is only to be called by GetConfiguredBackupClient():
-	void Login(int32_t account_number, bool read_only);
 };
 
 // --------------------------------------------------------------------------
@@ -87,9 +88,16 @@ class BackupStoreDaemonClient : public ConfiguredBackupClient
 {
 private:
 	TLSContext mTlsContext;
+	int32_t mAccountID;
+
+protected:
+	using ConfiguredBackupClient::Login;
 
 public:
 	BackupStoreDaemonClient(const Configuration& config);
+
+	virtual std::auto_ptr<BackupProtocolLoginConfirmed> Login(bool read_only,
+		int64_t expected_current_marker_value = ClientStoreMarker::NotKnown);
 };
 	
 // --------------------------------------------------------------------------
@@ -110,11 +118,16 @@ private:
 	std::auto_ptr<BackupFileSystem> mapFileSystem;
 	std::auto_ptr<BackupStoreContext> mapStoreContext;
 
+protected:
+	using ConfiguredBackupClient::Login;
+
 public:
 	S3BackupClient(const Configuration& config);
+
+	virtual std::auto_ptr<BackupProtocolLoginConfirmed> Login(bool read_only,
+		int64_t expected_current_marker_value = ClientStoreMarker::NotKnown);
 };
 
-std::auto_ptr<ConfiguredBackupClient> GetConfiguredBackupClient(const Configuration& config,
-	bool read_only);
+std::auto_ptr<ConfiguredBackupClient> GetConfiguredBackupClient(const Configuration& config);
 
 #endif // CONFIGUREDBACKUPCLIENT_H

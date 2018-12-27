@@ -719,7 +719,8 @@ void do_interrupted_restore(const TLSContext &context, int64_t restoredirid,
 				Configuration::LoadAndVerify
 					(bbackupd_conf_file, &BackupDaemonConfigVerify, errs));
 			std::auto_ptr<ConfiguredBackupClient> apClient =
-				GetConfiguredBackupClient(*apConfig, true); // read_only
+				GetConfiguredBackupClient(*apConfig);
+			apClient->Login(true); // read_only
 
 			// Test the restoration
 			TEST_THAT(BackupClientRestore(*apClient,

@@ -61,6 +61,7 @@ BackupStoreDaemonClient::BackupStoreDaemonClient(const Configuration& config)
 	BackupProtocolClient* pClient = new BackupProtocolClient(apSocket);
 	SetImplementation(pClient);
 	pClient->Handshake();
+	mAccountID = config.GetKeyValueInt("AccountNumber");
 }
 
 S3BackupClient::S3BackupClient(const Configuration& config)
@@ -75,22 +76,18 @@ S3BackupClient::S3BackupClient(const Configuration& config)
 	SetImplementation(new BackupProtocolLocal(*mapStoreContext));
 }
 
-std::auto_ptr<ConfiguredBackupClient> GetConfiguredBackupClient(const Configuration& config,
-	bool read_only)
+std::auto_ptr<ConfiguredBackupClient> GetConfiguredBackupClient(const Configuration& config)
 {
 	const std::string& storage_backend = config.GetKeyValue("StorageBackend");
-	int32_t login_account_number = -1;
 	std::auto_ptr<ConfiguredBackupClient> apClient;
 
 	if(storage_backend == "bbstored")
 	{
 		apClient.reset(new BackupStoreDaemonClient(config));
-		login_account_number = config.GetKeyValueInt("AccountNumber");
 	}
 	else if(storage_backend == "s3")
 	{
 		apClient.reset(new S3BackupClient(config));
-		login_account_number = S3_FAKE_ACCOUNT_ID;
 	}
 	else
 	{
@@ -98,11 +95,11 @@ std::auto_ptr<ConfiguredBackupClient> GetConfiguredBackupClient(const Configurat
 			"Unsupported value of StorageBackend: '" << storage_backend << "'");
 	}
 
-	apClient->Login(login_account_number, read_only);
 	return apClient;
 }
 
-void ConfiguredBackupClient::Login(int32_t account_number, bool read_only)
+std::auto_ptr<BackupProtocolLoginConfirmed> ConfiguredBackupClient::Login(int32_t account_number,
+	bool read_only, int64_t expected_current_marker_value)
 {
 	// Set logging option
 	SetLogToSysLog(mapConfig->GetKeyValueBool("ExtendedLogging"));
@@ -136,7 +133,45 @@ void ConfiguredBackupClient::Login(int32_t account_number, bool read_only)
 	}
 
 	// Login -- if this fails, the Protocol will exception
-	mapLoginConfirmed = QueryLogin(account_number, read_only);
+	std::auto_ptr<BackupProtocolLoginConfirmed> ap_login_conf = QueryLogin(account_number, read_only);
+
+	// If reconnecting, check that the client store marker is the one we expect:
+	if(expected_current_marker_value != ClientStoreMarker::NotKnown)
+	{
+		if(ap_login_conf->GetClientStoreMarker() != expected_current_marker_value)
+		{
+			// Not good... finish the connection, abort, etc, ignoring errors
+			try
+			{
+				QueryFinished();
+			}
+			catch(...)
+			{
+				// IGNORE
+			}
+
+			// Then throw an exception about this:
+			THROW_EXCEPTION_MESSAGE(BackupStoreException, ClientMarkerNotAsExpected,
+				"Client store marker unexpectedly changed from " <<
+				expected_current_marker_value << " to " <<
+				ap_login_conf->GetClientStoreMarker() << ": is someone else "
+				"writing to the same account?");
+		}
+	}
+
+	return ap_login_conf;
+}
+
+std::auto_ptr<BackupProtocolLoginConfirmed> BackupStoreDaemonClient::Login(bool read_only,
+	int64_t expected_current_marker_value)
+{
+	return Login(mAccountID, read_only, expected_current_marker_value);
+}
+
+std::auto_ptr<BackupProtocolLoginConfirmed> S3BackupClient::Login(bool read_only,
+	int64_t expected_current_marker_value)
+{
+	return Login(S3_FAKE_ACCOUNT_ID, read_only, expected_current_marker_value);
 }
 
 void ConfiguredBackupClient::SetNiceMode(bool enabled)
