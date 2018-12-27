@@ -124,15 +124,16 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 
 	try
 	{
-		mapConnection = GetConfiguredBackupClient(mrConfig, false); // !read_only
+		mapConnection = GetConfiguredBackupClient(mrConfig);
 
 		// Login -- if this fails, the Protocol will exception
-		BackupProtocolLoginConfirmed& login_conf(mapConnection->GetLoginConfirmed());
+		std::auto_ptr<BackupProtocolLoginConfirmed> ap_login_conf =
+			mapConnection->Login(false); // !read_only
 
 		// If reconnecting, check that the client store marker is the one we expect:
 		if(mClientStoreMarker != ClientStoreMarker::NotKnown)
 		{
-			if(login_conf.GetClientStoreMarker() != mClientStoreMarker)
+			if(ap_login_conf->GetClientStoreMarker() != mClientStoreMarker)
 			{
 				// Not good... finish the connection, abort, etc, ignoring errors
 				try
@@ -148,7 +149,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 				THROW_EXCEPTION_MESSAGE(BackupStoreException,
 					ClientMarkerNotAsExpected,
 					"Expected " << mClientStoreMarker <<
-					" but found " << login_conf.GetClientStoreMarker() <<
+					" but found " << ap_login_conf->GetClientStoreMarker() <<
 					": is someone else writing to the "
 					"same account?");
 			}
@@ -169,7 +170,7 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 		BOX_INFO("Connection made, login successful");
 
 		// Check to see if there is any space available on the server
-		if(login_conf.GetBlocksUsed() >= login_conf.GetBlocksHardLimit())
+		if(ap_login_conf->GetBlocksUsed() >= ap_login_conf->GetBlocksHardLimit())
 		{
 			// no -- flag so only things like deletions happen
 			mStorageLimitExceeded = true;
