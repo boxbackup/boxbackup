@@ -81,6 +81,11 @@ public:
 	}
 	using BackupProtocolLocal::Query;
 
+	BackupStoreContext& GetContext() // make public, for tests
+	{
+		return BackupProtocolLocal::GetContext();
+	}
+
 	void Reopen()
 	{
 		QueryVersion(BACKUP_STORE_SERVER_VERSION);

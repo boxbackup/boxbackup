@@ -2686,7 +2686,8 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		if(pLoc->mapDirectoryRecord.get() == NULL)
 		{
 			pLoc->mapDirectoryRecord.reset(
-				new BackupClientDirectoryRecord(existing_remote_dir_id, *pLocName));
+				CreateLocationRootRecord(existing_remote_dir_id, *pLocName)
+			);
 		}
 
 		// Read the exclude lists from the Configuration
@@ -2762,6 +2763,12 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 	}
 }
 
+// This exists only so that it can be overridden in subclasses for testing:
+BackupClientDirectoryRecord* BackupDaemon::CreateLocationRootRecord(int64_t remote_dir_id,
+	const std::string &location_name)
+{
+	return new BackupClientDirectoryRecord(remote_dir_id, location_name);
+}
 
 // --------------------------------------------------------------------------
 //
