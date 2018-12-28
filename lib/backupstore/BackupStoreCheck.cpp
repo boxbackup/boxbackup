@@ -49,6 +49,7 @@ BackupStoreCheck::BackupStoreCheck(BackupFileSystem& FileSystem, bool FixErrors,
   mLastIDInInfo(0),
   mpInfoLastBlock(0),
   mInfoLastBlockEntries(0),
+  mpNewRefs(NULL),
   mrFileSystem(FileSystem),
   mLostDirNameSerial(0),
   mLostAndFoundDirectoryID(0),
@@ -92,6 +93,8 @@ BackupStoreCheck::~BackupStoreCheck()
 		{
 			BOX_ERROR("Error while destroying BackupStoreCheck: discarding "
 				"the refcount database threw an exception: " << e.what());
+			Logging::sDestructorExceptions.push_back("Discarding the refcount database "
+				"threw an exception while destroying BackupStoreCheck");
 		}
 
 		mpNewRefs = NULL;

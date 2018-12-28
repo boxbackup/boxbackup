@@ -50,6 +50,7 @@ std::vector<LogLevelOverrideByFileGuard> Logging::sLogLevelOverrideByFileGuards;
 Logging     Logging::sGlobalLogging; // automatic initialisation
 std::string Logging::sProgramName;
 Log::Level  Logging::sLowestCommonLevel = Log::EVERYTHING;
+std::vector<std::string> Logging::sDestructorExceptions;
 const Log::Category Logging::UNCATEGORISED("Uncategorised");
 
 HideSpecificExceptionGuard::SuppressedExceptions_t

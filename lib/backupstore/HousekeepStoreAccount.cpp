@@ -92,6 +92,8 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 		{
 			BOX_ERROR("Failed to destroy housekeeper: discarding the refcount "
 				"database threw an exception: " << e.what());
+			Logging::sDestructorExceptions.push_back("Discarding the refcount database "
+				"threw an exception while destroying HousekeepStoreAccount");
 		}
 
 		mpNewRefs = NULL;

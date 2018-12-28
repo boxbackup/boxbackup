@@ -376,6 +376,29 @@ public:
 };
 
 
+RaidBackupFileSystem::~RaidBackupFileSystem()
+{
+	// Call ReleaseLock() to close any open refcount DBs before partially destroying the
+	// BackupFileSystem that they need to close down. Need to do this in the subclass to
+	// avoid calling SaveRefCountDatabase() (from ~BackupStoreRefCountDatabaseWrapper)
+	// or ~NamedLock when the subclass has already been partially destroyed.
+	// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
+	try
+	{
+		ReleaseLock();
+	}
+	catch(BoxException& e)
+	{
+		// Destructors aren't supposed to throw exceptions, so it's too late
+		// for us to do much except log a warning
+		BOX_WARNING("Failed to release a lock while destroying "
+			"RaidBackupFileSystem: " << e.what());
+		Logging::sDestructorExceptions.push_back("Failed to release a lock while "
+			"destroying RaidBackupFileSystem");
+	}
+}
+
+
 void RaidBackupFileSystem::TryGetLock()
 {
 	if(mWriteLock.GotLock())
@@ -2231,6 +2254,8 @@ S3BackupFileSystem::~S3BackupFileSystem()
 			// for us to do much except log a warning
 			BOX_WARNING("Failed to release a lock while destroying "
 				"S3BackupFileSystem: " << e.what());
+			Logging::sDestructorExceptions.push_back("Failed to release a lock while "
+				"destroying S3BackupFileSystem");
 		}
 	}
 }
