@@ -101,6 +101,7 @@ bool setUp(const std::string& function_name, const std::string& specialisation)
 	}
 
 	cleanup_test_environment();
+	Logging::sDestructorExceptions.clear();
 
 	return true;
 }
@@ -264,6 +265,11 @@ bool tearDown()
 	// Reset SIGCHLD handler, in case the test has changed it:
 	::signal(SIGCHLD, SIG_DFL);
 #endif
+
+	for(auto i: Logging::sDestructorExceptions)
+	{
+		TEST_FAIL_WITH_MESSAGE(i);
+	}
 
 	box_time_t elapsed_time = GetCurrentBoxTime() - current_test_start;
 	std::ostringstream buf;

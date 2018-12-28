@@ -219,18 +219,7 @@ public:
 		ASSERT(AccountRootDir[AccountRootDir.size() - 1] == '/' ||
 			AccountRootDir[AccountRootDir.size() - 1] == DIRECTORY_SEPARATOR_ASCHAR);
 	}
-	virtual ~RaidBackupFileSystem()
-	{
-		// Call ReleaseLock() to close any open refcount DBs before
-		// partially destroying the BackupFileSystem that they need to
-		// close down. Need to do this in the subclass to avoid calling
-		// SaveRefCountDatabase() (from
-		// ~BackupStoreRefCountDatabaseWrapper) when the subclass has
-		// already been partially destroyed.
-		// http://stackoverflow.com/questions/10707286/how-to-resolve-pure-virtual-method-called
-		ReleaseLock();
-	}
-
+	virtual ~RaidBackupFileSystem();
 	virtual void ReleaseLock()
 	{
 		BackupFileSystem::ReleaseLock();

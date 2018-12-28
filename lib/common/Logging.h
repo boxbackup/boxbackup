@@ -648,6 +648,9 @@ class Logging
 	};
 
 	static const Log::Category UNCATEGORISED;
+
+	// A vector to record exceptions caught in destructors, which should cause tests to fail:
+	static std::vector<std::string> sDestructorExceptions;
 };
 
 class FileLogger : public Logger
