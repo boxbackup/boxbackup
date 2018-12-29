@@ -136,20 +136,6 @@ AC_CHECK_LIB([z], [zlibVersion],, [AC_MSG_ERROR([[cannot find zlib]])])
 VL_LIB_READLINE([have_libreadline=yes], [have_libreadline=no])
 AC_CHECK_FUNCS([rl_filename_completion_function])
 
-## Check for Berkely DB. Restrict to certain versions
-AX_PATH_BDB([1.x or 4.1], [
-  LIBS="$BDB_LIBS $LIBS"
-  LDFLAGS="$BDB_LDFLAGS $LDFLAGS"
-  CPPFLAGS="$CPPFLAGS $BDB_CPPFLAGS"
-
-  AX_COMPARE_VERSION([$BDB_VERSION],[ge],[4.1],,
-    [AX_COMPARE_VERSION([$BDB_VERSION],[lt],[2],,
-      [AC_MSG_ERROR([[only Berkely DB versions 1.x or at least 4.1 are currently supported]])]
-      )]
-  )
-  AX_SPLIT_VERSION([BDB_VERSION], [$BDB_VERSION])
-])
-
 # need to find libdl before trying to link openssl, apparently
 AC_SEARCH_LIBS([dlsym], [dl])
 AC_CHECK_FUNCS([dlsym dladdr])
