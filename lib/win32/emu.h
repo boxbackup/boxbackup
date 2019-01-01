@@ -239,7 +239,7 @@ inline int strncasecmp(const char *s1, const char *s2, size_t count)
 
 struct dirent
 {
-	char *d_name;
+	char d_name[260]; // maximum filename length
 	int d_type; // emulated UNIX file attributes
 	DWORD win_attrs; // WIN32_FIND_DATA.dwFileAttributes
 };

@@ -1130,13 +1130,8 @@ DIR *opendir(const char *name)
 		return NULL;
 	}
 	
-	pDir->result.d_name = 0;
 	return pDir;
 }
-
-// this kinda makes it not thread friendly!
-// but I don't think it needs to be.
-char tempbuff[MAX_PATH];
 
 // --------------------------------------------------------------------------
 //
@@ -1162,12 +1157,10 @@ struct dirent *readdir(DIR *dp)
 			{
 				den = &dp->result;
 				std::wstring input(dp->info.cFileName);
-				memset(tempbuff, 0, sizeof(tempbuff));
+				memset(den->d_name, 0, sizeof(den->d_name));
 				WideCharToMultiByte(CP_UTF8, 0, dp->info.cFileName, 
-					-1, &tempbuff[0], sizeof (tempbuff), 
+					-1, den->d_name, sizeof(den->d_name),
 					NULL, NULL);
-				//den->d_name = (char *)dp->info.name;
-				den->d_name = &tempbuff[0];
 				den->win_attrs = dp->info.dwFileAttributes;
 				if(dp->info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 				{
