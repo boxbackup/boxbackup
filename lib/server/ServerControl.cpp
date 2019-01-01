@@ -302,10 +302,14 @@ bool WaitForProcessExit(int pid, int expected_signal, int expected_exit_status)
 
 bool KillServer(const std::string& pid_file, bool WaitForProcess)
 {
-	FileStream fs(pid_file);
-	IOStreamGetLine getline(fs);
-	std::string line = getline.GetLine(false); // !preprocess
-	int pid = atoi(line.c_str());
+	int pid;
+	{
+		FileStream fs(pid_file);
+		IOStreamGetLine getline(fs);
+		std::string line = getline.GetLine(false); // !preprocess
+		pid = atoi(line.c_str());
+	}
+
 	bool status = KillServer(pid, WaitForProcess);
 	TEST_EQUAL_LINE(true, status, std::string("kill(") + pid_file + ")");
 
