@@ -1822,56 +1822,43 @@ bool test_backup_pauses_when_store_is_full(RaidAndS3TestSpecs::Specialisation& s
 	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
 }
 
-bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
+bool test_excluded_files_are_removed_by_housekeeping(RaidAndS3TestSpecs::Specialisation& spec)
 {
-	SETUP_TEST_SPECIALISED_BBSTORED(spec);
-
-	BackupDaemon bbackupd;
-	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, // !do_unpack_files
-		false, // !do_start_bbstored
-		bbackupd_conf_file),
-		FAIL);
+	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
 
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, true); // ReadOnly
 	protocol.QueryFinished();
 
-	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
-	// Delete a file and a directory
-	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/spacetest/f1") == 0);
-
-#ifdef WIN32
-	TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\spacetest\\d7") == 0);
-#else
-	TEST_THAT(::system("rm -rf testfiles/TestDir1/spacetest/d7") == 0);
-#endif
-
-	// We need just enough space to upload the initial files (>24 blocks), but not enough to
-	// create another directory. That must be the thing that pushes us over the limit:
 	int block_multiplier = (spec.name() == "s3" ? 1 : 2);
-	TEST_EQUAL(0, spec.control().SetLimit(0, 12 * block_multiplier));
-	fs.ReleaseLock();
+
+	TEST_THAT(unpack_files("spacetest1", "testfiles/TestDir1"));
 
 	// Backup the initial files:
 	{
 		bbackupd.RunSyncNow();
 		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
-		// BLOCK
-		{
-			protocol.Reopen();
-			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
-			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
-				8 * block_multiplier, 12 * block_multiplier));
-			protocol.QueryFinished();
-		}
+		protocol.Reopen();
+		TEST_THAT(check_num_files(fs, 11, 0, 0, 12));
+		TEST_THAT(check_num_blocks(protocol, 11 * block_multiplier, 0, 0,
+			12 * block_multiplier, 23 * block_multiplier));
+		protocol.QueryFinished();
+
+		// We need to set the limit to just enough space for the file currently on the server, but
+		// not enough for another directory to be created. That must be the thing that pushes us
+		// over the limit:
+		BackupStoreInfo& info = fs.GetBackupStoreInfo(true); // read_only
+		TEST_EQUAL(23 * block_multiplier, info.GetBlocksUsed());
+		TEST_EQUAL(0, spec.control().SetLimit(0, info.GetBlocksUsed()));
+		fs.ReleaseLock();
 	}
 
 	// Create a directory and then try to run a backup. This should try
 	// to create the directory on the server, fail, and catch the error.
 	// The directory that we create, spacetest/d6/d8, is included in
-	// spacetest2.tgz, so we can ignore this for counting files after we
-	// unpack spacetest2.tgz.
+	// spacetest2.tgz, so we should avoid double-counting it after we
+	// unpack spacetest2.tgz below:
 	TEST_THAT(::mkdir("testfiles/TestDir1/spacetest/d6/d8", 0755) == 0);
 	bbackupd.RunSyncNow();
 	TEST_THAT(bbackupd.StorageLimitExceeded());
@@ -1882,14 +1869,11 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		bbackupd.RunSyncNow();
 		TEST_THAT(bbackupd.StorageLimitExceeded());
 
-		// BLOCK
-		{
-			protocol.Reopen();
-			TEST_THAT(check_num_files(fs, 4, 0, 0, 8));
-			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
-				8 * block_multiplier, 12 * block_multiplier));
-			protocol.QueryFinished();
-		}
+		protocol.Reopen();
+		TEST_THAT(check_num_files(fs, 11, 0, 0, 12));
+		TEST_THAT(check_num_blocks(protocol, 11 * block_multiplier, 0, 0,
+			12 * block_multiplier, 23 * block_multiplier));
+		protocol.QueryFinished();
 	}
 
 	std::string bbackupd_conf_exclude = (spec.name() == "s3")
@@ -1924,15 +1908,9 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		// d3		excluded
 		// d3/d4	excluded
 		// d3/d4/f5	excluded
-		// Careful with timing here, these files will be removed by
-		// housekeeping the next time it runs. We hold onto the client
-		// context (and hence an open connection) to stop it from
-		// running for now.
 
-		// But we can't do that on Windows, because bbstored only
-		// support one simultaneous connection. So we have to hope that
-		// housekeeping has run recently enough that it doesn't need to
-		// run again when we disconnect.
+		// Careful with timing here, these files will be removed by
+		// housekeeping the next time it runs.
 
 		if(spec.name() == "s3")
 		{
@@ -1943,6 +1921,11 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		}
 		else
 		{
+			// We hold onto the client context (and hence an open connection) to stop
+			// it from running for now. But we can't do that on Windows, because
+			// bbstored only supports one simultaneous connection. So we have to hope
+			// that housekeeping has run recently enough that it doesn't need to run
+			// again when we disconnect.
 #ifdef WIN32
 			apClientContext.reset();
 #endif
@@ -1969,12 +1952,6 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
 				ReadDirectory(protocol, spacetestDirId);
 
-			// these files were deleted before, they should be
-			// long gone by now
-
-			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
-			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
-
 			// these files have just been deleted, because
 			// they are excluded by the new configuration.
 			// but housekeeping should not have run yet
@@ -1996,13 +1973,10 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 				ReadDirectory(protocol, d4_id);
 			TEST_THAT(test_entry_deleted(*d4_dir, "f5"));
 
-			// d1/f3 and d1/f4 are the only two files on the
-			// server which are not deleted, they use 2 blocks
-			// each, the rest is directories and 2 deleted files
-			// (f2 and d3/d4/f5)
-			TEST_THAT(check_num_files(fs, 2, 0, 2, 8));
-			TEST_THAT(check_num_blocks(protocol, 2 * block_multiplier, 0,
-				2 * block_multiplier, 8 * block_multiplier, 12 * block_multiplier));
+			// Two files should have been marked as deleted:
+			TEST_THAT(check_num_files(fs, 9, 0, 2, 12));
+			TEST_THAT(check_num_blocks(protocol, 9 * block_multiplier, 0,
+				2 * block_multiplier, 12 * block_multiplier, 23 * block_multiplier));
 
 			// Log out.
 			protocol.QueryFinished();
@@ -2030,24 +2004,22 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 			std::auto_ptr<BackupStoreDirectory> spacetest_dir =
 				ReadDirectory(protocol, spacetestDirId);
 
-			TEST_THAT(SearchDir(*spacetest_dir, "f1") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "f2") == 0);
 			TEST_THAT(SearchDir(*spacetest_dir, "d3") == 0);
-			TEST_THAT(SearchDir(*spacetest_dir, "d7") == 0);
 
 			// f2, d3, d3/d4 and d3/d4/f5 have been removed.
 			// The files were counted as deleted files before, the
 			// deleted directories just as directories.
-			TEST_THAT(check_num_files(fs, 2, 0, 0, 6));
-			TEST_THAT(check_num_blocks(protocol, 2 * block_multiplier, 0, 0,
-				6 * block_multiplier, 8 * block_multiplier));
+			TEST_THAT(check_num_files(fs, 9, 0, 0, 10));
+			TEST_THAT(check_num_blocks(protocol, 9 * block_multiplier, 0,
+				0, 10 * block_multiplier, 19 * block_multiplier));
 
 			// Log out.
 			protocol.QueryFinished();
 		}
 
-		// Need 22 blocks free to upload everything
-		TEST_EQUAL(0, spec.control().SetLimit(0, 11 * block_multiplier));
+		// Need another 3 blocks free to upload everything
+		TEST_EQUAL(0, spec.control().SetLimit(0, 22 * block_multiplier));
 		fs.ReleaseLock();
 
 		// Run another backup, now there should be enough space
@@ -2060,18 +2032,13 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		TEST_COMPARE_EXTRA(Compare_Same, ("-c " + bbackupd_conf_exclude).c_str());
 		BOX_TRACE("done.");
 
-		// BLOCK
-		{
-			protocol.Reopen();
-			TEST_THAT(check_num_files(fs, 4, 0, 0, 7));
-			TEST_THAT(check_num_blocks(protocol, 4 * block_multiplier, 0, 0,
-				7 * block_multiplier, 11 * block_multiplier));
-
-			// d2/f6, d6/d8 and d6/d8/f7 are new
-			// i.e. 2 new files, 1 new directory
-
-			protocol.QueryFinished();
-		}
+		protocol.Reopen();
+		// d2/f6, d6/d8 and d6/d8/f7 are new
+		// i.e. 2 new files, 1 new directory
+		TEST_THAT(check_num_files(fs, 11, 0, 0, 11));
+		TEST_THAT(check_num_blocks(protocol, 11 * block_multiplier, 0, 0,
+			11 * block_multiplier, 22 * block_multiplier));
+		protocol.QueryFinished();
 	}
 
 	TEARDOWN_TEST_SPECIALISED_NO_CHECK(spec);
@@ -2990,29 +2957,36 @@ bool test_delete_update_and_symlink_files()
 
 	// TODO FIXME dedent
 	{
-		// Delete a file
+		// Delete a file:
 		TEST_THAT(EMU_UNLINK("testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 
-		#ifndef WIN32
-			// New symlink
-			TEST_THAT(::symlink("does-not-exist",
-				"testfiles/TestDir1/symlink-to-dir") == 0);
-		#endif
+		// Delete a directory:
+#ifdef WIN32
+		TEST_THAT(::system("rd /s/q testfiles\\TestDir1\\x2") == 0);
+#else
+		TEST_THAT(::system("rm -r testfiles/TestDir1/x2") == 0);
+#endif
+
+#ifndef WIN32
+		// New symlink
+		TEST_THAT(::symlink("does-not-exist", "testfiles/TestDir1/symlink-to-dir") == 0);
+#endif
 
 		// Update a file (will be uploaded as a diff)
 		{
 			// Check that the file is over the diffing
 			// threshold in the bbackupd.conf file
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df")
-				> 1024);
+			int file_size = TestGetFileSize("testfiles/TestDir1/f45.df");
+			TEST_THAT(file_size > 1024);
 
 			// Add a bit to the end
 			FILE *f = ::fopen("testfiles/TestDir1/f45.df", "a");
 			TEST_THAT(f != 0);
 			::fprintf(f, "EXTRA STUFF");
 			::fclose(f);
-			TEST_THAT(TestGetFileSize("testfiles/TestDir1/f45.df")
-				> 1024);
+
+			int new_file_size = TestGetFileSize("testfiles/TestDir1/f45.df");
+			TEST_EQUAL(file_size + 11, new_file_size);
 		}
 
 		// wait long enough for new files to be old enough to backup
@@ -4509,7 +4483,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(test_backup_disappearing_directory(*i));
 		TEST_THAT(test_backup_hardlinked_files(*i));
 		TEST_THAT(test_backup_pauses_when_store_is_full(*i));
-		TEST_THAT(test_bbackupd_exclusions(*i));
+		TEST_THAT(test_excluded_files_are_removed_by_housekeeping(*i));
 		TEST_THAT(test_bbackupd_responds_to_connection_failure_out_of_process(*i, specs));
 		TEST_THAT(test_interrupted_restore_can_be_recovered(*i));
 		TEST_THAT(test_store_error_reporting(*i));
