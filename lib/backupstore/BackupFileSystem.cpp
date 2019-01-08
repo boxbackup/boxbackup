@@ -122,6 +122,9 @@ void BackupFileSystem::GetLock(int max_tries)
 	ASSERT(HaveLock());
 	BOX_LOG_CATEGORY(Log::TRACE, LOCKING, "Successfully locked account " <<
 		GetAccountIdentifier() << " after " << (i + 1) << " attempts");
+
+	// Ensure that any subsequent write operation makes the store dirty:
+	mStoreIsDirty = false;
 }
 
 void BackupFileSystem::ReleaseLock()
@@ -141,6 +144,19 @@ void BackupFileSystem::ReleaseLock()
 	}
 
 	mapPermanentRefCountDatabase.reset();
+}
+
+void BackupFileSystem::SetStoreDirty()
+{
+	ASSERT(HaveLock());
+
+	if(!mStoreIsDirty)
+	{
+		// Choose a new, unique client store marker for this connection (duration of the
+		// current write lock). The current time will do.
+		SetClientStoreMarker(GetCurrentBoxTime());
+		mStoreIsDirty = true;
+	}
 }
 
 // Refresh forces the any current BackupStoreInfo to be discarded and reloaded from the
@@ -479,6 +495,10 @@ std::auto_ptr<BackupStoreInfo> RaidBackupFileSystem::GetBackupStoreInfoInternal(
 
 void RaidBackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
+	// Either there is no BackupStoreInfo loaded, or this is the same one. Otherwise we have two
+	// loaded, and they might be inconsistent, so we might lose changes to one.
+	ASSERT(!mapBackupStoreInfo.get() || mapBackupStoreInfo.get() == &rInfo);
+
 	if(rInfo.IsReadOnly())
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, StoreInfoIsReadOnly,
@@ -594,6 +614,8 @@ void RaidBackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& 
 
 void RaidBackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 {
+	SetStoreDirty();
+
 	// Create the containing directory if it doesn't exist.
 	std::string filename = GetObjectFileName(rDir.GetObjectID(), true);
 	RaidFileWrite writeDir(mStoreDiscSet, filename);
@@ -662,6 +684,7 @@ public:
 void RaidPutFileCompleteTransaction::Commit()
 {
 	ASSERT(!mCommitted);
+
 	mStoreFile.Commit(BACKUP_STORE_CONVERT_TO_RAID_IMMEDIATELY);
 
 #ifndef BOX_RELEASE_BUILD
@@ -697,6 +720,8 @@ std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	BackupStoreRefCountDatabase::refcount_t refcount, bool allow_overwrite)
 {
+	SetStoreDirty();
+
 	// Create the containing directory if it doesn't exist.
 	std::string filename = GetObjectFileName(ObjectID, true);
 
@@ -809,6 +834,8 @@ std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::PutFilePatch(int64_t ObjectID, int64_t DiffFromFileID,
 	IOStream& rPatchData, BackupStoreRefCountDatabase::refcount_t refcount)
 {
+	SetStoreDirty();
+
 	// Create the containing directory if it doesn't exist.
 	std::string newVersionFilename = GetObjectFileName(ObjectID, true);
 
@@ -940,6 +967,8 @@ std::auto_ptr<IOStream> RaidBackupFileSystem::GetTemporaryFileStream(int64_t id)
 // it is to use RaidFileWrite::Delete() on it.
 void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID, bool missing_ok)
 {
+	SetStoreDirty();
+
 	std::string filename = GetObjectFileName(ObjectID, false);
 	RaidFileWrite deleteFile(mStoreDiscSet, filename);
 	try
@@ -962,6 +991,9 @@ void RaidBackupFileSystem::DeleteObjectUnknown(int64_t ObjectID, bool missing_ok
 std::auto_ptr<BackupFileSystem::Transaction>
 RaidBackupFileSystem::CombineFileOrDiff(int64_t OlderPatchID, int64_t NewerObjectID, bool NewerIsPatch)
 {
+	// We don't ever delete the latest version of an object (I hope!) so we shouldn't need to
+	// invalidate client caches by changing the client store marker.
+
 	// This normally only happens during housekeeping, which is using a temporary
 	// refcount database, so insist on that for now.
 	BackupStoreRefCountDatabase* pRefCount = mapPotentialRefCountDatabase.get();
@@ -1286,10 +1318,28 @@ void RaidBackupFileSystem::EnsureObjectIsPermanent(int64_t ObjectID, bool fix_er
 }
 
 
+int64_t RaidBackupFileSystem::GetClientStoreMarker() const
+{
+	ASSERT(mapBackupStoreInfo.get());
+	return mapBackupStoreInfo->GetClientStoreMarker();
+}
+
+
+void RaidBackupFileSystem::SetClientStoreMarker(int64_t new_client_store_marker)
+{
+	ASSERT(HaveLock());
+	GetBackupStoreInfo(false).SetClientStoreMarker(new_client_store_marker); // !ReadOnly
+	// Save immediately, to increase likelihood that one side or other detects a conflict,
+	// if it occurs.
+	PutBackupStoreInfo(*mapBackupStoreInfo);
+}
+
+
 S3BackupFileSystem::S3BackupFileSystem(const Configuration& s3_config, S3Client& rClient)
 : mrS3Config(s3_config),
   mrClient(rClient),
-  mHaveLock(false)
+  mHaveLock(false),
+  mClientStoreMarker(ClientStoreMarker::NotKnown)
 {
 	mBasePath = s3_config.GetKeyValue("BasePath");
 
@@ -1422,7 +1472,63 @@ int64_t S3BackupFileSystem::GetRevisionID(const std::string& uri,
 }
 
 
-// TODO FIXME ADD CACHING!
+// Because S3 doesn't make any guarantees about consistency except for eventual consistency, we
+// can't rely on another client having changed the client store marker in the BackupStoreInfo file
+// to know whether it has updated the store (which requires us to flush all caches). Instead we
+// store the client store marker in the SimpleDB database, along with the lock entry, since we have
+// immediate consistency guarantees over it here.
+
+int64_t S3BackupFileSystem::GetClientStoreMarker() const
+{
+	ASSERT(mHaveLock);
+	return mClientStoreMarker;
+}
+
+
+void S3BackupFileSystem::SetClientStoreMarker(int64_t new_client_store_marker)
+{
+	ASSERT(mHaveLock);
+
+	// The store is locked, so we know the attributes that we set when we locked it with, so we
+	// can make the update request conditional on those attributes. This will also fail (and
+	// blow up) if someone deletes (overrides) the lock before we first write to the store.
+
+	SimpleDBClient::str_map_t conditional = mLockAttributes;
+	SimpleDBClient::str_map_t update;
+
+	{
+		std::ostringstream marker_buf;
+		marker_buf << new_client_store_marker;
+		update["marker"] = marker_buf.str();
+
+		// We need to update mLockAttributes as well, to ensure that ReportLockMismatches()
+		// does not falsely report a conflicting change when the client calls ReleaseLock():
+		mLockAttributes["marker"] = marker_buf.str();
+	}
+
+	// This will throw an exception if the conditional PUT fails:
+	mapSimpleDBClient->PutAttributes(mSimpleDBDomain, mLockName, update, conditional);
+
+	// Keep the BackupStoreInfo and BackupStoreRefCountDatabase up-to-date:
+	mClientStoreMarker = new_client_store_marker;
+	GetBackupStoreInfo(false).SetClientStoreMarker(mClientStoreMarker);
+
+	// If we have a potential refcount DB open, then it must be the read-write one, and the
+	// permanent one is either not open at all, or read-only (see comments in
+	// GetPermanentRefCountDatabase()).
+	if(mapPotentialRefCountDatabase.get())
+	{
+		mapPotentialRefCountDatabase->SetClientStoreMarker(mClientStoreMarker);
+	}
+	else if(mapPermanentRefCountDatabase.get())
+	{
+		mapPermanentRefCountDatabase->SetClientStoreMarker(mClientStoreMarker);
+	}
+	// It's possible that neither is loaded yet. GetPermanentRefCountDatabase() should check
+	// the client store marker when it opens the database read-write.
+}
+
+
 std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bool ReadOnly)
 {
 	std::string info_uri = GetMetadataURI(S3_INFO_FILE_NAME);
@@ -1447,6 +1553,10 @@ std::auto_ptr<BackupStoreInfo> S3BackupFileSystem::GetBackupStoreInfoInternal(bo
 
 void S3BackupFileSystem::PutBackupStoreInfo(BackupStoreInfo& rInfo)
 {
+	// Either there is no BackupStoreInfo loaded, or this is the same one. Otherwise we have two
+	// loaded, and they might be inconsistent, so we might lose changes to one.
+	ASSERT(!mapBackupStoreInfo.get() || mapBackupStoreInfo.get() == &rInfo);
+
 	if(rInfo.IsReadOnly())
 	{
 		THROW_EXCEPTION_MESSAGE(BackupStoreException, StoreInfoIsReadOnly,
@@ -1511,8 +1621,10 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 		digest = digester.DigestAsString();
 	}
 
-	// Try to fetch it from the remote server. If we pass a digest, and if it matches,
-	// then the server won't send us the same file data again.
+	// Try to fetch it from the remote server. If we pass a digest, and if it matches, then the
+	// server won't send us the same file data again. TODO: check the local and remote client
+	// store markers, and if one of them matches the one that we have, then keep that version
+	// (don't assume that the local one is stale and the remote one is correct).
 	std::string uri = GetMetadataURI(S3_REFCOUNT_FILE_NAME);
 	HTTPResponse response = mrClient.GetObject(uri, digest);
 	if(response.GetResponseCode() == HTTPResponse::Code_OK)
@@ -1565,8 +1677,45 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPermanentRefCountDatabase(
 			"count database");
 	}
 
+	// If we are being asked for the permanent refcount DB and we currently have a potential
+	// one open, then the latter should be the read-write one, and the former should be
+	// read-only. In that case, the client store marker of the permanent DB might be out of
+	// date, since the potential one would have been updated instead, so we leave the
+	// permanent one read-only and don't check its client store marker.
+	if(mapPotentialRefCountDatabase.get() != NULL)
+	{
+		ASSERT(ReadOnly);
+	}
+	// Otherwise, we should not ever have a write lock on the BackupFileSystem but a read-only
+	// refcount DB (possibly left over after housekeeping), otherwise we could fail to update
+	// its client store marker when the store is dirtied. So if we've been asked to open the
+	// permanent database read-only, and we already have a lock, then open it read-write instead:
+	else if(ReadOnly && mHaveLock)
+	{
+		ReadOnly = false;
+	}
+
 	mapPermanentRefCountDatabase = BackupStoreRefCountDatabase::Load(local_path,
 		S3_FAKE_ACCOUNT_ID, ReadOnly);
+
+	// If not read-only, check that the client store marker matches our expectation. Otherwise
+	// the refcount DB that we just downloaded could be out of date, and should not be relied
+	// upon.
+	if(!ReadOnly)
+	{
+		ASSERT(mHaveLock); // otherwise we don't know the client store marker value
+		if(mapPermanentRefCountDatabase->GetClientStoreMarker() != mClientStoreMarker)
+		{
+			THROW_EXCEPTION_MESSAGE(BackupStoreException,
+				CorruptReferenceCountDatabase, "Reference count database has a "
+				"different ClientStoreMarker than expected, it may not have been "
+				"uploaded properly after the last backup. Please run "
+				"bbstoreaccounts check on the account to recreate it. Found: " <<
+				mapPermanentRefCountDatabase->GetClientStoreMarker() << ", "
+				"expected: " << mClientStoreMarker);
+		}
+	}
+
 	return *mapPermanentRefCountDatabase;
 }
 
@@ -1606,6 +1755,7 @@ BackupStoreRefCountDatabase& S3BackupFileSystem::GetPotentialRefCountDatabase()
 		BackupStoreRefCountDatabase::Create(local_path, S3_FAKE_ACCOUNT_ID);
 	mapPotentialRefCountDatabase.reset(
 		new BackupStoreRefCountDatabaseWrapper(ap_new_db, *this));
+	mapPotentialRefCountDatabase->SetClientStoreMarker(mClientStoreMarker);
 
 	return *mapPotentialRefCountDatabase;
 }
@@ -1749,6 +1899,8 @@ void S3BackupFileSystem::GetDirectory(int64_t ObjectID, BackupStoreDirectory& rD
 //! ID and SizeInBlocks.
 void S3BackupFileSystem::PutDirectory(BackupStoreDirectory& rDir)
 {
+	SetStoreDirty();
+
 	CollectInBufferStream out;
 	rDir.WriteToStream(out);
 	out.SetForReading();
@@ -1777,6 +1929,8 @@ std::auto_ptr<IOStream> S3BackupFileSystem::GetTemporaryFileStream(int64_t id)
 
 void S3BackupFileSystem::DeleteDirectory(int64_t ObjectID)
 {
+	SetStoreDirty();
+
 	std::ostringstream msg;
 	msg << "Failed to delete directory object " << BOX_FORMAT_OBJECTID(ObjectID);
 	mrClient.DeleteObjectChecked(GetDirectoryURI(ObjectID), msg.str());
@@ -1785,6 +1939,8 @@ void S3BackupFileSystem::DeleteDirectory(int64_t ObjectID)
 
 void S3BackupFileSystem::DeleteFile(int64_t ObjectID)
 {
+	SetStoreDirty();
+
 	std::ostringstream msg;
 	msg << "Failed to delete file object " << BOX_FORMAT_OBJECTID(ObjectID);
 	mrClient.DeleteObjectChecked(GetFileURI(ObjectID), msg.str());
@@ -1793,6 +1949,8 @@ void S3BackupFileSystem::DeleteFile(int64_t ObjectID)
 
 void S3BackupFileSystem::DeleteObjectUnknown(int64_t ObjectID, bool missing_ok)
 {
+	SetStoreDirty();
+
 	// It might be a directory or a file:
 	std::string file_uri = GetFileURI(ObjectID);
 	std::string dir_uri = GetDirectoryURI(ObjectID);
@@ -1878,6 +2036,8 @@ std::auto_ptr<BackupFileSystem::Transaction>
 S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 	BackupStoreRefCountDatabase::refcount_t refcount, bool allow_overwrite)
 {
+	SetStoreDirty();
+
 	ASSERT(refcount == 0 || refcount == 1);
 	BackupStoreFile::VerifyStream validator(rFileData);
 	S3PutFileCompleteTransaction* pTrans = new S3PutFileCompleteTransaction(*this,
@@ -1889,6 +2049,10 @@ S3BackupFileSystem::PutFileComplete(int64_t ObjectID, IOStream& rFileData,
 std::auto_ptr<BackupFileSystem::Transaction>
 S3BackupFileSystem::CombineFileOrDiff(int64_t OlderObjectID, int64_t NewerPatchID, bool OlderIsPatch)
 {
+	// We may delete the newest object ID for a given filename, so clients should refresh their
+	// caches.
+	SetStoreDirty();
+
 	// This normally only happens during housekeeping, which is using a temporary
 	// refcount database, so insist on that for now:
 	BackupStoreRefCountDatabase* pRefCount = mapPotentialRefCountDatabase.get();
@@ -2081,6 +2245,10 @@ void S3BackupFileSystem::TryGetLock()
 		}
 	}
 
+	// Save the value set by the client, before we overwrite it:
+	// int64_t expected_client_store_marker = mClientStoreMarker;
+	ASSERT(mClientStoreMarker == ClientStoreMarker::NotKnown);
+
 	if(lock_exists)
 	{
 		// Someone once held the lock. If the locked attribute is empty, then they released
@@ -2140,8 +2308,45 @@ void S3BackupFileSystem::TryGetLock()
 				"' is held by '" << attributes["locker"] << " since " <<
 				FormatTime(since_time, true)); // includeDate
 		}
+
+		// Since the lock exists, we can tell whether it was ever written to (client store
+		// marker <> "") and if so, get the current client store marker from it. Note that
+		// this is different to all the other attributes, which we *write* to the lock.
+		// We don't ever write the client store marker while taking the lock; only if and
+		// when the client calls SetClientStoreMarker (e.g. via SetStoreDirty()).
+		if(attributes["marker"] != "")
+		{
+			mClientStoreMarker = box_strtoui64(attributes["marker"].c_str(), NULL, 10);
+		}
+		else
+		{
+			// Set it to the default value for new stores
+			mClientStoreMarker = ClientStoreMarker::Default;
+		}
+	}
+	else
+	{
+		// Since the lock doesn't exist, we can assume that the store was never written to
+		// (never locked) before, for the purposes of setting the initial client store
+		// marker. If the client keeps locally cached state, it should check this value
+		// after connection, and discard the cached state if it's different than expected.
+		// We will change the value when writing to the store for the first time after
+		// getting a write lock.
+		mClientStoreMarker = ClientStoreMarker::Default;
 	}
 
+	/*
+	if(expected_client_store_marker != ClientStoreMarker::NotKnown &&
+		expected_client_store_marker != mClientStoreMarker)
+	{
+		THROW_EXCEPTION_MESSAGE(BackupStoreException, ClientMarkerNotAsExpected,
+			"Client store marker unexpectedly changed from " <<
+			expected_client_store_marker << " to " << mClientStoreMarker << ": "
+			"is someone else writing to the same account?");
+	}
+	*/
+
+	mLockAttributes.clear();
 	mLockAttributes["locked"] = "true";
 	mLockAttributes["locker"] = mLockValue;
 	mLockAttributes["hostname"] = mCurrentHostName;
@@ -2162,12 +2367,23 @@ void S3BackupFileSystem::TryGetLock()
 	mapSimpleDBClient->PutAttributes(mSimpleDBDomain, mLockName, mLockAttributes,
 		conditional);
 
-	// To avoid the race condition, read back the attribute values with a consistent
-	// read, to check that nobody else sneaked in at the same time:
+	// To avoid the race condition, read back the attribute values with a consistent read, to
+	// check that nobody else sneaked in at the same time. Also, although we didn't write the
+	// client store marker, if the lock already existed then there already is one, so we expect
+	// to get the same value back:
+	SimpleDBClient::str_map_t expected = mLockAttributes;
+
+	if(lock_exists && mClientStoreMarker != ClientStoreMarker::Default)
+	{
+		std::ostringstream marker_buf;
+		marker_buf << mClientStoreMarker;
+		expected["marker"] = marker_buf.str();
+	}
+
 	SimpleDBClient::str_map_t attributes_read = mapSimpleDBClient->GetAttributes(
 		mSimpleDBDomain, mLockName, true); // consistent_read
 
-	str_map_diff_t mismatches = compare_str_maps(mLockAttributes, attributes_read);
+	str_map_diff_t mismatches = compare_str_maps(expected, attributes_read);
 
 	// This should throw an exception if there are any mismatches:
 	ReportLockMismatches(mismatches);
@@ -2175,6 +2391,21 @@ void S3BackupFileSystem::TryGetLock()
 
 	// Now we have the lock!
 	mHaveLock = true;
+
+	// ReleaseLock checks that mLockAttributes still matches the attributes that we expect to be
+	// stored on the lock. We have already set all of them except the client store marker, which
+	// we added to "expected" above, so add that now.
+	mLockAttributes = expected;
+
+	// We should not have a write lock on the BackupFileSystem but a read-only refcount DB
+	// (possibly left over after housekeeping), otherwise we could fail to update its client
+	// store marker when the store is dirtied. So if we do, then we discard it now, when
+	// hopefully nobody is holding a reference to it, so that it can be reopened read/write:
+	if(mapPermanentRefCountDatabase.get() &&
+		mapPermanentRefCountDatabase->IsReadOnly())
+	{
+		mapPermanentRefCountDatabase.reset();
+	}
 }
 
 
@@ -2234,6 +2465,8 @@ void S3BackupFileSystem::ReleaseLock()
 
 	// Now we no longer have the lock!
 	mHaveLock = false;
+	mLockAttributes.clear();
+	mClientStoreMarker = ClientStoreMarker::NotKnown;
 }
 
 

@@ -661,19 +661,6 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	apNewInfo->AdjustNumDeletedFiles(mNumDeletedFiles);
 	apNewInfo->AdjustNumDirectories(mNumDirectories);
 
-	// If there are any errors (apart from wrong block counts), then we
-	// should reset the ClientStoreMarker to zero, which
-	// CreateForRegeneration does. But if there are no major errors, then
-	// we should maintain the old ClientStoreMarker, to avoid invalidating
-	// the client's directory cache.
-	if(apOldInfo.get() && !mNumberErrorsFound)
-	{
-		BOX_INFO("No major errors found, preserving old "
-			"ClientStoreMarker: " <<
-			apOldInfo->GetClientStoreMarker());
-		apNewInfo->SetClientStoreMarker(apOldInfo->GetClientStoreMarker());
-	}
-
 	if(apOldInfo.get())
 	{
 		mNumberErrorsFound += apNewInfo->ReportChangesTo(*apOldInfo);
@@ -682,6 +669,7 @@ void BackupStoreCheck::WriteNewStoreInfo()
 	// Save to disc?
 	if(mFixErrors)
 	{
+		mrFileSystem.DiscardBackupStoreInfo();
 		mrFileSystem.PutBackupStoreInfo(*apNewInfo);
 		BOX_INFO("New store info file written successfully.");
 	}

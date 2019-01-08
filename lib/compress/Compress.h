@@ -49,20 +49,20 @@ public:
 	
 	~Compress()
 	{
-		int r = 0;
-		if((r = ((Compressing)?(deflateEnd(&mStream))
-			:(inflateEnd(&mStream)))) != Z_OK)
+		int r = Compressing ? deflateEnd(&mStream) : inflateEnd(&mStream);
+		if(r != Z_OK)
 		{
-			BOX_WARNING("zlib error code = " << r);
 			if(r == Z_DATA_ERROR)
 			{
-				BOX_WARNING("End of compress/decompress "
-					"without all input being consumed, "
-					"possible corruption?");
+				BOX_WARNING("End of compress/decompress without all input being "
+					"consumed, possible corruption? Zlib message: " <<
+					mStream.msg);
 			}
 			else
 			{
-				THROW_EXCEPTION(CompressException, EndFailed)
+				THROW_EXCEPTION_MESSAGE(CompressException, EndFailed,
+					"Zlib " << (Compressing ? "compression" : "decompression")
+					<< " end failed with error code " << r);
 			}
 		}
 	}
@@ -151,8 +151,18 @@ public:
 		// Check errors
 		if(ret < 0)
 		{
-			BOX_WARNING("zlib error code = " << ret);			
-			THROW_EXCEPTION(CompressException, TransformFailed)
+			if(ret == Z_DATA_ERROR)
+			{
+				THROW_EXCEPTION_MESSAGE(CompressException, TransformFailed,
+					"Zlib " << (Compressing ? "compression" : "decompression")
+					<< " failed: " << mStream.msg);
+			}
+			else
+			{
+				THROW_EXCEPTION_MESSAGE(CompressException, TransformFailed,
+					"Zlib " << (Compressing ? "compression" : "decompression")
+					<< " failed with error code " << ret);
+			}
 		}
 		
 		// Parse result

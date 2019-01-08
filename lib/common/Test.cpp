@@ -131,6 +131,7 @@ void cleanup_test_environment(bool delete_pid_files)
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
+			StartsWith("refcount.db.", filename) ||
 			StartsWith("restore", filename) ||
 			filename == "store" ||
 			filename == "syncallowscript.control" ||

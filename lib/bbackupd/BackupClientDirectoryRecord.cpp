@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <algorithm>
+
 #include "autogen_BackupProtocol.h"
 #include "autogen_CipherException.h"
 #include "autogen_ClientException.h"
@@ -114,7 +116,7 @@ std::string BackupClientDirectoryRecord::ConvertVssPathToRealPath(
 		rVssPath.substr(0, rBackupLocation.mSnapshotPath.length()));
 	BOX_TRACE("VSS: ConvertVssPathToRealPath: Snapshot Path = " <<
 		rBackupLocation.mSnapshotPath);
-	if (rBackupLocation.mIsSnapshotCreated &&
+	if(rBackupLocation.mIsSnapshotCreated &&
 		rVssPath.substr(0, rBackupLocation.mSnapshotPath.length()) ==
 		rBackupLocation.mSnapshotPath)
 	{
@@ -258,11 +260,9 @@ void BackupClientDirectoryRecord::SyncDirectory(
 			"found device/inode " <<
 			dest_st.st_dev << "/" << dest_st.st_ino);
 
-		// Store inode number in map so directories are tracked
-		// in case they're renamed
+		// Store inode number in map so directories are tracked, in case they're renamed:
 		{
-			BackupClientInodeToIDMap &idMap(
-				rParams.mrContext.GetNewIDMap());
+			BackupClientInodeToIDMap &idMap(rParams.mrContext.GetNewIDMap());
 			idMap.AddToMap(dest_st.st_ino, mObjectID, ContainingDirectoryID,
 				local_path_non_vss);
 		}
@@ -487,7 +487,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 	// unreadable files to suppress warnings that they are not accessible.
 
 	int type;
-	if (en->d_type == DT_DIR)
+	if(en->d_type == DT_DIR)
 	{
 		type = S_IFDIR;
 	}
@@ -565,7 +565,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 		// parent directory under Vista and later, and causes an
 		// infinite loop:
 		// http://social.msdn.microsoft.com/forums/en-US/windowscompatibility/thread/05d14368-25dd-41c8-bdba-5590bf762a68/
-		if (en->win_attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+		if(en->win_attrs & FILE_ATTRIBUTE_REPARSE_POINT)
 		{
 			rNotifier.NotifyMountPointSkipped(this, realFileName);
 			return false;
@@ -574,7 +574,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 	}
 	else // not a file or directory, what is it?
 	{
-		if (type == S_IFSOCK
+		if(type == S_IFSOCK
 #ifndef WIN32
 			|| type == S_IFIFO
 #endif // !WIN32
@@ -640,7 +640,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 	currentStateChecksum.Add(&checksum_info, sizeof(checksum_info));
 	currentStateChecksum.Add(en->d_name, strlen(en->d_name));
 	
-	// If the file has been modified madly into the future, download the 
+	// If the file has been modified madly into the future, download the
 	// directory record anyway to ensure that it doesn't get uploaded
 	// every single time the disc is scanned.
 	if(checksum_info.mModificationTime > rParams.mUploadAfterThisTimeInTheFuture)
@@ -777,7 +777,7 @@ std::string BackupClientDirectoryRecord::DecryptFilename(
 	}
 	catch(BoxException &e)
 	{
-		BOX_ERROR("Failed to decrypt filename for object " << 
+		BOX_ERROR("Failed to decrypt filename for object " <<
 			BOX_FORMAT_OBJECTID(filenameObjectID) << " in "
 			"directory " << BOX_FORMAT_OBJECTID(mObjectID) <<
 			" (" << rRemoteDirectoryPath << ")");
@@ -827,8 +827,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			std::string filenameClear;
 			try
 			{
-				filenameClear = DecryptFilename(en,
-					rRemotePath);
+				filenameClear = DecryptFilename(en, rRemotePath);
 				decryptedEntries[filenameClear] = en;
 			}
 			catch (CipherException &e)
@@ -863,8 +862,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			EMU_STRUCT_STAT st;
 			if(EMU_LSTAT(filename.c_str(), &st) != 0)
 			{
-				rNotifier.NotifyFileStatFailed(this, nonVssFilePath,
-					strerror(errno));
+				rNotifier.NotifyFileStatFailed(this, nonVssFilePath, strerror(errno));
 
 				// Report the error (logs and
 				// eventual email to administrator)
@@ -934,6 +932,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		
 		// If pDirOnStore == 0, then this must have been after an initial sync:
 		ASSERT(pDirOnStore != NULL || mInitialSyncDone);
+
 		// So, if pDirOnStore == 0, then we know that everything before syncPeriodStart
 		// is either on the server, or in the toupload list. If the directory had changed,
 		// we'd have got a directory listing.
@@ -1043,11 +1042,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			if(modTime > rParams.mSyncPeriodEnd)
 			{
 				box_time_t now = GetCurrentBoxTime();
-				int age = BoxTimeToSeconds(now -
-					modTime);
+				int age = BoxTimeToSeconds(now - modTime);
 				std::ostringstream s;
-				s << "modified too recently: only " <<
-					age << " seconds ago";
+				s << "modified too recently: only " << age << " seconds ago";
 				decisionReason = s.str();
 			}
 			else
@@ -1086,8 +1083,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			{
 				// Upload the file to the server, recording the
 				// object ID it returns
-				bool noPreviousVersionOnServer =
-					((pDirOnStore != 0) && (en == 0));
+				bool noPreviousVersionOnServer = ((pDirOnStore != 0) && (en == 0));
 				
 				// Surround this in a try/catch block, to
 				// catch errors, but still continue
@@ -1120,8 +1116,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// passed on to the main handler,
 					// retries would probably just cause
 					// more problems.
-					rNotifier.NotifyFileUploadException(
-						this, nonVssFilePath, e);
+					rNotifier.NotifyFileUploadException(this, nonVssFilePath, e);
 					throw;
 				}
 				catch(BoxException &e)
@@ -1146,10 +1141,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
 					// Log it.
-					SetErrorWhenReadingFilesystemObject(rParams,
-						nonVssFilePath);
-					rNotifier.NotifyFileUploadException(this,
-						nonVssFilePath, e);
+					SetErrorWhenReadingFilesystemObject(rParams, nonVssFilePath);
+					rNotifier.NotifyFileUploadException(this, nonVssFilePath, e);
 				}
 
 				// Update structures if the file was uploaded successfully:
@@ -1167,8 +1160,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				}
 				else
 				{
-					BOX_NOTICE("Upload failed, attempts remaining: " <<
-						retries);
+					BOX_NOTICE("Upload failed, attempts remaining: " << retries);
 				}
 			}
 
@@ -1209,9 +1201,9 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					BackupClientFileAttributes attr;
 					attr.ReadAttributes(filename,
 						false /* put mod times in the attributes, please */);
-					std::auto_ptr<IOStream> attrStream(
-						new MemBlockStream(attr));
-					connection.QuerySetReplacementFileAttributes(mObjectID, attributesHash, storeFilename, attrStream);
+					std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
+					connection.QuerySetReplacementFileAttributes(mObjectID,
+						attributesHash, storeFilename, attrStream);
 					fileSynced = true;
 				}
 				catch (BoxException &e)
@@ -1252,13 +1244,10 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		// Zero pointer in rEntriesLeftOver, if we have a pointer to zero
 		if(en != 0)
 		{
-			for(unsigned int l = 0; l < rEntriesLeftOver.size(); ++l)
+			auto i = std::find(rEntriesLeftOver.begin(), rEntriesLeftOver.end(), en);
+			if(i != rEntriesLeftOver.end())
 			{
-				if(rEntriesLeftOver[l] == en)
-				{
-					rEntriesLeftOver[l] = 0;
-					break;
-				}
+				*i = NULL;
 			}
 		}
 		
@@ -1357,8 +1346,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 		
 		// Get the local filename
 		std::string dirname(MakeFullPath(rLocalPath, *d));
-		std::string nonVssDirPath = ConvertVssPathToRealPath(dirname,
-			rBackupLocation);
+		std::string nonVssDirPath = ConvertVssPathToRealPath(dirname, rBackupLocation);
 	
 		// See if it's in the listing (if we have one)
 		BackupStoreFilenameClear storeFilename(*d);
@@ -1380,10 +1368,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			BackupProtocolCallable &connection(rContext.GetConnection());
 			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename);
 
-			std::string filenameClear = DecryptFilename(en,
-				rRemotePath);
-			rNotifier.NotifyFileDeleted(en->GetObjectID(),
-				filenameClear);
+			std::string filenameClear = DecryptFilename(en, rRemotePath);
+			rNotifier.NotifyFileDeleted(en->GetObjectID(), filenameClear);
 			
 			// Nothing found
 			en = 0;
@@ -1512,8 +1498,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 
 			try
 			{
-				filenameClear = DecryptFilename(en,
-					rRemotePath);
+				filenameClear = DecryptFilename(en, rRemotePath);
 			}
 			catch (CipherException &e)
 			{
@@ -1523,23 +1508,19 @@ bool BackupClientDirectoryRecord::UpdateItems(
 				isCorruptFilename = true;
 			}
 
-			std::string localName = MakeFullPath(rLocalPath,
-				filenameClear);
-			std::string nonVssLocalName = ConvertVssPathToRealPath(localName,
-				rBackupLocation);
+			std::string localName = MakeFullPath(rLocalPath, filenameClear);
+			std::string nonVssLocalName = ConvertVssPathToRealPath(localName, rBackupLocation);
 
 			// Delete this entry -- file or directory?
 			if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_File) != 0)
 			{
 				// Set a pending deletion for the file
-				rdel.AddFileDelete(mObjectID, en->GetName(),
-					localName);
+				rdel.AddFileDelete(mObjectID, en->GetName(), localName);
 			}
 			else if((en->GetFlags() & BackupStoreDirectory::Entry::Flags_Dir) != 0)
 			{
 				// Set as a pending deletion for the directory
-				rdel.AddDirectoryDelete(en->GetObjectID(),
-					localName);
+				rdel.AddDirectoryDelete(en->GetObjectID(), localName);
 				
 				// If there's a directory record for it in
 				// the sub directory map, delete it now
@@ -1553,8 +1534,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					mSubDirectories.erase(e);
 					delete rec;
 
-					BOX_TRACE("Deleted directory record for " <<
-						nonVssLocalName);
+					BOX_TRACE("Deleted directory record for " << nonVssLocalName);
 				}
 			}
 		}
@@ -1574,7 +1554,7 @@ BackupStoreDirectory::Entry* BackupClientDirectoryRecord::CheckForRename(
 	// We now know...
 	// 1) File has just been added
 	// 2) It's not in the store
-
+	
 	// Do we know about the inode number?
 	const BackupClientInodeToIDMap &idMap(context.GetCurrentIDMap());
 	int64_t prev_object_id = 0, prev_dir_id = 0;
@@ -1651,18 +1631,18 @@ BackupStoreDirectory::Entry* BackupClientDirectoryRecord::CheckForRename(
 			BOX_FORMAT_OBJECTID(mObjectID));
 		return NULL;
 	}
-
+		
 	// Rename the existing files (ie include old versions) on the server
 	connection.QueryMoveObject(prev_object_id, prev_dir_id,
 		mObjectID /* move to this directory */,
 		BackupProtocolMoveObject::Flags_MoveAllWithSameName |
 		BackupProtocolMoveObject::Flags_AllowMoveOverDeletedObject,
 		remote_filename);
-
+		
 	// Stop the attempt to delete the file in the original location
 	BackupClientDeleteList &rdelList(context.GetDeleteList());
 	rdelList.StopFileDeletion(prev_dir_id, prev_remote_name);
-
+	
 	BOX_TRACE(possible_prev_local_name << " appears to have been renamed to " <<
 		local_path_non_vss << ", so moving object " <<
 		BOX_FORMAT_OBJECTID(prev_object_id) << " from directory " <<
@@ -1675,7 +1655,7 @@ BackupStoreDirectory::Entry* BackupClientDirectoryRecord::CheckForRename(
 		0 /* size in blocks unknown, but not needed */,
 		BackupStoreDirectory::Entry::Flags_File, remote_attr_hash);
 }
-
+		
 int64_t BackupClientDirectoryRecord::CreateRemoteDir(const std::string& localDirPath,
 	const std::string& nonVssDirPath, const std::string& remoteDirPath,
 	BackupStoreFilenameClear& storeFilename, bool* pHaveJustCreatedDirOnServer,
@@ -1817,9 +1797,10 @@ int64_t BackupClientDirectoryRecord::CreateRemoteDir(const std::string& localDir
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(SyncParams &, BackupStoreDirectory *, int64_t, const std::string &)
+//		Name:    BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
+//		         SyncParams &, BackupStoreDirectory *, int64_t, const std::string &)
 //		Purpose: Called to resolve difficulties when a directory is found on the
-//				 store where a file is to be uploaded.
+//		         store where a file is to be uploaded.
 //		Created: 9/7/04
 //
 // --------------------------------------------------------------------------
@@ -1925,7 +1906,7 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 					rStoreFilename, diffFromID, *blockIndexStream,
 					connection.GetTimeout(),
 					&rContext, // DiffTimer implementation
-					0 /* not interested in the modification time */, 
+					0 /* not interested in the modification time */,
 					&isCompletelyDifferent,
 					rParams.mpBackgroundTask);
 
@@ -1970,15 +1951,13 @@ int64_t BackupClientDirectoryRecord::UploadFile(
 			// QueryStoreFile() doesn't delete the original
 			// stream (upload object) and we can retrieve
 			// the byte counter.
-			apWrappedStream.reset(new BufferedStream(
-				*apStreamToUpload));
+			apWrappedStream.reset(new BufferedStream(*apStreamToUpload));
 		}
 
 		// Send to store
 		std::auto_ptr<BackupProtocolSuccess> stored(
-			connection.QueryStoreFile(mObjectID, ModificationTime,
-				AttributesHash, diffFromID, rStoreFilename,
-				apWrappedStream));
+			connection.QueryStoreFile(mObjectID, ModificationTime, AttributesHash,
+				diffFromID, rStoreFilename, apWrappedStream));
 
 		rContext.SetNiceMode(false);
 
@@ -2136,13 +2115,13 @@ void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
 	int64_t iCount = 0;
 	rArchive.Read(iCount);
 
-	if (iCount != sizeof(mStateChecksum)/sizeof(mStateChecksum[0]))
+	if(iCount != sizeof(mStateChecksum)/sizeof(mStateChecksum[0]))
 	{
 		// we have some kind of internal system representation change: throw for now
 		THROW_EXCEPTION(CommonException, Internal)
 	}
 
-	for (int v = 0; v < iCount; v++)
+	for(int v = 0; v < iCount; v++)
 	{
 		// Load each checksum entry
 		rArchive.Read(mStateChecksum[v]);
@@ -2154,16 +2133,16 @@ void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
 	iCount = 0;
 	rArchive.Read(iCount);
 
-	if (iCount > 0)
+	if(iCount > 0)
 	{
 		// load each pending entry
 		mpPendingEntries = new std::map<std::string, box_time_t>;
-		if (!mpPendingEntries)
+		if(!mpPendingEntries)
 		{
 			throw std::bad_alloc();
 		}
 
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 		{
 			std::string strItem;
 			box_time_t btItem;
@@ -2180,9 +2159,9 @@ void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
 	iCount = 0;
 	rArchive.Read(iCount);
 
-	if (iCount > 0)
+	if(iCount > 0)
 	{
-		for (int v = 0; v < iCount; v++)
+		for(int v = 0; v < iCount; v++)
 		{
 			std::string strItem;
 			rArchive.Read(strItem);
@@ -2191,7 +2170,7 @@ void BackupClientDirectoryRecord::Deserialize(Archive & rArchive)
 				new BackupClientDirectoryRecord(0, "");
 			// will be deserialized anyway, give it id 0 for now
 
-			if (!pSubDirRecord)
+			if(!pSubDirRecord)
 			{
 				throw std::bad_alloc();
 			}
@@ -2227,12 +2206,12 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 	//
 	int64_t iCount = 0;
 
-	// when reading back the archive, we will 
+	// when reading back the archive, we will
 	// need to know how many items there are.
 	iCount = sizeof(mStateChecksum) / sizeof(mStateChecksum[0]);
-	rArchive.Write(iCount); 
+	rArchive.Write(iCount);
 
-	for (int v = 0; v < iCount; v++)
+	for(int v = 0; v < iCount; v++)
 	{
 		rArchive.Write(mStateChecksum[v]);
 	}
@@ -2240,7 +2219,7 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 	//
 	//
 	//
-	if (!mpPendingEntries)
+	if(!mpPendingEntries)
 	{
 		iCount = 0;
 		rArchive.Write(iCount);
@@ -2250,8 +2229,8 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 		iCount = mpPendingEntries->size();
 		rArchive.Write(iCount);
 
-		for (std::map<std::string, box_time_t>::const_iterator
-			i =  mpPendingEntries->begin(); 
+		for(std::map<std::string, box_time_t>::const_iterator
+			i  = mpPendingEntries->begin();
 			i != mpPendingEntries->end(); i++)
 		{
 			rArchive.Write(i->first);
@@ -2264,8 +2243,8 @@ void BackupClientDirectoryRecord::Serialize(Archive & rArchive) const
 	iCount = mSubDirectories.size();
 	rArchive.Write(iCount);
 
-	for (std::map<std::string, BackupClientDirectoryRecord*>::const_iterator
-		i =  mSubDirectories.begin(); 
+	for(std::map<std::string, BackupClientDirectoryRecord*>::const_iterator
+		i  = mSubDirectories.begin();
 		i != mSubDirectories.end(); i++)
 	{
 		const BackupClientDirectoryRecord* pSubItem = i->second;

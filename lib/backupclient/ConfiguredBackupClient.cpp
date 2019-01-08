@@ -158,6 +158,21 @@ std::auto_ptr<BackupProtocolLoginConfirmed> ConfiguredBackupClient::Login(int32_
 				"writing to the same account?");
 		}
 	}
+	else // mClientStoreMarker == ClientStoreMarker::NotKnown
+	{
+		// Can't change it if the connection is read-only:
+		if(!read_only)
+		{
+			// Choose a new pseudo-random client store marker. The current time will do:
+			box_time_t marker = GetCurrentBoxTime();
+
+			// Set it on the store
+			QuerySetClientStoreMarker(marker);
+
+			// Store it somewhere that the caller can access it:
+			ap_login_conf->SetClientStoreMarker(marker);
+		}
+	}
 
 	return ap_login_conf;
 }

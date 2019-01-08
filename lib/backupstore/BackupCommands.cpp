@@ -162,8 +162,18 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolLogin::DoCommand(BackupProtoc
 		return PROTOCOL_ERROR(Err_DisabledAccount);
 	}
 
-	// Get the last client store marker
-	int64_t clientStoreMarker = rContext.GetClientStoreMarker();
+	// Get the last client store marker. This now requires a read-write session (a lock on the
+	// filesystem). It doesn't make much sense to ask about the client store marker otherwise,
+	// as another client could take a lock and change it at any time.
+	int64_t clientStoreMarker;
+	if(mFlags & Flags_ReadOnly)
+	{
+		clientStoreMarker = ClientStoreMarker::NotKnown;
+	}
+	else
+	{
+		clientStoreMarker = rContext.GetClientStoreMarker();
+	}
 
 	// Mark the next phase
 	rContext.SetPhase(BackupStoreContext::Phase_Commands);

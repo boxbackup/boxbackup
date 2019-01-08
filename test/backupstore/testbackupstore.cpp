@@ -20,6 +20,7 @@
 #include "BackupAccountControl.h"
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientFileAttributes.h"
+#include "BackupConstants.h"
 #include "BackupDaemonConfigVerify.h"
 #include "BackupProtocol.h"
 #include "BackupStoreAccountDatabase.h"
@@ -2319,6 +2320,9 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 	TEST_THAT_OR(en, return false);
 	set_refcount(en->GetObjectID(), 0);
 	subdir.DeleteEntry(en->GetObjectID());
+
+	// Need a write lock to modify directories, so take it now:
+	fs.GetLock();
 	fs.PutDirectory(subdir);
 
 	enCopy.SetSizeInBlocks(get_disc_usage_in_blocks(true, subdirid, spec));
@@ -2377,6 +2381,7 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 	// Sleep to ensure that the directory file timestamp changes, so that
 	// the read-only connection will discard its cached copy.
 	safe_sleep(1);
+	fs.GetLock();
 	fs.PutDirectory(root);
 
 	TEST_EQUAL(1234, get_object_size(protocol_read_only, subdirid,
@@ -2460,7 +2465,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 	{
 		CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs_2, context_2, protocol_read_only,
 			true); // ReadOnly
-		TEST_EQUAL(0x8732523ab23aLL, protocol_read_only.GetClientStoreMarker());
+		TEST_EQUAL(ClientStoreMarker::NotKnown, protocol_read_only.GetClientStoreMarker());
 	}
 
 	// Try network connections too (but only for store tests):
@@ -2488,7 +2493,7 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 			std::auto_ptr<BackupProtocolLoginConfirmed> loginConf
 				(protocol_read_only_2.QueryLogin(0x01234567,
 					BackupProtocolLogin::Flags_ReadOnly));
-			TEST_EQUAL(0x8732523ab23aLL, loginConf->GetClientStoreMarker());
+			TEST_EQUAL(ClientStoreMarker::NotKnown, loginConf->GetClientStoreMarker());
 		}
 
 		TEST_THAT(StopServer());
@@ -2868,7 +2873,7 @@ bool test_bbstoreaccounts_create(RaidAndS3TestSpecs::Specialisation& spec)
 	TEST_EQUAL(1, info->GetNumDirectories());
 	TEST_EQUAL(true, info->IsAccountEnabled());
 	TEST_EQUAL(true, info->IsReadOnly());
-	TEST_EQUAL(0, info->GetClientStoreMarker());
+	TEST_THAT(info->GetClientStoreMarker() != 0);
 
 	BackupStoreDirectory root_dir;
 	fs.GetDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID, root_dir);
@@ -3433,7 +3438,8 @@ bool test_read_old_backupstoreinfo_files()
 	// expected properties, including any extra data for forward
 	// compatibility
 	extra_data.Seek(0, IOStream::SeekType_Absolute);
-	apInfoReadOnly = BackupStoreInfo::CreateForRegeneration(
+
+	std::auto_ptr<BackupStoreInfo> apNewInfo = BackupStoreInfo::CreateForRegeneration(
 		apInfoReadOnly->GetAccountID(), "spurtle" /* rAccountName */,
 		apInfoReadOnly->GetLastObjectIDUsed(),
 		apInfoReadOnly->GetBlocksUsed(),
@@ -3445,20 +3451,27 @@ bool test_read_old_backupstoreinfo_files()
 		apInfoReadOnly->GetBlocksHardLimit(),
 		false /* AccountEnabled */,
 		extra_data);
-	// CreateForRegeneration always sets the ClientStoreMarker to 0
+
+	// Update our expectations to match the new BackupStoreInfo created by
+	// CreateForRegeneration, which always sets the ClientStoreMarker to 0:
 	info_v1.mClientStoreMarker = 0;
-	// CreateForRegeneration does not store any deleted directories
+
+	// And does not store any deleted directories:
 	info_v1.mNumberDeletedDirectories = 0;
 
-	// check that the store info has the correct values in memory
+	// Check that the new store info has the expected values in memory:
 	TEST_THAT(
 		compare_backupstoreinfo_values_to_expected("stored by "
 			"BackupStoreInfo::CreateForRegeneration", info_v1,
-			*apInfoReadOnly, "spurtle", false /* AccountEnabled */,
+			*apNewInfo, "spurtle", false /* AccountEnabled */,
 			extra_data));
-	// Save the file and load again, check that the extra data is still there
-	fs.PutBackupStoreInfo(*apInfoReadOnly);
 
+	// Discard the current BackupStoreInfo (cached in the BackupFileSystem) and overwrite it
+	// with the new one:
+	fs.DiscardBackupStoreInfo(fs.GetBackupStoreInfo(true)); // ReadOnly
+	fs.PutBackupStoreInfo(*apNewInfo); // ReadOnly
+
+	// Then load again, and check that the extra data is still there:
 	apInfoReadOnly = fs.GetBackupStoreInfoUncached();
 	TEST_THAT(
 		compare_backupstoreinfo_values_to_expected("saved by "
@@ -3467,7 +3480,6 @@ bool test_read_old_backupstoreinfo_files()
 			extra_data));
 
 	// Delete the account to stop teardown_test_backupstore checking it for errors.
-	apInfoReadOnly.reset();
 	TEST_THAT(delete_account());
 
 	TEARDOWN_TEST_UNIFIED();
@@ -3664,6 +3676,7 @@ bool test_simpledb_locking(RaidAndS3TestSpecs::Specialisation& spec)
 			BackupStoreException, CouldNotLockStoreAccount);
 
 		// And that the lock was not disturbed
+		attributes = client.GetAttributes("boxbackup_locks", "localhost/subdir/");
 		TEST_THAT(test_equal_maps(expected, attributes));
 	}
 

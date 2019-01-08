@@ -58,13 +58,19 @@ public:
 		virtual int64_t GetChangeInBlocksUsedByOldFile() { return 0; }
 	};
 
-	BackupFileSystem() { }
+	BackupFileSystem() : mStoreIsDirty(false) { }
 	virtual ~BackupFileSystem() { }
 	static const int KEEP_TRYING_FOREVER = -1;
 	virtual void GetLock(int max_tries = 8);
 	virtual void ReleaseLock();
 	virtual bool HaveLock() = 0;
 	virtual int GetBlockSize() = 0;
+
+	// If the store is not dirty, then any change (write) will make it dirty, which sets the
+	// client store marker to a new unique value.
+	bool IsStoreDirty() const { return mStoreIsDirty; }
+	void SetStoreDirty();
+
 	virtual BackupStoreInfo& GetBackupStoreInfo(bool ReadOnly, bool Refresh = false);
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo) = 0;
 
@@ -106,8 +112,6 @@ public:
 	// automatically.
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db) = 0;
 
-	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0) = 0;
-	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut) = 0;
 	virtual void PutDirectory(BackupStoreDirectory& rDir) = 0;
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount,
@@ -115,6 +119,8 @@ public:
 	virtual std::auto_ptr<Transaction> PutFilePatch(int64_t ObjectID,
 		int64_t DiffFromFileID, IOStream& rPatchData,
 		BackupStoreRefCountDatabase::refcount_t refcount) = 0;
+
+	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0) = 0;
 	// GetObject() will retrieve either a file or directory, whichever exists.
 	// GetFile() and GetDirectory() are only guaranteed to work on objects of the
 	// correct type, but may be faster (depending on the implementation).
@@ -122,17 +128,22 @@ public:
 	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID) = 0;
 	virtual std::auto_ptr<IOStream> GetFilePatch(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain);
+	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut) = 0;
+
 	virtual std::auto_ptr<IOStream> GetBlockIndexReconstructed(int64_t ObjectID,
 		std::vector<int64_t>& rPatchChain);
+
 	virtual void DeleteFile(int64_t ObjectID) = 0;
 	virtual void DeleteDirectory(int64_t ObjectID) = 0;
 	virtual void DeleteObjectUnknown(int64_t ObjectID, bool missing_ok = false) = 0;
+
 	virtual bool CanMergePatchesEasily() = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
 		CombineFile(int64_t OlderPatchID, int64_t NewerFileID) = 0;
 	virtual std::auto_ptr<BackupFileSystem::Transaction>
 		CombineDiffs(int64_t OlderPatchID, int64_t NewerPatchID) = 0;
 	virtual std::string GetAccountIdentifier() = 0;
+
 	// Use of GetAccountID() is not recommended. It returns S3_FAKE_ACCOUNT_ID on
 	// S3BackupFileSystem.
 	virtual int GetAccountID() = 0;
@@ -172,13 +183,33 @@ public:
 		return mapPermanentRefCountDatabase.get();
 	}
 
+	// The client store marker is now checked and updated by BackupFileSystem. Not all clients
+	// cache state, and those that do not can ignore the marker completely.
+	//
+	// BackupFileSystem::SetStoreDirty, called on every write operation, will automatically
+	// update the marker to a new (different) value if the store is not already dirty, i.e. on
+	// the first write operation after GetLock()). This happens automatically even if the client
+	// does not use a cache, for example BackupStoreCheck and BackupQueries, to ensure that they
+	// automatically invalidate any cache in BackupDaemon.
+	//
+	// If the client caches state, then it should check the current marker value (in case it has
+	// changed) before calling ReleaseLock() (which resets it to ClientStoreMarker::NotKnown),
+	// save it along with the cached state, and check it again after re-acquiring the lock.
+
+	virtual int64_t GetClientStoreMarker() const = 0;
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker) = 0;
+
 	static const FileSystemCategory LOCKING;
 
 protected:
 	virtual void TryGetLock() = 0;
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly) = 0;
+
+	// mapBackupStoreInfo is owned by this BackupFileSystem and will be released and freed
+	// automatically:
 	std::auto_ptr<BackupStoreInfo> mapBackupStoreInfo;
-	// You can have one temporary and one permanent refcound DB open at any time,
+
+	// You can have one temporary and one permanent refcount DB open at any time,
 	// obtained with GetPotentialRefCountDatabase() and
 	// GetPermanentRefCountDatabase() respectively:
 	std::auto_ptr<BackupStoreRefCountDatabase> mapPotentialRefCountDatabase;
@@ -192,6 +223,9 @@ protected:
 	// any held references to it!
 	virtual void RefCountDatabaseAfterDiscard(BackupStoreRefCountDatabase& refcount_db);
 	virtual std::auto_ptr<IOStream> GetTemporaryFileStream(int64_t id) = 0;
+
+private:
+	bool mStoreIsDirty;
 };
 
 class RaidBackupFileSystem : public BackupFileSystem
@@ -276,6 +310,9 @@ public:
 	virtual CheckObjectsResult CheckObjects(bool fix_errors);
 	virtual void EnsureObjectIsPermanent(int64_t ObjectID, bool fix_errors);
 
+	virtual int64_t GetClientStoreMarker() const;
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker);
+
 protected:
 	virtual void TryGetLock();
 	virtual std::auto_ptr<BackupStoreInfo> GetBackupStoreInfoInternal(bool ReadOnly);
@@ -310,6 +347,7 @@ private:
 	S3Client& mrClient;
 	std::auto_ptr<SimpleDBClient> mapSimpleDBClient;
 	bool mHaveLock;
+	int64_t mClientStoreMarker;
 	std::string mSimpleDBDomain, mLockName, mLockValue, mCurrentUserName,
 		mCurrentHostName;
 	SimpleDBClient::str_map_t mLockAttributes;
@@ -333,13 +371,17 @@ public:
 		return mHaveLock;
 	}
 	virtual int GetBlockSize();
+
 	virtual void PutBackupStoreInfo(BackupStoreInfo& rInfo);
 	virtual BackupStoreRefCountDatabase& GetPotentialRefCountDatabase();
 	virtual BackupStoreRefCountDatabase& GetPermanentRefCountDatabase(bool ReadOnly);
 	virtual void SaveRefCountDatabase(BackupStoreRefCountDatabase& refcount_db);
+
 	virtual bool ObjectExists(int64_t ObjectID, int64_t *pRevisionID = 0);
 	virtual std::auto_ptr<IOStream> GetObject(int64_t ObjectID, bool required = true);
+	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
 	virtual void GetDirectory(int64_t ObjectID, BackupStoreDirectory& rDirOut);
+
 	virtual void PutDirectory(BackupStoreDirectory& rDir);
 	virtual std::auto_ptr<Transaction> PutFileComplete(int64_t ObjectID,
 		IOStream& rFileData, BackupStoreRefCountDatabase::refcount_t refcount,
@@ -350,7 +392,7 @@ public:
 	{
 		return PutFileComplete(ObjectID, rPatchData, refcount);
 	}
-	virtual std::auto_ptr<IOStream> GetFile(int64_t ObjectID);
+
 	virtual void DeleteFile(int64_t ObjectID);
 	virtual void DeleteDirectory(int64_t ObjectID);
 	virtual void DeleteObjectUnknown(int64_t ObjectID, bool missing_ok = false);
@@ -404,6 +446,9 @@ public:
 	{
 		// Filesystem is not transactional, so nothing to do here.
 	}
+
+	virtual int64_t GetClientStoreMarker() const;
+	virtual void SetClientStoreMarker(int64_t new_client_store_marker);
 
 protected:
 	virtual void TryGetLock();

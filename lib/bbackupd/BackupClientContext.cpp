@@ -126,45 +126,10 @@ BackupProtocolCallable &BackupClientContext::GetConnection()
 	{
 		mapConnection = GetConfiguredBackupClient(mrConfig);
 
-		// Login -- if this fails, the Protocol will exception
-		std::auto_ptr<BackupProtocolLoginConfirmed> ap_login_conf =
-			mapConnection->Login(false); // !read_only
-
+		// Login -- if this fails, the Protocol will exception.
 		// If reconnecting, check that the client store marker is the one we expect:
-		if(mClientStoreMarker != ClientStoreMarker::NotKnown)
-		{
-			if(ap_login_conf->GetClientStoreMarker() != mClientStoreMarker)
-			{
-				// Not good... finish the connection, abort, etc, ignoring errors
-				try
-				{
-					mapConnection->QueryFinished();
-				}
-				catch(...)
-				{
-					// IGNORE
-				}
-
-				// Then throw an exception about this
-				THROW_EXCEPTION_MESSAGE(BackupStoreException,
-					ClientMarkerNotAsExpected,
-					"Expected " << mClientStoreMarker <<
-					" but found " << ap_login_conf->GetClientStoreMarker() <<
-					": is someone else writing to the "
-					"same account?");
-			}
-		}
-		else // mClientStoreMarker == ClientStoreMarker::NotKnown
-		{
-			// Yes, choose one, the current time will do
-			box_time_t marker = GetCurrentBoxTime();
-			
-			// Set it on the store
-			mapConnection->QuerySetClientStoreMarker(marker);
-			
-			// Record it so that it can be picked up later.
-			mClientStoreMarker = marker;
-		}
+		std::auto_ptr<BackupProtocolLoginConfirmed> ap_login_conf =
+			mapConnection->Login(false, mClientStoreMarker); // !read_only
 
 		// Log success
 		BOX_INFO("Connection made, login successful");
@@ -215,8 +180,12 @@ void BackupClientContext::CloseAnyOpenConnection()
 	{
 		try
 		{
-			// Quit nicely:
-			pConnection->QueryFinished();
+			// Quit nicely. This command returns the new client store marker in its
+			// ObjectID, so save it:
+			mClientStoreMarker = pConnection->QueryFinished2()->GetObjectID();
+
+			// We should definitely have set a valid marker by this time:
+			ASSERT(mClientStoreMarker != ClientStoreMarker::NotKnown);
 		}
 		catch(...)
 		{

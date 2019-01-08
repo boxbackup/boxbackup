@@ -238,8 +238,14 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 		mapFileSystem->GetLock();
 	}
 
-	BackupStoreInfo info(AccountID, SoftLimit, HardLimit);
-	info.SetAccountName(AccountName);
+	{
+		BackupStoreInfo info(AccountID, SoftLimit, HardLimit);
+		info.SetAccountName(AccountName);
+
+		// We need to save the BackupStoreInfo now, so that PutDirectory() can call
+		// SetStoreDirty() to update its client store marker:
+		mapFileSystem->PutBackupStoreInfo(info);
+	}
 
 	// And an empty directory
 	BackupStoreDirectory rootDir(BACKUPSTORE_ROOT_DIRECTORY_ID,
@@ -248,6 +254,7 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	int64_t rootDirSize = rootDir.GetUserInfo1_SizeInBlocks();
 
 	// Update the store info to reflect the size of the root directory
+	BackupStoreInfo& info(mapFileSystem->GetBackupStoreInfo(false)); // !ReadOnly
 	info.ChangeBlocksUsed(rootDirSize);
 	info.ChangeBlocksInDirectories(rootDirSize);
 	info.AdjustNumDirectories(1);
@@ -265,6 +272,9 @@ int BackupAccountControl::CreateAccount(int32_t AccountID, int32_t SoftLimit,
 	BackupStoreRefCountDatabase& refcount(
 		mapFileSystem->GetPotentialRefCountDatabase());
 	refcount.Commit();
+
+	// Before it goes out of scope:
+	mapFileSystem->DiscardBackupStoreInfo(info);
 
 	return 0;
 }

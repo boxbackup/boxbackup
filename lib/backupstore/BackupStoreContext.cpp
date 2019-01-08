@@ -223,9 +223,6 @@ void BackupStoreContext::CleanUp()
 			// Save the store info, not delayed
 			SaveStoreInfo(false);
 		}
-		// Ask the BackupFileSystem to clear its BackupStoreInfo, so that we don't use
-		// a stale one if the Context is later reused.
-		mpFileSystem->DiscardBackupStoreInfo(info);
 
 		// Make sure the refcount database is saved too, and removed from the
 		// BackupFileSystem (in case it's modified before reopening).
@@ -238,6 +235,10 @@ void BackupStoreContext::CleanUp()
 			mpRefCount = NULL;
 		}
 	}
+
+	// Ask the BackupFileSystem to clear its BackupStoreInfo, so that we don't use
+	// a stale one if the Context is later reused.
+	mpFileSystem->DiscardBackupStoreInfo();
 
 	ReleaseWriteLock();
 
@@ -1733,7 +1734,10 @@ std::string BackupStoreContext::GetAccountIdentifier()
 // --------------------------------------------------------------------------
 int64_t BackupStoreContext::GetClientStoreMarker()
 {
-	return GetBackupStoreInfo().GetClientStoreMarker();
+	// This now requires a read-write session (a lock on the filesystem). It doesn't make much
+	// sense to ask about the client store marker otherwise, as another client could take a lock
+	// and change it at any time.
+	return mpFileSystem->GetClientStoreMarker();
 }
 
 
@@ -1784,8 +1788,7 @@ void BackupStoreContext::SetClientStoreMarker(int64_t ClientStoreMarker)
 		THROW_EXCEPTION(BackupStoreException, ContextIsReadOnly)
 	}
 
-	GetBackupStoreInfoInternal().SetClientStoreMarker(ClientStoreMarker);
-	SaveStoreInfo(false /* don't delay saving this */);
+	mpFileSystem->SetClientStoreMarker(ClientStoreMarker);
 }
 
 

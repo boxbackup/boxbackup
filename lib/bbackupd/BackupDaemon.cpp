@@ -65,6 +65,7 @@
 #include "BackupConstants.h"
 #include "BackupDaemon.h"
 #include "BackupDaemonConfigVerify.h"
+#include "BackupFileSystem.h"
 #include "BackupStoreConstants.h"
 #include "BackupStoreDirectory.h"
 #include "BackupStoreException.h"
@@ -774,7 +775,12 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 	{
 		OnBackupStart();
 		// Do sync
-		RunSyncNow();
+		std::auto_ptr<BackupClientContext> ap_client_context = RunSyncNow();
+		// If that didn't throw an exception, record the new client store marker:
+		ap_client_context->CloseAnyOpenConnection();
+		mClientStoreMarker = ap_client_context->GetClientStoreMarker();
+		// We should definitely have set a valid marker by this time:
+		ASSERT(mClientStoreMarker != ClientStoreMarker::NotKnown);
 	}
 	catch(BoxException &e)
 	{
@@ -1766,7 +1772,8 @@ void BackupDaemon::OnBackupFinish()
 			<< ", encoded size "
 			<< BackupStoreFile::msStats.mTotalFileStreamSize
 			<< ", " << mNumFilesUploaded << " files uploaded, "
-			<< mNumDirsCreated << " dirs created");
+			<< mNumDirsCreated << " dirs created, new client store marker "
+			<< mClientStoreMarker);
 
 		// Reset statistics again
 		BackupStoreFile::ResetStats();

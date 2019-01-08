@@ -113,12 +113,10 @@ void NamedLock::ReleaseLock()
 	bool success = true;
 
 #ifndef WIN32
-	// Delete the file. We need to do this before closing the filehandle,
-	// if we used flock() or fcntl() to lock it, otherwise someone could
-	// acquire the lock, release and delete it between us closing (and
-	// hence releasing) and deleting it, and we'd fail when it came to
-	// deleting the file. This happens in tests much more often than
-	// you'd expect!
+	// Delete the file. We need to do this before closing the filehandle, if we used flock() or
+	// fcntl() to lock it, otherwise someone could acquire the lock, release and delete it
+	// between us closing (and hence releasing) and deleting it, and we'd fail when it came to
+	// deleting the file. This happens in tests much more often than you'd expect!
 	//
 	// This doesn't apply on Windows (of course) because we can't delete the file while we still
 	// have it open. So we open it with the O_TEMPORARY flag so that it's deleted automatically

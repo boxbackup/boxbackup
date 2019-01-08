@@ -1124,8 +1124,10 @@ bool test_orphan_files_and_directories_unrecoverably(RaidAndS3TestSpecs::Special
 
 	int64_t dir1_id = getID("Test1/dir1");
 	int64_t dir2_id = getID("Test1/dir1/dir2");
+	fs.GetLock();
 	fs.DeleteDirectory(dir1_id);
 	fs.DeleteDirectory(dir2_id);
+	fs.ReleaseLock();
 	set_refcount(dir1_id, 0);
 	set_refcount(dir2_id, 0);
 

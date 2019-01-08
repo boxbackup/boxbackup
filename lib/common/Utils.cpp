@@ -259,6 +259,8 @@ void DumpStackBacktrace(const std::string& filename, size_t size, void * const *
 		if(result == 0)
 #endif
 		{
+			// This can also happen if HAVE_DLADDR is not defined (dladdr not found),
+			// in which case the reported error is likely to be 0 (Success).
 			BOX_LOG_NATIVE_WARNING("Failed to resolve "
 				"backtrace address " << array[i]);
 			output << "unresolved address " << array[i];

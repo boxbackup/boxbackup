@@ -904,8 +904,7 @@ bool compare_external(BackupQueries::ReturnCode::Type expected_status,
 }
 
 bool compare_in_process(BackupQueries::ReturnCode::Type expected_status,
-	BackupProtocolCallable& client,
-	const std::string& compare_options = "acQ")
+	BackupProtocolCallable& client, const std::string& compare_options = "acQ")
 {
 	std::auto_ptr<Configuration> config =
 		load_config_file(DEFAULT_BBACKUPD_CONFIG_FILE, BackupDaemonConfigVerify);
@@ -1168,7 +1167,7 @@ bool test_replace_zero_byte_file_with_nonzero_byte_file()
 		"backup/01234567/", 0, false);
 	MockBackupDaemon bbackupd(client);
 	TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"));
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_LOCAL(Compare_Same, client);
 
 	MemBlockStream stream("Hello world");
@@ -1176,7 +1175,7 @@ bool test_replace_zero_byte_file_with_nonzero_byte_file()
 	emptyFile.Close();
 	wait_for_operation(5, "f2 to be old enough");
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE_LOCAL(Compare_Same, client);
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -1854,7 +1853,7 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 
 	// Backup the initial files:
 	{
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
 		// BLOCK
@@ -1873,13 +1872,13 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 	// spacetest2.tgz, so we can ignore this for counting files after we
 	// unpack spacetest2.tgz.
 	TEST_THAT(::mkdir("testfiles/TestDir1/spacetest/d6/d8", 0755) == 0);
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_THAT(bbackupd.StorageLimitExceeded());
 
 	// BLOCK
 	{
 		TEST_THAT(unpack_files("spacetest2", "testfiles/TestDir1"));
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_THAT(bbackupd.StorageLimitExceeded());
 
 		// BLOCK
@@ -2052,7 +2051,7 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 
 		// Run another backup, now there should be enough space
 		// for everything we want to upload.
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
 		// Check that the contents of the store are the same
@@ -2086,7 +2085,7 @@ bool test_bbackupd_uploads_files()
 		// The files were all unpacked with timestamps in the past,
 		// so no delay should be needed to make them eligible to be
 		// backed up.
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -2456,7 +2455,7 @@ bool test_absolute_symlinks_not_followed_during_restore()
 		TEST_THAT(symlink("self", SYM_DIR "/self") == 0);
 
 		wait_for_operation(5, "symlinks to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		// Check that the backup was successful, i.e. no differences
 		TEST_COMPARE(Compare_Same);
@@ -2558,7 +2557,7 @@ bool test_redundant_locations_deleted_on_time()
 	// to the server.
 	{
 		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd-temploc.conf"));
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -2568,18 +2567,18 @@ bool test_redundant_locations_deleted_on_time()
 		TEST_THAT(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"));
 
 		// Initial run to start the countdown to destruction
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		// Not deleted yet!
 		TEST_THAT(search_for_file("Test2"));
 
 		wait_for_operation(9, "just before Test2 should be deleted");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_THAT(search_for_file("Test2"));
 
 		// Now wait until after it should be deleted
 		wait_for_operation(2, "just after Test2 should be deleted");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		TEST_THAT(search_for_file("Test2"));
 		std::auto_ptr<BackupProtocolCallable> client = connect_and_login(
@@ -2608,7 +2607,7 @@ bool test_read_only_dirs_can_be_restored()
 					0555) == 0);
 			#endif
 
-			bbackupd.RunSyncNow();
+			run_bbackupd_sync_with_logging(bbackupd);
 			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
 
 			// check that we can restore it
@@ -2748,7 +2747,7 @@ bool test_unicode_filenames_can_be_backed_up()
 			TEST_THAT(emu_utimes(filepath.c_str(), times) == 0);
 		}
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		// Compare to check that the file was uploaded
 		TEST_COMPARE(Compare_Same);
@@ -2986,7 +2985,7 @@ bool test_delete_update_and_symlink_files()
 {
 	SETUP_WITH_BBSTORED();
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3018,7 +3017,7 @@ bool test_delete_update_and_symlink_files()
 		// wait long enough for new files to be old enough to backup
 		wait_for_operation(5, "new files to be old enough");
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		// compare to make sure that it worked
 		TEST_COMPARE(Compare_Same);
@@ -3210,8 +3209,7 @@ bool test_store_error_reporting(RaidAndS3TestSpecs::Specialisation& spec)
 		TEST_COMPARE_SPECIALISED(spec, Compare_Different);
 
 		// Test initial state
-		TEST_THAT(!TestFileExists("testfiles/"
-			"notifyran.backup-start.wait-automatic.1"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.wait-automatic.1"));
 
 		// Set a tag for the notify script to distinguish from
 		// previous runs.
@@ -3230,16 +3228,14 @@ bool test_store_error_reporting(RaidAndS3TestSpecs::Specialisation& spec)
 		wait_for_operation(BACKUP_ERROR_DELAY_SHORTENED - 1 -
 			BoxTimeToMilliSeconds(GetCurrentBoxTime() - last_run_finish_time) / 1000.0,
 			"just before bbackupd recovers");
-		TEST_THAT(!TestFileExists("testfiles/"
-			"notifyran.backup-start.wait-automatic.1"));
+		TEST_THAT(!TestFileExists("testfiles/notifyran.backup-start.wait-automatic.1"));
 
 		// Should not have backed up, should still get errors
 		TEST_COMPARE_SPECIALISED(spec, Compare_Different);
 
 		// wait another 3 seconds, bbackup should have run
 		wait_for_operation(3, "bbackupd to recover");
-		TEST_THAT(TestFileExists("testfiles/"
-			"notifyran.backup-start.wait-automatic.1"));
+		TEST_THAT(TestFileExists("testfiles/notifyran.backup-start.wait-automatic.1"));
 
 		// Check that it did get uploaded, and we have no more errors
 		TEST_COMPARE_SPECIALISED(spec, Compare_Same);
@@ -3260,7 +3256,7 @@ bool test_change_file_to_symlink_and_back()
 			"testfiles/TestDir1/symlink-to-dir") == 0);
 #endif
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3283,7 +3279,7 @@ bool test_change_file_to_symlink_and_back()
 #endif
 
 		wait_for_operation(5, "files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// And the inverse, replace a directory with a file/symlink
@@ -3300,7 +3296,7 @@ bool test_change_file_to_symlink_and_back()
 #endif
 
 		wait_for_operation(5, "files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// And then, put it back to how it was before.
@@ -3319,7 +3315,7 @@ bool test_change_file_to_symlink_and_back()
 #endif
 
 		wait_for_operation(5, "files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// And finally, put it back to how it was before
@@ -3338,7 +3334,7 @@ bool test_change_file_to_symlink_and_back()
 #endif
 
 		wait_for_operation(5, "files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -3348,7 +3344,7 @@ bool test_change_file_to_symlink_and_back()
 bool test_file_rename_tracking()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3368,8 +3364,12 @@ bool test_file_rename_tracking()
 
 		// back up both files
 		wait_for_operation(5, "untracked files to be old enough");
-		bbackupd.RunSyncNow();
-		TEST_COMPARE(Compare_Same);
+		run_bbackupd_sync_with_logging(bbackupd);
+
+		BackupProtocolLocal2 protocol(0x01234567, "test",
+			"backup/01234567/", 0, false);
+		TEST_COMPARE_LOCAL(Compare_Same, protocol);
+		protocol.QueryFinished();
 
 #ifdef WIN32
 		TEST_THAT(EMU_UNLINK("testfiles/TestDir1/untracked-2") == 0);
@@ -3380,7 +3380,7 @@ bool test_file_rename_tracking()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/untracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/untracked-2"));
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// case which went wrong: rename a tracked file over an
@@ -3403,7 +3403,7 @@ bool test_file_rename_tracking()
 
 		// wait for them to be old enough to back up
 		wait_for_operation(5, "tracked files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 #ifdef WIN32
@@ -3415,7 +3415,7 @@ bool test_file_rename_tracking()
 		TEST_THAT(!TestFileExists("testfiles/TestDir1/tracked-1"));
 		TEST_THAT( TestFileExists("testfiles/TestDir1/tracked-2"));
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// case which went wrong: rename a tracked file
@@ -3425,7 +3425,7 @@ bool test_file_rename_tracking()
 		TEST_THAT(::rename("testfiles/TestDir1/df9834.dsf",
 			"testfiles/TestDir1/x1/dsfdsfs98.fd") == 0);
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// Check that no read error has been reported yet
@@ -3441,7 +3441,7 @@ bool test_file_rename_tracking()
 bool test_upload_very_old_files()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3456,7 +3456,7 @@ bool test_upload_very_old_files()
 #endif
 
 		// Wait and test
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// Check that no read error has been reported yet
@@ -3500,7 +3500,7 @@ bool test_upload_very_old_files()
 		}
 
 		// Wait and test
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same); // files too new?
 
 		// Check that no read error has been reported yet
@@ -3528,7 +3528,7 @@ bool test_excluded_files_are_not_backed_up(RaidAndS3TestSpecs::Specialisation& s
 	{
 		// Add some files and directories which are marked as excluded
 		TEST_THAT(unpack_files("testexclude"));
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 
 		// compare with exclusions, should not find differences
 		TEST_COMPARE_SPECIALISED(spec, Compare_Same)
@@ -3708,7 +3708,7 @@ bool test_continuously_updated_file()
 bool test_delete_dir_change_attribute()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3727,7 +3727,7 @@ bool test_delete_dir_change_attribute()
 
 		TEST_COMPARE(Compare_Different);
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -3737,7 +3737,7 @@ bool test_delete_dir_change_attribute()
 bool test_restore_files_and_directories()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3826,7 +3826,7 @@ bool test_compare_detects_attribute_changes()
 {
 	SETUP_WITH_BBSTORED();
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	// TODO FIXME dedent
@@ -3889,7 +3889,7 @@ bool test_compare_detects_attribute_changes()
 bool test_sync_new_files()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3910,11 +3910,11 @@ bool test_sync_new_files()
 		}
 		
 		// At least one file is too new to be backed up on the first run.
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Different);
 
 		wait_for_operation(5, "newly added files to be old enough");
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -3927,7 +3927,7 @@ bool test_rename_operations()
 
 	TEST_THAT(unpack_files("test2"));
 	TEST_THAT(unpack_files("test3"));
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	// TODO FIXME dedent
@@ -3936,7 +3936,7 @@ bool test_rename_operations()
 		TEST_THAT(rename("testfiles/TestDir1/sub23/dhsfdss",
 			"testfiles/TestDir1/renamed-dir") == 0);
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 
 		// and again, but with quick flag
@@ -3948,7 +3948,7 @@ bool test_rename_operations()
 		TEST_THAT(rename("testfiles/TestDir1/sub23/find2perl",
 			"testfiles/TestDir1/find2perl-ren") == 0);
 
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		TEST_COMPARE(Compare_Same);
 	}
 
@@ -3959,7 +3959,7 @@ bool test_rename_operations()
 bool test_sync_files_with_timestamps_in_future()
 {
 	SETUP_WITH_BBSTORED();
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	// TODO FIXME dedent
 	{
@@ -3982,7 +3982,7 @@ bool test_sync_files_with_timestamps_in_future()
 		}
 
 		// Wait and test
-		bbackupd.RunSyncNow();
+		run_bbackupd_sync_with_logging(bbackupd);
 		wait_for_backup_operation("bbackup to sync future file");
 		TEST_COMPARE(Compare_Same);
 	}
@@ -4129,7 +4129,7 @@ bool test_interrupted_restore_can_be_recovered(RaidAndS3TestSpecs::Specialisatio
 {
 	SETUP_TEST_SPECIALISED_BBACKUPD(spec);
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, rwContext, protocol, true); // ReadOnly
@@ -4198,7 +4198,7 @@ bool test_restore_deleted_files()
 {
 	SETUP_WITH_BBSTORED();
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	TEST_THAT(EMU_UNLINK("testfiles/TestDir1/f1.dat") == 0);
@@ -4209,7 +4209,7 @@ bool test_restore_deleted_files()
 #endif
 	TEST_COMPARE(Compare_Different);
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 	TEST_THAT(assert_x1_deleted_or_not(true));
 
@@ -4288,7 +4288,7 @@ bool test_locked_file_behaviour()
 			// now close the file and check that it is
 			// backed up on the next run.
 			CloseHandle(handle);
-			bbackupd.RunSyncNow();
+			run_bbackupd_sync_with_logging(bbackupd);
 
 			// still no read errors?
 			TEST_THAT(!TestFileExists("testfiles/"
@@ -4326,7 +4326,7 @@ bool test_backup_many_files()
 	unpack_files("spacetest1", "testfiles/TestDir1");
 	unpack_files("spacetest2", "testfiles/TestDir1");
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 	TEST_COMPARE(Compare_Same);
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -4455,7 +4455,7 @@ bool test_bbackupd_config_script()
 			"testfiles/tmp/bbackupd.conf")
 		);
 
-	bbackupd.RunSyncNow();
+	run_bbackupd_sync_with_logging(bbackupd);
 
 	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
 		"", "-acQ", "testfiles/tmp/bbackupd.conf"));

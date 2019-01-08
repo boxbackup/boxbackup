@@ -842,6 +842,7 @@ __E
 				return $current_value;
 			}
 			@prefixed_inputs  = map {canonicalise($_)} (@prefixed_inputs);
+			@prefixed_outputs = map {canonicalise($_)} (@prefixed_outputs);
 
 			# Delegate to the extra sub-makefile:
 			print MASTER_MAKEFILE "\n";

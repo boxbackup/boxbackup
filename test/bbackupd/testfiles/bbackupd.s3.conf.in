@@ -37,12 +37,9 @@ KeepAliveTime = 1
 
 ExtendedLogging = no
 ExtendedLogFile = testfiles/bbackupd.log
-# LogAllFileAccess = yes
+LogAllFileAccess = yes
 
 CommandSocket = testfiles/bbackupd.sock
-
-NotifyScript    = @TARGET_PERL@ testfiles/notifyscript.pl
-SyncAllowScript = @TARGET_PERL@ testfiles/syncallowscript.pl
 
 Server
 {

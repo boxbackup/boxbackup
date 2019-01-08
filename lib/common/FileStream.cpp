@@ -245,7 +245,6 @@ void FileStream::OpenFile(int orig_flags, int mode, lock_mode_t lock_mode, bool 
 	{
 #ifdef BOX_LOCK_TYPE_FLOCK
 		BOX_TRACE("Trying to lock " << mFileName << " with " << lock_message);
-		int flock_op;
 		int flock_flags = (lock_mode == SHARED ? LOCK_SH : LOCK_EX);
 		if(!wait_for_lock)
 		{

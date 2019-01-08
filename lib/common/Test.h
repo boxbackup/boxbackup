@@ -36,15 +36,17 @@
 #define BBSTORED        "..\\..\\bin\\bbstored\\bbstored.exe"
 #define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
 #define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
-#define TEST_RETURN(actual, expected) TEST_EQUAL(expected, actual);
+#define TEST_RETURN_OR(actual, expected, or_command) TEST_EQUAL_OR(expected, actual, or_command);
 #else
 #define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
 #define BBACKUPD        "../../bin/bbackupd/bbackupd"
 #define BBSTORED        "../../bin/bbstored/bbstored"
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
-#define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
+#define TEST_RETURN_OR(actual, expected, or_command) TEST_EQUAL_OR((expected << 8), actual, or_command);
 #endif
+
+#define TEST_RETURN(actual, expected) TEST_RETURN_OR(actual, expected,)
 
 #define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
 #define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
