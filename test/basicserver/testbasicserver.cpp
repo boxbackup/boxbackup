@@ -15,18 +15,17 @@
 
 #include <typeinfo>
 
-#include "Test.h"
-#include "Daemon.h"
-#include "Configuration.h"
-#include "ServerStream.h"
-#include "SocketStream.h"
-#include "IOStreamGetLine.h"
-#include "ServerTLS.h"
 #include "CollectInBufferStream.h"
-
+#include "Configuration.h"
+#include "Daemon.h"
+#include "IOStreamGetLine.h"
+#include "ServerControl.h"
+#include "ServerStream.h"
+#include "ServerTLS.h"
+#include "SocketStream.h"
+#include "Test.h"
 #include "TestContext.h"
 #include "autogen_TestProtocol.h"
-#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 

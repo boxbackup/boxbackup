@@ -34,6 +34,9 @@ public:
 private:
 };
 
+#define EXCEPTION_IS_TYPE(exception_obj, type, subtype) \
+	(exception_obj.GetType() == type::ExceptionType && \
+	exception_obj.GetSubType() == type::subtype)
 
 #endif // BOXEXCEPTION__H
 
