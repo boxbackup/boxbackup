@@ -12,15 +12,32 @@
 // do not include MinGW's dirent.h on Win32, 
 // as we override some of it in lib/win32.
 
+#include <limits.h>
+#include <stdio.h>
+#include <string.h>
+
 #ifndef WIN32
 	#include <dirent.h>
 #endif
 
-#include <stdio.h>
-#include <sys/types.h>
+#ifdef WIN32
+	#include <process.h>
+#endif
+
+#ifdef HAVE_PWD_H
+	#include <pwd.h>
+#endif
+
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
+#endif
+
 #include <sys/stat.h>
-#include <limits.h>
-#include <string.h>
+#include <sys/types.h>
+
+#ifdef HAVE_SYSCALL
+	#include <sys/syscall.h>
+#endif
 
 #ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
@@ -31,19 +48,7 @@
 	#include <sys/xattr.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
-	#include <signal.h>
-#endif
-
-#ifdef WIN32
-	#include <process.h>
-#endif
-
 #include <map>
-
-#ifdef HAVE_SYSCALL
-	#include <sys/syscall.h>
-#endif
 
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientContext.h"
@@ -410,7 +415,8 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 }
 
 bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_files = true,
-	bool do_start_bbstored = true)
+	bool do_start_bbstored = true,
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	Timers::Cleanup(false); // don't throw exception if not initialised
 	Timers::Init();
@@ -451,8 +457,7 @@ bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_file
 		#endif
 	}
 
-	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
-		FAIL);
+	TEST_THAT_OR(configure_bbackupd(bbackupd, bbackupd_conf_file), FAIL);
 	spDaemon = &bbackupd;
 	return true;
 }
@@ -967,13 +972,14 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 
 bool compare_external(BackupQueries::ReturnCode::Type expected_status,
 	const std::string& bbackupquery_options = "",
-	const std::string& compare_options = "-acQ")
+	const std::string& compare_options = "-acQ",
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	std::string cmd = BBACKUPQUERY;
 	cmd += " ";
 	cmd += (expected_status == BackupQueries::ReturnCode::Compare_Same)
 		? "-Wwarning" : "-Werror";
-	cmd += " -c testfiles/bbackupd.conf ";
+	cmd += " -c " + bbackupd_conf_file;
 	cmd += " " + bbackupquery_options;
 	cmd += " \"compare " + compare_options + "\" quit";
 
@@ -4032,6 +4038,105 @@ bool test_parse_syncallowscript_output()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+bool test_bbackupd_config_script()
+{
+	SETUP_TEST_BBACKUPD();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform"); // TODO: write a PowerShell version
+#else
+	char buf[PATH_MAX];
+	if (getcwd(buf, sizeof(buf)) == NULL)
+	{
+		BOX_LOG_SYS_ERROR("getcwd");
+	}
+	std::string current_dir = buf;
+
+	TEST_THAT(mkdir("testfiles/tmp", 0777) == 0);
+	TEST_THAT(mkdir("testfiles/TestDir1", 0777) == 0);
+
+	// Generate a new configuration for our test bbackupd, from scratch:
+	std::string cmd = "../../../bin/bbackupd/bbackupd-config " +
+		current_dir + "/testfiles/tmp " // config-dir
+		"lazy " // backup-mode
+		"12345 " // account-num
+		"localhost " + // server-hostname
+		current_dir + "/testfiles " + // working-dir
+		current_dir + "/testfiles/TestDir1"; // backup directories
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	// Open the generated config file and add a StorePort line:
+	{
+		FileStream conf_file("testfiles/tmp/bbackupd.conf", O_WRONLY | O_APPEND);
+		conf_file.Write("StorePort = 22011\n");
+		conf_file.Close();
+	}
+
+	// Generate a new configuration for our test bbstored, from scratch:
+	struct passwd *result = getpwuid(getuid());
+	TEST_THAT_OR(result != NULL, FAIL); // failed to get username for current user
+	std::string username = result->pw_name;
+
+	cmd = "../../../bin/bbstored/bbstored-config testfiles/tmp localhost " + username + " "
+		"testfiles/raidfile.conf";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
+		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
+		"testfiles/tmp/bbstored.conf";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	// Create a server certificate authority, and sign the client and server certificates:
+	cmd = "../../../bin/bbstored/bbstored-certs testfiles/ca init";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign "
+		"testfiles/tmp/bbackupd/12345-csr.pem";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign-server "
+		"testfiles/tmp/bbstored/localhost-csr.pem";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	// Copy the certificate files into the right places
+	cmd = "cp testfiles/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "cp testfiles/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "cp testfiles/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = "cp testfiles/ca/roots/clientCA.pem testfiles/tmp/bbstored";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = BBSTOREACCOUNTS " -c testfiles/tmp/bbstored.conf create 12345 0 1M 2M";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + bbstored_args +
+		" testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid", 22011);
+
+	BackupDaemon bbackupd;
+	TEST_THAT(
+		prepare_test_with_client_daemon(
+			bbackupd,
+			true, // do_unpack_files
+			false, // !do_start_bbstored
+			"testfiles/tmp/bbackupd.conf")
+		);
+
+	bbackupd.RunSyncNow();
+
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
+		"", "-acQ", "testfiles/tmp/bbackupd.conf"));
+
+	TEST_THAT(StopServer());
+#endif
+
+	TEARDOWN_TEST_BBACKUPD();
+}
+
 int test(int argc, const char *argv[])
 {
 	// SSL library
@@ -4097,6 +4202,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_backup_many_files());
 	TEST_THAT(test_parse_incomplete_command());
 	TEST_THAT(test_parse_syncallowscript_output());
+	TEST_THAT(test_bbackupd_config_script());
 
 	TEST_THAT(kill_running_daemons());
 

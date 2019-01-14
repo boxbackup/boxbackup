@@ -229,7 +229,7 @@ bool KillServer(int pid, bool WaitForProcess)
 	return !ServerIsAlive(pid);
 }
 
-bool KillServer(std::string pid_file, bool WaitForProcess)
+bool KillServer(const std::string& pid_file, bool WaitForProcess)
 {
 	FileStream fs(pid_file);
 	IOStreamGetLine getline(fs);

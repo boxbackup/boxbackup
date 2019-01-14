@@ -97,6 +97,8 @@ bool setUp(const char* function_name)
 		if(StartsWith("TestDir", filename) ||
 			StartsWith("0_", filename) ||
 			filename == "accounts.txt" ||
+			filename == "bbackupd-data" ||
+			filename == "ca" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
@@ -105,7 +107,9 @@ bool setUp(const char* function_name)
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
-			EndsWith("testfile", filename))
+			EndsWith("testfile", filename) ||
+			filename == "tmp" ||
+			EndsWith(".qdbm", filename))
 		{
 			std::string filepath = std::string("testfiles\\") + filename;
 
