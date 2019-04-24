@@ -23,6 +23,7 @@
 #define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
 #define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
 #define TEST_RETURN(actual, expected) TEST_EQUAL(expected, actual);
+#define TEST_RETURN_COMMAND(actual, expected, command) TEST_EQUAL_LINE(expected, actual, command);
 #else
 #define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
 #define BBACKUPD        "../../bin/bbackupd/bbackupd"
@@ -30,6 +31,7 @@
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
 #define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
+#define TEST_RETURN_COMMAND(actual, expected, command) TEST_EQUAL_LINE((expected << 8), actual, command);
 #endif
 
 #define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
@@ -39,7 +41,6 @@
 extern int num_failures;
 extern int first_fail_line;
 extern int num_tests_selected;
-extern int old_failure_count;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 extern std::list<std::string> run_only_named_tests;

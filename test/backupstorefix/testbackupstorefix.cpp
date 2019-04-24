@@ -671,8 +671,12 @@ int test(int argc, const char *argv[])
 		char name[256];
 		while(::fgets(line, sizeof(line), f) != 0)
 		{
-			TEST_THAT(::sscanf(line, "%x %s %s", &id, 
-				flags, name) == 3);
+			if(StartsWith("WARNING: SSLSecurityLevel not set.", line))
+			{
+				continue;
+			}
+			TEST_EQUAL_LINE(3, ::sscanf(line, "%x %s %s", &id, flags, name),
+				"Unexpected format in initial-listing.txt: <" << line << ">");
 			bool isDir = (::strcmp(flags, "-d---") == 0);
 			//TRACE3("%x,%d,%s\n", id, isDir, name);
 			MEMLEAKFINDER_NO_LEAKS;

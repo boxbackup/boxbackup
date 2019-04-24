@@ -28,7 +28,7 @@
 
 int num_tests_selected = 0;
 int num_failures = 0;
-int old_failure_count = 0;
+static int old_failure_count = 0; // do not expose!
 int first_fail_line;
 std::string original_working_dir;
 std::string first_fail_file;
@@ -98,6 +98,8 @@ bool setUp(const char* function_name)
 			StartsWith("0_", filename) ||
 			filename == "accounts.txt" ||
 			filename == "bbackupd-data" ||
+			filename == "bbackupquery.log" ||
+			filename == "bbstored.log" ||
 			filename == "ca" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
@@ -205,7 +207,8 @@ bool setUp(const char* function_name)
 		"testfiles/restore* testfiles/bbackupd-data "
 		"testfiles/syncallowscript.control "
 		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
+		"testfiles/test2.downloaded "
+		"testfiles/tmp "
 		) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 #endif

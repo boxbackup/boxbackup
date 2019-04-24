@@ -169,7 +169,7 @@ if(!-f $private_key)
 if(!-f $certificate_request)
 {
 	die "Couldn't run openssl for CSR generation" unless
-		open(CSR,"|openssl req -new -key $private_key -sha1 -out $certificate_request");
+		open(CSR,"|openssl req -new -key $private_key -sha256 -out $certificate_request");
 	print CSR <<__E;
 .
 .
@@ -316,6 +316,21 @@ DataDirectory = $working_dir
 NotifyScript = $notify_script
 
 __E
+
+if("@HAVE_SSL_CTX_SET_SECURITY_LEVEL@" eq "1")
+{
+	print CONFIG <<__E;
+# Box Backup compiled with support for SSLSecurityLevel
+SSLSecurityLevel = 2
+__E
+}
+else
+{
+	print CONFIG <<__E;
+# Box Backup compiled without support for SSLSecurityLevel
+# SSLSecurityLevel = 2
+__E
+}
 
 if($backup_mode eq 'lazy')
 {

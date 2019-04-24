@@ -4038,6 +4038,56 @@ bool test_parse_syncallowscript_output()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+bool check_output_log_file_for_ssl_security_level_warnings(const std::string& log_file_name,
+	const std::string& sentinel_value)
+{
+	int old_num_failures = num_failures;
+
+	FileStream fs(log_file_name, O_RDONLY);
+	IOStreamGetLine getline(fs);
+	std::string line;
+	bool found_not_set = false, found_not_supported = false, found_sentinel = false;
+
+	while(fs.StreamDataLeft())
+	{
+		TEST_THAT(getline.GetLine(line, true, 30000)); // 30 seconds should be enough
+		TEST_THAT(line.size() >= 30);
+		if(line.size() < 30)
+		{
+			continue;
+		}
+
+		if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+			"be secure.", line.substr(30)))
+		{
+			found_not_set = true;
+		}
+		else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+			"is not compiled with OpenSSL 1.1 or higher", line.substr(30)))
+		{
+			found_not_supported = true;
+		}
+		else if(StartsWith(sentinel_value, line.substr(30)))
+		{
+			found_sentinel = true;
+			break;
+		}
+	}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+	TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+	TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+	TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+
+	TEST_THAT(found_sentinel); // Otherwise we're looking for the wrong thing!
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+
 bool test_bbackupd_config_script()
 {
 	SETUP_TEST_BBACKUPD();
@@ -4079,60 +4129,99 @@ bool test_bbackupd_config_script()
 
 	cmd = "../../../bin/bbstored/bbstored-config testfiles/tmp localhost " + username + " "
 		"testfiles/raidfile.conf";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
 		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
 		"testfiles/tmp/bbstored.conf";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	// Create a server certificate authority, and sign the client and server certificates:
-	cmd = "../../../bin/bbstored/bbstored-certs testfiles/ca init";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "../../../bin/bbstored/bbstored-certs testfiles/tmp/ca init";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign "
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign "
 		"testfiles/tmp/bbackupd/12345-csr.pem";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign-server "
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign-server "
 		"testfiles/tmp/bbstored/localhost-csr.pem";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	// Copy the certificate files into the right places
-	cmd = "cp testfiles/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/roots/clientCA.pem testfiles/tmp/bbstored";
+	cmd = "cp testfiles/tmp/ca/roots/clientCA.pem testfiles/tmp/bbstored";
 	TEST_RETURN(system(cmd.c_str()), 0)
 
 	cmd = BBSTOREACCOUNTS " -c testfiles/tmp/bbstored.conf create 12345 0 1M 2M";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + bbstored_args +
-		" testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid", 22011);
+		" -o testfiles/tmp/bbstored.log testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid",
+		22011);
 
-	BackupDaemon bbackupd;
-	TEST_THAT(
-		prepare_test_with_client_daemon(
-			bbackupd,
-			true, // do_unpack_files
-			false, // !do_start_bbstored
-			"testfiles/tmp/bbackupd.conf")
-		);
+	{
+		Capture capture;
+		Logging::TempLoggerGuard guard(&capture);
 
-	bbackupd.RunSyncNow();
+		BackupDaemon bbackupd;
+		TEST_THAT(
+			prepare_test_with_client_daemon(
+				bbackupd,
+				true, // do_unpack_files
+				false, // !do_start_bbstored
+				"testfiles/tmp/bbackupd.conf")
+			);
+
+		bbackupd.RunSyncNow();
+
+		std::vector<Capture::Message> messages = capture.GetMessages();
+		TEST_THAT(!messages.empty());
+		if (!messages.empty())
+		{
+			bool found_not_set = false, found_not_supported = false;
+			for(std::vector<Capture::Message>::iterator i = messages.begin();
+				i != messages.end(); i++)
+			{
+				if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+					"be secure.", i->message))
+				{
+					found_not_set = true;
+				}
+				else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+					"is not compiled with OpenSSL 1.1 or higher", i->message))
+				{
+					found_not_supported = true;
+				}
+			}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+			TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+			TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+			TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+			TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+		}
+	}
 
 	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
-		"", "-acQ", "testfiles/tmp/bbackupd.conf"));
+		"-otestfiles/tmp/bbackupquery.log", "-acQ", "testfiles/tmp/bbackupd.conf"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbackupquery.log",
+		"Connecting to store"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbstored.log",
+		"Forked child process"));
 
 	TEST_THAT(StopServer());
-#endif
+#endif // !WIN32
 
 	TEARDOWN_TEST_BBACKUPD();
 }

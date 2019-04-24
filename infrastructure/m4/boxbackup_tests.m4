@@ -128,6 +128,7 @@ AC_CHECK_FUNCS([dlsym dladdr])
 AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
 AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
 AX_CHECK_SSL(, [AC_MSG_ERROR([[OpenSSL is not installed but is required]])])
+AC_CHECK_DECLS([SSL_R_EE_KEY_TOO_SMALL],,, [[#include <openssl/ssl.h>]])
 AC_ARG_ENABLE(
   [old-ssl],
   [AC_HELP_STRING([--enable-old-ssl],
@@ -142,7 +143,8 @@ AC_SEARCH_LIBS(
 Upgrade or read the documentation for alternatives]])
   fi
   ])
-
+AC_CHECK_FUNCS([SSL_CTX_set_security_level], [HAVE_SSL_CTX_SET_SECURITY_LEVEL=1])
+AC_SUBST([HAVE_SSL_CTX_SET_SECURITY_LEVEL])
 
 ### Checks for header files.
 

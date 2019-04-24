@@ -579,8 +579,9 @@ void BackupDaemon::InitCrypto()
 	std::string certFile(conf.GetKeyValue("CertificateFile"));
 	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
 	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
+	int ssl_security_level(conf.GetKeyValueInt("SSLSecurityLevel"));
 	mTlsContext.Initialise(false /* as client */, certFile.c_str(),
-		keyFile.c_str(), caFile.c_str());
+		keyFile.c_str(), caFile.c_str(), ssl_security_level);
 	
 	// Set up the keys for various things
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile"));

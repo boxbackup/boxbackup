@@ -306,7 +306,16 @@ public:
 						#endif // !WIN32
 							// Just handle in this process
 							SetProcessTitle("handling");
-							HandleConnection(connection);
+							try
+							{
+								HandleConnection(connection);
+							}
+							catch(BoxException &e)
+							{
+								BOX_ERROR("Error in child handler, terminating connection: "
+									"exception " << e.what() << "(" << e.GetType() << "/" <<
+									e.GetSubType() << ")");
+							}
 							SetProcessTitle("idle");										
 						#ifndef WIN32
 						}
