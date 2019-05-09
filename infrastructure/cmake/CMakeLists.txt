@@ -71,13 +71,6 @@ function(move_file_if_exists source_file dest_file)
 	endif()
 endfunction()
 
-foreach(file_to_configure ${files_to_configure})
-	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}.out" @ONLY)
-	replace_file_if_different(
-		"${base_dir}/${file_to_configure}"
-		"${base_dir}/${file_to_configure}.out")
-endforeach()
-
 # If BOXBACKUP_VERSION is defined when running CMake (as the AppVeyor config does), use it
 # as-is, since it contains the full version number, branch, and platform (Win32/Win64):
 if(BOXBACKUP_VERSION)
@@ -828,6 +821,13 @@ endif(MSVC)
 file(TO_NATIVE_PATH "${PERL_EXECUTABLE}" perl_executable_native)
 string(REPLACE "\\" "\\\\" perl_path_escaped ${perl_executable_native})
 target_compile_definitions(test_backupstorefix PRIVATE -DPERL_EXECUTABLE="${perl_path_escaped}")
+
+foreach(file_to_configure ${files_to_configure})
+	configure_file("${base_dir}/${file_to_configure}.in" "${base_dir}/${file_to_configure}.out" @ONLY)
+	replace_file_if_different(
+		"${base_dir}/${file_to_configure}"
+		"${base_dir}/${file_to_configure}.out")
+endforeach()
 
 # Configure test timeouts:
 # I've set the timeout to 4 times as long as it took to run on a particular run on Appveyor:
