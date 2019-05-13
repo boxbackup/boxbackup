@@ -470,6 +470,16 @@ int Configuration::GetKeyValueInt(const std::string& rKeyName) const
 }
 
 
+int Configuration::GetKeyValueInt(const std::string& rKeyName, int default_value) const
+{
+	if(!KeyExists(rKeyName))
+	{
+		return default_value;
+	}
+	return GetKeyValueInt(rKeyName);
+}
+
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -778,8 +788,7 @@ bool Configuration::Verify(const ConfigurationVerify &rVerify,
 				}
 				else if(pvkey->HasDefaultValue())
 				{
-					mKeys[pvkey->Name()] =
-						pvkey->DefaultValue();
+					mKeys[pvkey->Name()] = pvkey->DefaultValue();
 				}
 			}
 		
@@ -922,5 +931,3 @@ bool Configuration::Verify(const ConfigurationVerify &rVerify,
 	
 	return ok;
 }
-
-
