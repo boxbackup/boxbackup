@@ -205,7 +205,8 @@ bool setUp(const char* function_name)
 		"testfiles/restore* testfiles/bbackupd-data "
 		"testfiles/syncallowscript.control "
 		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
+		"testfiles/test2.downloaded "
+		"testfiles/tmp "
 		) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 #endif

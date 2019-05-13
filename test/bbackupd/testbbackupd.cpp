@@ -4079,60 +4079,66 @@ bool test_bbackupd_config_script()
 
 	cmd = "../../../bin/bbstored/bbstored-config testfiles/tmp localhost " + username + " "
 		"testfiles/raidfile.conf";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
 		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
 		"testfiles/tmp/bbstored.conf";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	// Create a server certificate authority, and sign the client and server certificates:
-	cmd = "../../../bin/bbstored/bbstored-certs testfiles/ca init";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "../../../bin/bbstored/bbstored-certs testfiles/tmp/ca init";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign "
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign "
 		"testfiles/tmp/bbackupd/12345-csr.pem";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/ca sign-server "
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign-server "
 		"testfiles/tmp/bbstored/localhost-csr.pem";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	// Copy the certificate files into the right places
-	cmd = "cp testfiles/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	cmd = "cp testfiles/tmp/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
-	cmd = "cp testfiles/ca/roots/clientCA.pem testfiles/tmp/bbstored";
+	cmd = "cp testfiles/tmp/ca/roots/clientCA.pem testfiles/tmp/bbstored";
 	TEST_RETURN(system(cmd.c_str()), 0)
 
 	cmd = BBSTOREACCOUNTS " -c testfiles/tmp/bbstored.conf create 12345 0 1M 2M";
-	TEST_RETURN(system(cmd.c_str()), 0)
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
 
 	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + bbstored_args +
-		" testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid", 22011);
+		" -o testfiles/tmp/bbstored.log testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid",
+		22011);
 
-	BackupDaemon bbackupd;
-	TEST_THAT(
-		prepare_test_with_client_daemon(
-			bbackupd,
-			true, // do_unpack_files
-			false, // !do_start_bbstored
-			"testfiles/tmp/bbackupd.conf")
-		);
+	{
+		Capture capture;
+		Logging::TempLoggerGuard guard(&capture);
 
-	bbackupd.RunSyncNow();
+		BackupDaemon bbackupd;
+		TEST_THAT(
+			prepare_test_with_client_daemon(
+				bbackupd,
+				true, // do_unpack_files
+				false, // !do_start_bbstored
+				"testfiles/tmp/bbackupd.conf")
+			);
+
+		bbackupd.RunSyncNow();
+	}
 
 	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
-		"", "-acQ", "testfiles/tmp/bbackupd.conf"));
+		"-otestfiles/tmp/bbackupquery.log", "-acQ", "testfiles/tmp/bbackupd.conf"));
 
 	TEST_THAT(StopServer());
-#endif
+#endif // !WIN32
 
 	TEARDOWN_TEST_BBACKUPD();
 }
