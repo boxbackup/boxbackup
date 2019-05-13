@@ -98,8 +98,6 @@ bool setUp(const char* function_name)
 			StartsWith("0_", filename) ||
 			filename == "accounts.txt" ||
 			filename == "bbackupd-data" ||
-			filename == "bbackupquery.log" ||
-			filename == "bbstored.log" ||
 			filename == "ca" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
