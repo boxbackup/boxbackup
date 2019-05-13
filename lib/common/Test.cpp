@@ -28,7 +28,7 @@
 
 int num_tests_selected = 0;
 int num_failures = 0;
-int old_failure_count = 0;
+static int old_failure_count = 0; // do not expose!
 int first_fail_line;
 std::string original_working_dir;
 std::string first_fail_file;
