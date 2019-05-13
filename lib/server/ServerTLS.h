@@ -54,8 +54,6 @@ public:
 		std::string keyFile(serverconf.GetKeyValue("PrivateKeyFile"));
 		std::string caFile(serverconf.GetKeyValue("TrustedCAsFile"));
 
-		// -1 is the default security level, especially for daemons with no
-		// ConfigurationVerify to override it:
 		int ssl_security_level(serverconf.GetKeyValueInt("SSLSecurityLevel",
 			BOX_DEFAULT_SSL_SECURITY_LEVEL));
 
@@ -82,7 +80,8 @@ private:
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists), \
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists), \
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists), \
-	ConfigurationVerifyKey("SSLSecurityLevel", ConfigTest_IsInt, -1), \
+	ConfigurationVerifyKey("SSLSecurityLevel", ConfigTest_IsInt, \
+		BOX_DEFAULT_SSL_SECURITY_LEVEL), \
 	SERVERSTREAM_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES)
 
 #endif // SERVERTLS__H
