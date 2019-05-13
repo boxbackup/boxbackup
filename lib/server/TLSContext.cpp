@@ -21,7 +21,7 @@
 #include "MemLeakFindOn.h"
 
 #define MAX_VERIFICATION_DEPTH		2
-#define CIPHER_LIST					"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
+#define CIPHER_LIST			"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
 
 // Macros to allow compatibility with OpenSSL 1.0 and 1.1 APIs. See
 // https://github.com/charybdis-ircd/charybdis/blob/release/3.5/libratbox/src/openssl_ratbox.h
@@ -87,26 +87,26 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	// Setup our identity
 	if(::SSL_CTX_use_certificate_chain_file(mpContext, CertificatesFile) != 1)
 	{
-		std::string msg = "loading certificates from ";
-		msg += CertificatesFile;
-		CryptoUtils::LogError(msg);
-		THROW_EXCEPTION(ServerException, TLSLoadCertificatesFailed)
+		{
+			THROW_EXCEPTION_MESSAGE(ServerException, TLSLoadCertificatesFailed,
+				"Failed to load certificates from " << CertificatesFile << ": " <<
+				CryptoUtils::LogError("loading certificates"));
+		}
 	}
+
 	if(::SSL_CTX_use_PrivateKey_file(mpContext, PrivateKeyFile, SSL_FILETYPE_PEM) != 1)
 	{
-		std::string msg = "loading private key from ";
-		msg += PrivateKeyFile;
-		CryptoUtils::LogError(msg);
-		THROW_EXCEPTION(ServerException, TLSLoadPrivateKeyFailed)
+		THROW_EXCEPTION_MESSAGE(ServerException, TLSLoadPrivateKeyFailed,
+			"Failed to load private key from " << PrivateKeyFile << ": " <<
+				CryptoUtils::LogError("loading private key"));
 	}
 	
 	// Setup the identify of CAs we trust
 	if(::SSL_CTX_load_verify_locations(mpContext, TrustedCAsFile, NULL) != 1)
 	{
-		std::string msg = "loading CA cert from ";
-		msg += TrustedCAsFile;
-		CryptoUtils::LogError(msg);
-		THROW_EXCEPTION(ServerException, TLSLoadTrustedCAsFailed)
+		THROW_EXCEPTION_MESSAGE(ServerException, TLSLoadTrustedCAsFailed,
+			"Failed to load CA certificate from " << TrustedCAsFile << ": " <<
+				CryptoUtils::LogError("loading CA cert"));
 	}
 	
 	// Setup options to require these certificates
@@ -117,8 +117,9 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	// Setup allowed ciphers
 	if(::SSL_CTX_set_cipher_list(mpContext, CIPHER_LIST) != 1)
 	{
-		CryptoUtils::LogError("setting cipher list to " CIPHER_LIST);
-		THROW_EXCEPTION(ServerException, TLSSetCiphersFailed)
+		THROW_EXCEPTION_MESSAGE(ServerException, TLSSetCiphersFailed,
+			"Failed to set cipher list to " << CIPHER_LIST << ": " <<
+				CryptoUtils::LogError("setting cipher list"));
 	}
 }
 

@@ -10,14 +10,17 @@
 #include "Box.h"
 
 #define TLS_CLASS_IMPLEMENTATION_CPP
-#include <openssl/ssl.h>
-#include <openssl/bio.h>
+
 #include <errno.h>
 #include <fcntl.h>
 
 #ifndef WIN32
 #include <poll.h>
 #endif
+
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
@@ -126,8 +129,8 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpBIO = ::BIO_new(::BIO_s_socket());
 	if(mpBIO == 0)
 	{
-		CryptoUtils::LogError("creating socket bio");
-		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
+		THROW_EXCEPTION_MESSAGE(ServerException, TLSAllocationFailed,
+			"Failed to create SSL BIO: " << CryptoUtils::LogError("creating socket bio"));
 	}
 
 	tOSSocketHandle socket = GetSocketHandle();
@@ -137,8 +140,8 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	mpSSL = ::SSL_new(rContext.GetRawContext());
 	if(mpSSL == 0)
 	{
-		CryptoUtils::LogError("creating SSL object");
-		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
+		THROW_EXCEPTION_MESSAGE(ServerException, TLSAllocationFailed,
+			"Failed to create SSL object: " << CryptoUtils::LogError("creating SSL object"));
 	}
 
 	// Make the socket non-blocking so timeouts on Read work
@@ -205,13 +208,14 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			// Error occured
 			if(IsServer)
 			{
-				CryptoUtils::LogError("accepting connection");
-				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
+				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSHandshakeFailed,
+					"Failed to accept connection: " <<
+					CryptoUtils::LogError("accepting connection"));
 			}
 			else
 			{
-				CryptoUtils::LogError("connecting");
-				THROW_EXCEPTION(ConnectionException, TLSHandshakeFailed)
+				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSHandshakeFailed,
+					"Failed to connect: " << CryptoUtils::LogError("connecting"));
 			}
 		}
 	}
