@@ -121,5 +121,7 @@ private:
 	ConfigurationVerifyKey("LogFacility", 0), \
 	ConfigurationVerifyKey("User", ConfigTest_LastEntry)
 
+extern const ConfigurationVerifyKey ssl_security_level_key;
+
 #endif // DAEMON__H
 

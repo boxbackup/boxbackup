@@ -206,6 +206,33 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 			
 		default: // (and SSL_ERROR_ZERO_RETURN)
 			// Error occured
+#if HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
+			int err_reason = ERR_GET_REASON(ERR_peek_error());
+			const char *file, *data;
+			int line, flags;
+			ERR_peek_error_line_data(&file, &line, &data, &flags);
+			long verify_result = SSL_get_verify_result(mpSSL);
+
+			if(se == SSL_ERROR_SSL && verify_result == X509_V_ERR_CA_KEY_TOO_SMALL)
+			{
+				// Would be nice to use GetPeerCommonName() in these error messages,
+				// but since the certificate isn't trusted, that might be misleading,
+				// and it's not available to us anyway :(
+
+				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSPeerWeakCertificate,
+					(IsServer ? "Failed to accept connection from" :
+						"Failed to connect to") << " " << mPeerSocketDesc <<
+					": key too short for current security level");
+			}
+			else if(se == SSL_ERROR_SSL && verify_result == X509_V_ERR_CA_MD_TOO_WEAK)
+			{
+				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSPeerWeakCertificate,
+					(IsServer ? "Failed to accept connection from" :
+						"Failed to connect to") << " " << mPeerSocketDesc <<
+					": hash too weak for current security level");
+			}
+			else
+#endif // HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
 			if(IsServer)
 			{
 				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSHandshakeFailed,

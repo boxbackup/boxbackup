@@ -10,6 +10,7 @@
 #ifndef SERVERTLS__H
 #define SERVERTLS__H
 
+#include "BoxPortsAndFiles.h"
 #include "ServerStream.h"
 #include "SocketStreamTLS.h"
 #include "SSLLib.h"
@@ -52,8 +53,12 @@ public:
 		std::string certFile(serverconf.GetKeyValue("CertificateFile"));
 		std::string keyFile(serverconf.GetKeyValue("PrivateKeyFile"));
 		std::string caFile(serverconf.GetKeyValue("TrustedCAsFile"));
+
+		int ssl_security_level(serverconf.GetKeyValueInt("SSLSecurityLevel",
+			BOX_DEFAULT_SSL_SECURITY_LEVEL));
+
 		mContext.Initialise(true /* as server */, certFile.c_str(),
-			keyFile.c_str(), caFile.c_str());
+			keyFile.c_str(), caFile.c_str(), ssl_security_level);
 	
 		// Then do normal stream server stuff
 		ServerStream<SocketStreamTLS, Port, ListenBacklog,
@@ -75,6 +80,8 @@ private:
 	ConfigurationVerifyKey("CertificateFile", ConfigTest_Exists), \
 	ConfigurationVerifyKey("PrivateKeyFile", ConfigTest_Exists), \
 	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_Exists), \
+	ConfigurationVerifyKey("SSLSecurityLevel", ConfigTest_IsInt, \
+		BOX_DEFAULT_SSL_SECURITY_LEVEL), \
 	SERVERSTREAM_VERIFY_SERVER_KEYS(DEFAULT_ADDRESSES)
 
 #endif // SERVERTLS__H

@@ -29,6 +29,7 @@ TLSSetCiphersFailed				28
 SSLLibraryInitialisationError	29
 TLSNoSSLObject					31
 TLSAlreadyHandshaked			35
+TLSServerWeakCertificate				36	Our SSL certificate is too weak for the current SSL Security Level, see https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates
 SocketSetNonBlockingFailed		40
 Protocol_BadUsage				43
 Protocol_UnsuitableStreamTypeForSending		51

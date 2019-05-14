@@ -148,18 +148,20 @@ elsif($ARGV[0] eq 'reroot')
 		or die "can't open copy listing file";
 	my $err = 0;
 	my $count = 0;
-	while(<LISTING>)
+	while(my $line = <LISTING>)
 	{
-		print LISTING_COPY;
-		chomp;
-		s/\[FILENAME NOT ENCRYPTED\]//;
-		next if /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
-		my ($id,$type,$name) = split / /;
+		print LISTING_COPY $line;
+		chomp $line;
+		$line =~s/\[FILENAME NOT ENCRYPTED\]//;
+		next if $line =~ /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
+		next if $line =~ /^WARNING: SSLSecurityLevel not set./;
+		my ($id,$type,$name) = split / /, $line;
 		$count++;
 		if($name !~ /\Alost\+found0/)
 		{
 			# everything must be in a lost and found dir
-			$err = 1
+			print "Expected '$name' to be in a lost+found directory, but it was not ($line)";
+			$err = 1;
 		}
 	}
 	close LISTING_COPY;

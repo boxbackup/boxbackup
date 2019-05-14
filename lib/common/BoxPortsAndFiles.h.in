@@ -20,6 +20,10 @@
 // directory within the RAIDFILE root for the backup store daemon
 #define BOX_RAIDFILE_ROOT_BBSTORED		"backup"
 
+// default security level if SSLSecurityLevel is not specified: see
+// https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates
+const int BOX_DEFAULT_SSL_SECURITY_LEVEL = -1;
+
 // configuration file paths
 #ifdef WIN32
 	// no default config file path, use these macros to call

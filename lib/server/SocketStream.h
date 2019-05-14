@@ -114,6 +114,7 @@ private:
 protected:
 	off_t mBytesRead;
 	off_t mBytesWritten;
+	std::string mPeerSocketDesc;
 
 public:
 	off_t GetBytesRead() const {return mBytesRead;}

@@ -202,11 +202,24 @@ Server
 	CertificateFile = $certificate
 	PrivateKeyFile = $private_key
 	TrustedCAsFile = $ca_root_cert
-}
-
-
 __E
 
+if("@HAVE_SSL_CTX_SET_SECURITY_LEVEL@" eq "1")
+{
+	print CONFIG <<__E;
+	# Box Backup compiled with support for SSLSecurityLevel
+	SSLSecurityLevel = 2
+__E
+}
+else
+{
+	print CONFIG <<__E;
+	# Box Backup compiled without support for SSLSecurityLevel
+	# SSLSecurityLevel = 2
+__E
+}
+
+print CONFIG "}\n";
 close CONFIG;
 
 # explain to the user what they need to do next

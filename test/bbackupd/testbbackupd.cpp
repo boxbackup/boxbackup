@@ -4038,6 +4038,56 @@ bool test_parse_syncallowscript_output()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+bool check_output_log_file_for_ssl_security_level_warnings(const std::string& log_file_name,
+	const std::string& sentinel_value)
+{
+	int old_num_failures = num_failures;
+
+	FileStream fs(log_file_name, O_RDONLY);
+	IOStreamGetLine getline(fs);
+	std::string line;
+	bool found_not_set = false, found_not_supported = false, found_sentinel = false;
+
+	while(fs.StreamDataLeft())
+	{
+		TEST_THAT(getline.GetLine(line, true, 30000)); // 30 seconds should be enough
+		TEST_THAT(line.size() >= 30);
+		if(line.size() < 30)
+		{
+			continue;
+		}
+
+		if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+			"be secure.", line.substr(30)))
+		{
+			found_not_set = true;
+		}
+		else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+			"is not compiled with OpenSSL 1.1 or higher", line.substr(30)))
+		{
+			found_not_supported = true;
+		}
+		else if(StartsWith(sentinel_value, line.substr(30)))
+		{
+			found_sentinel = true;
+			break;
+		}
+	}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+	TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+	TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+	TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+
+	TEST_THAT(found_sentinel); // Otherwise we're looking for the wrong thing!
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+
 bool test_bbackupd_config_script()
 {
 	SETUP_TEST_BBACKUPD();
@@ -4132,10 +4182,43 @@ bool test_bbackupd_config_script()
 			);
 
 		bbackupd.RunSyncNow();
+
+		std::vector<Capture::Message> messages = capture.GetMessages();
+		TEST_THAT(!messages.empty());
+		if (!messages.empty())
+		{
+			bool found_not_set = false, found_not_supported = false;
+			for(std::vector<Capture::Message>::iterator i = messages.begin();
+				i != messages.end(); i++)
+			{
+				if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+					"be secure.", i->message))
+				{
+					found_not_set = true;
+				}
+				else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+					"is not compiled with OpenSSL 1.1 or higher", i->message))
+				{
+					found_not_supported = true;
+				}
+			}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+			TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+			TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+			TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+			TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+		}
 	}
 
 	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
 		"-otestfiles/tmp/bbackupquery.log", "-acQ", "testfiles/tmp/bbackupd.conf"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbackupquery.log",
+		"Connecting to store"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbstored.log",
+		"Forked child process"));
 
 	TEST_THAT(StopServer());
 #endif // !WIN32

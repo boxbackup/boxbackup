@@ -10,10 +10,12 @@
 #include "Box.h"
 
 #define TLS_CLASS_IMPLEMENTATION_CPP
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "BoxPortsAndFiles.h"
 #include "CryptoUtils.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -71,7 +73,8 @@ TLSContext::~TLSContext()
 //		Created: 2003/08/06
 //
 // --------------------------------------------------------------------------
-void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const char *PrivateKeyFile, const char *TrustedCAsFile)
+void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const char *PrivateKeyFile,
+	const char *TrustedCAsFile, int SSLSecurityLevel)
 {
 	if(mpContext != 0)
 	{
@@ -84,9 +87,45 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 	
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	if(SSLSecurityLevel == -1)
+	{
+		BOX_WARNING("SSLSecurityLevel not set. Your connection may not be secure. "
+			"Please see https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates "
+			"for details");
+		SSLSecurityLevel = 1; // Default for now. Unsafe, but we warned the user.
+		// TODO: upgrade to level 2 soon.
+	}
+
+	SSL_CTX_set_security_level(mpContext, SSLSecurityLevel);
+#else
+	if(SSLSecurityLevel != BOX_DEFAULT_SSL_SECURITY_LEVEL)
+	{
+		BOX_WARNING("SSLSecurityLevel is set, but this Box Backup is not compiled with "
+			"OpenSSL 1.1 or higher, so will be ignored (compiled with "
+			OPENSSL_VERSION_TEXT ")");
+	}
+#endif
+
 	// Setup our identity
 	if(::SSL_CTX_use_certificate_chain_file(mpContext, CertificatesFile) != 1)
 	{
+#if HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
+		int err_reason = ERR_GET_REASON(ERR_peek_error());
+		if(err_reason == SSL_R_EE_KEY_TOO_SMALL)
+		{
+			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
+				"Failed to load certificates from " << CertificatesFile << ": "
+				"key too short for current security level");
+		}
+		else if(err_reason == SSL_R_CA_MD_TOO_WEAK)
+		{
+			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
+				"Failed to load certificates from " << CertificatesFile << ": "
+				"hash too weak for current security level");
+		}
+		else
+#endif // HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, TLSLoadCertificatesFailed,
 				"Failed to load certificates from " << CertificatesFile << ": " <<

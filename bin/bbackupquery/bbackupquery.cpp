@@ -364,7 +364,9 @@ int main(int argc, const char *argv[])
 	std::string certFile(conf.GetKeyValue("CertificateFile"));
 	std::string keyFile(conf.GetKeyValue("PrivateKeyFile"));
 	std::string caFile(conf.GetKeyValue("TrustedCAsFile"));
-	tlsContext.Initialise(false /* as client */, certFile.c_str(), keyFile.c_str(), caFile.c_str());
+	int ssl_security_level(conf.GetKeyValueInt("SSLSecurityLevel"));
+	tlsContext.Initialise(false /* as client */, certFile.c_str(), keyFile.c_str(),
+		caFile.c_str(), ssl_security_level);
 	
 	// Initialise keys
 	BackupClientCryptoKeys_Setup(conf.GetKeyValue("KeysFile").c_str());
