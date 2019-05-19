@@ -30,7 +30,8 @@ public:
 private:
 	TLSContext(const TLSContext &);
 public:
-	void Initialise(bool AsServer, const char *CertificatesFile, const char *PrivateKeyFile, const char *TrustedCAsFile);
+	void Initialise(bool AsServer, const char *CertificatesFile, const char *PrivateKeyFile,
+		const char *TrustedCAsFile, int SSLSecurityLevel = -1);
 	SSL_CTX *GetRawContext() const;
 
 private:

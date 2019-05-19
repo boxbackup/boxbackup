@@ -12,15 +12,32 @@
 // do not include MinGW's dirent.h on Win32, 
 // as we override some of it in lib/win32.
 
+#include <limits.h>
+#include <stdio.h>
+#include <string.h>
+
 #ifndef WIN32
 	#include <dirent.h>
 #endif
 
-#include <stdio.h>
-#include <sys/types.h>
+#ifdef WIN32
+	#include <process.h>
+#endif
+
+#ifdef HAVE_PWD_H
+	#include <pwd.h>
+#endif
+
+#ifdef HAVE_SIGNAL_H
+	#include <signal.h>
+#endif
+
 #include <sys/stat.h>
-#include <limits.h>
-#include <string.h>
+#include <sys/types.h>
+
+#ifdef HAVE_SYSCALL
+	#include <sys/syscall.h>
+#endif
 
 #ifdef HAVE_SYS_WAIT_H
 	#include <sys/wait.h>
@@ -31,19 +48,7 @@
 	#include <sys/xattr.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
-	#include <signal.h>
-#endif
-
-#ifdef WIN32
-	#include <process.h>
-#endif
-
 #include <map>
-
-#ifdef HAVE_SYSCALL
-	#include <sys/syscall.h>
-#endif
 
 #include "BackupClientCryptoKeys.h"
 #include "BackupClientContext.h"
@@ -96,7 +101,6 @@
 #define TIME_TO_WAIT_FOR_BACKUP_OPERATION 12
 #define SHORT_TIMEOUT 5000
 #define BACKUP_ERROR_DELAY_SHORTENED 10
-#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
 
 void wait_for_backup_operation(const char* message)
 {
@@ -410,25 +414,9 @@ bool configure_bbackupd(BackupDaemon& bbackupd, const std::string& config_file)
 	return true;
 }
 
-bool kill_running_daemons()
-{
-	bool success = true;
-
-	if(FileExists("testfiles/bbstored.pid"))
-	{
-		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
-	}
-
-	if(FileExists("testfiles/bbackupd.pid"))
-	{
-		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
-	}
-
-	return success;
-}
-
-bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
-	bool do_start_bbstored = true)
+bool prepare_test_with_client_daemon(BackupDaemon& bbackupd, bool do_unpack_files = true,
+	bool do_start_bbstored = true,
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	Timers::Cleanup(false); // don't throw exception if not initialised
 	Timers::Init();
@@ -469,8 +457,7 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 		#endif
 	}
 
-	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
-		FAIL);
+	TEST_THAT_OR(configure_bbackupd(bbackupd, bbackupd_conf_file), FAIL);
 	spDaemon = &bbackupd;
 	return true;
 }
@@ -486,13 +473,13 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 #define SETUP_WITHOUT_FILES() \
 	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd, false), FAIL); \
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false), FAIL); \
 	TEST_THAT_OR(::mkdir("testfiles/TestDir1", 0755) == 0, FAIL);
 
 #define SETUP_WITH_BBSTORED() \
 	SETUP_TEST_BBACKUPD(); \
 	BackupDaemon bbackupd; \
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd), FAIL);
 
 #define TEARDOWN_TEST_BBACKUPD() \
 	TEST_THAT(bbackupd_pid == 0 || StopClient()); \
@@ -983,15 +970,16 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 	return flags && BackupStoreDirectory::Entry::Flags_Deleted;
 }
 
-bool compare(BackupQueries::ReturnCode::Type expected_status,
+bool compare_external(BackupQueries::ReturnCode::Type expected_status,
 	const std::string& bbackupquery_options = "",
-	const std::string& compare_options = "-acQ")
+	const std::string& compare_options = "-acQ",
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	std::string cmd = BBACKUPQUERY;
 	cmd += " ";
 	cmd += (expected_status == BackupQueries::ReturnCode::Compare_Same)
 		? "-Wwarning" : "-Werror";
-	cmd += " -c testfiles/bbackupd.conf ";
+	cmd += " -c " + bbackupd_conf_file;
 	cmd += " " + bbackupquery_options;
 	cmd += " \"compare " + compare_options + "\" quit";
 
@@ -1007,7 +995,7 @@ bool compare(BackupQueries::ReturnCode::Type expected_status,
 	return (returnValue == expected_system_result);
 }
 
-bool compare_local(BackupQueries::ReturnCode::Type expected_status,
+bool compare_in_process(BackupQueries::ReturnCode::Type expected_status,
 	BackupProtocolCallable& client,
 	const std::string& compare_options = "acQ")
 {
@@ -1074,10 +1062,21 @@ bool touch_and_wait(const std::string& filename)
 
 TLSContext sTlsContext;
 
-#define TEST_COMPARE(...) \
-	TEST_THAT(compare(BackupQueries::ReturnCode::__VA_ARGS__));
-#define TEST_COMPARE_LOCAL(...) \
-	TEST_THAT(compare_local(BackupQueries::ReturnCode::__VA_ARGS__));
+#define TEST_COMPARE(expected_status) \
+	BOX_INFO("Running external compare, expecting " #expected_status); \
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status));
+#define TEST_COMPARE_EXTRA(expected_status, ...) \
+	BOX_INFO("Running external compare, expecting " #expected_status); \
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::expected_status, __VA_ARGS__));
+
+#define TEST_COMPARE_LOCAL(expected_status, client) \
+	BOX_INFO("Running compare in-process, expecting " #expected_status); \
+	TEST_THAT(compare_in_process(BackupQueries::ReturnCode::expected_status, client));
+#define TEST_COMPARE_LOCAL_EXTRA(expected_status, client, compare_options) \
+	BOX_INFO("Running compare in-process, expecting " #expected_status); \
+	TEST_THAT(compare_in_process(BackupQueries::ReturnCode::expected_status, client, \
+		compare_options));
+
 
 bool search_for_file(const std::string& filename)
 {
@@ -1458,7 +1457,7 @@ bool test_ssl_keepalives()
 	KeepAliveBackupProtocolLocal connection(0x01234567, "test", "backup/01234567/",
 		0, false);
 	MockBackupDaemon bbackupd(connection);
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd), FAIL);
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd), FAIL);
 
 	// Test that sending a keepalive actually works, when the timeout has expired,
 	// but doesn't send anything at the beginning:
@@ -1943,9 +1942,9 @@ bool test_bbackupd_exclusions()
 		bbackupd.RunSyncNow();
 		TEST_THAT(!bbackupd.StorageLimitExceeded());
 
-		// Check that the contents of the store are the same 
-		// as the contents of the disc 
-		TEST_COMPARE(Compare_Same, "-c testfiles/bbackupd-exclude.conf");
+		// Check that the contents of the store are the same
+		// as the contents of the disc
+		TEST_COMPARE_EXTRA(Compare_Same, "-c testfiles/bbackupd-exclude.conf");
 		BOX_TRACE("done.");
 
 		// BLOCK
@@ -2055,7 +2054,7 @@ bool test_bbackupd_responds_to_connection_failure()
 		MockBackupProtocolLocal client(0x01234567, "test",
 			"backup/01234567/", 0, false);
 		MockBackupDaemon bbackupd(client);
-		TEST_THAT_OR(setup_test_bbackupd(bbackupd, false, false), FAIL);
+		TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd, false, false), FAIL);
 
 		TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
 		std::auto_ptr<BackupClientContext> apClientContext;
@@ -2285,11 +2284,11 @@ bool test_read_only_dirs_can_be_restored()
 			#endif
 
 			bbackupd.RunSyncNow();
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
 
 			// check that we can restore it
 			TEST_THAT(restore("Test1", "testfiles/restore1"));
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 testfiles/restore1");
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/restore1");
 
 			// Try a restore with just the remote directory name,
 			// check that it uses the same name in the local
@@ -2297,7 +2296,7 @@ bool test_read_only_dirs_can_be_restored()
 			TEST_THAT(::mkdir("testfiles/restore-test", 0700) == 0);
 			TEST_THAT(bbackupquery("\"lcd testfiles/restore-test\" "
 				"\"restore Test1\""));
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1 "
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 "
 				"testfiles/restore-test/Test1");
 
 			// put the permissions back to sensible values
@@ -2507,7 +2506,7 @@ bool test_unicode_filenames_can_be_backed_up()
 
 		// Check that bbackupquery can compare the dir when given
 		// on the command line in system encoding.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/TestDir1/" + systemDirName);
 
 		// Check that bbackupquery can restore the dir when given
@@ -2516,7 +2515,7 @@ bool test_unicode_filenames_can_be_backed_up()
 			"testfiles/restore-" + systemDirName));
 
 		// Compare to make sure it was restored properly.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
 
 		std::string fileToUnlink = "testfiles/restore-" + 
@@ -2548,7 +2547,7 @@ bool test_unicode_filenames_can_be_backed_up()
 		// Compare to make sure it was restored properly. The Get
 		// command does restore attributes, so we don't need to
 		// specify the -A option for this to succeed.
-		TEST_COMPARE(Compare_Same, "", "-cEQ Test1/" + systemDirName +
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/" + systemDirName +
 			" testfiles/restore-" + systemDirName);
 
 		// Check that no read error has been reported yet
@@ -2704,7 +2703,7 @@ bool test_delete_update_and_symlink_files()
 		TEST_COMPARE(Compare_Same);
 
 		// Try a quick compare, just for fun
-		TEST_COMPARE(Compare_Same, "", "-acqQ");
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-acqQ");
 	}
 
 	TEARDOWN_TEST_BBACKUPD();
@@ -3193,8 +3192,8 @@ bool test_excluded_files_are_not_backed_up()
 	BackupProtocolLocal2 client(0x01234567, "test", "backup/01234567/",
 		0, false);
 	MockBackupDaemon bbackupd(client);
-	
-	TEST_THAT_OR(setup_test_bbackupd(bbackupd,
+
+	TEST_THAT_OR(prepare_test_with_client_daemon(bbackupd,
 		true, // do_unpack_files
 		false // do_start_bbstored
 		), FAIL);
@@ -3210,8 +3209,8 @@ bool test_excluded_files_are_not_backed_up()
 		TEST_COMPARE_LOCAL(Compare_Same, client);
 
 		// compare without exclusions, should find differences
-		// TEST_COMPARE(Compare_Different, "", "-acEQ");
-		TEST_COMPARE_LOCAL(Compare_Different, client, "acEQ");
+		// TEST_COMPARE_EXTRA(Compare_Different, "", "-acEQ");
+		TEST_COMPARE_LOCAL_EXTRA(Compare_Different, client, "acEQ");
 
 		// check that the excluded files did not make it
 		// into the store, and the included files did
@@ -3614,7 +3613,7 @@ bool test_rename_operations()
 		TEST_COMPARE(Compare_Same);
 
 		// and again, but with quick flag
-		TEST_COMPARE(Compare_Same, "", "-acqQ");
+		TEST_COMPARE_EXTRA(Compare_Same, "", "-acqQ");
 
 		// Rename some files -- one under the threshold, others above
 		TEST_THAT(rename("testfiles/TestDir1/df324", 
@@ -3914,7 +3913,7 @@ bool test_restore_deleted_files()
 			client.reset();
 
 			// Do a compare with the now undeleted files
-			TEST_COMPARE(Compare_Same, "", "-cEQ Test1/x1 "
+			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1/x1 "
 				"testfiles/restore-Test1-x1-2");
 		}
 		
@@ -4039,6 +4038,194 @@ bool test_parse_syncallowscript_output()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+bool check_output_log_file_for_ssl_security_level_warnings(const std::string& log_file_name,
+	const std::string& sentinel_value)
+{
+	int old_num_failures = num_failures;
+
+	FileStream fs(log_file_name, O_RDONLY);
+	IOStreamGetLine getline(fs);
+	std::string line;
+	bool found_not_set = false, found_not_supported = false, found_sentinel = false;
+
+	while(fs.StreamDataLeft())
+	{
+		TEST_THAT(getline.GetLine(line, true, 30000)); // 30 seconds should be enough
+		TEST_THAT(line.size() >= 30);
+		if(line.size() < 30)
+		{
+			continue;
+		}
+
+		if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+			"be secure.", line.substr(30)))
+		{
+			found_not_set = true;
+		}
+		else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+			"is not compiled with OpenSSL 1.1 or higher", line.substr(30)))
+		{
+			found_not_supported = true;
+		}
+		else if(StartsWith(sentinel_value, line.substr(30)))
+		{
+			found_sentinel = true;
+			break;
+		}
+	}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+	TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+	TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+	TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+
+	TEST_THAT(found_sentinel); // Otherwise we're looking for the wrong thing!
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+
+bool test_bbackupd_config_script()
+{
+	SETUP_TEST_BBACKUPD();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform"); // TODO: write a PowerShell version
+#else
+	char buf[PATH_MAX];
+	if (getcwd(buf, sizeof(buf)) == NULL)
+	{
+		BOX_LOG_SYS_ERROR("getcwd");
+	}
+	std::string current_dir = buf;
+
+	TEST_THAT(mkdir("testfiles/tmp", 0777) == 0);
+	TEST_THAT(mkdir("testfiles/TestDir1", 0777) == 0);
+
+	// Generate a new configuration for our test bbackupd, from scratch:
+	std::string cmd = "../../../bin/bbackupd/bbackupd-config " +
+		current_dir + "/testfiles/tmp " // config-dir
+		"lazy " // backup-mode
+		"12345 " // account-num
+		"localhost " + // server-hostname
+		current_dir + "/testfiles " + // working-dir
+		current_dir + "/testfiles/TestDir1"; // backup directories
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	// Open the generated config file and add a StorePort line:
+	{
+		FileStream conf_file("testfiles/tmp/bbackupd.conf", O_WRONLY | O_APPEND);
+		conf_file.Write("StorePort = 22011\n");
+		conf_file.Close();
+	}
+
+	// Generate a new configuration for our test bbstored, from scratch:
+	struct passwd *result = getpwuid(getuid());
+	TEST_THAT_OR(result != NULL, FAIL); // failed to get username for current user
+	std::string username = result->pw_name;
+
+	cmd = "../../../bin/bbstored/bbstored-config testfiles/tmp localhost " + username + " "
+		"testfiles/raidfile.conf";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
+		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
+		"testfiles/tmp/bbstored.conf";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	// Create a server certificate authority, and sign the client and server certificates:
+	cmd = "../../../bin/bbstored/bbstored-certs testfiles/tmp/ca init";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign "
+		"testfiles/tmp/bbackupd/12345-csr.pem";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign-server "
+		"testfiles/tmp/bbstored/localhost-csr.pem";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	// Copy the certificate files into the right places
+	cmd = "cp testfiles/tmp/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/roots/clientCA.pem testfiles/tmp/bbstored";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = BBSTOREACCOUNTS " -c testfiles/tmp/bbstored.conf create 12345 0 1M 2M";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + bbstored_args +
+		" -o testfiles/tmp/bbstored.log testfiles/tmp/bbstored.conf", "testfiles/bbstored.pid",
+		22011);
+
+	{
+		Capture capture;
+		Logging::TempLoggerGuard guard(&capture);
+
+		BackupDaemon bbackupd;
+		TEST_THAT(
+			prepare_test_with_client_daemon(
+				bbackupd,
+				true, // do_unpack_files
+				false, // !do_start_bbstored
+				"testfiles/tmp/bbackupd.conf")
+			);
+
+		bbackupd.RunSyncNow();
+
+		std::vector<Capture::Message> messages = capture.GetMessages();
+		TEST_THAT(!messages.empty());
+		if (!messages.empty())
+		{
+			bool found_not_set = false, found_not_supported = false;
+			for(std::vector<Capture::Message>::iterator i = messages.begin();
+				i != messages.end(); i++)
+			{
+				if(StartsWith("SSLSecurityLevel not set. Your connection may not "
+					"be secure.", i->message))
+				{
+					found_not_set = true;
+				}
+				else if(StartsWith("SSLSecurityLevel is set, but this Box Backup "
+					"is not compiled with OpenSSL 1.1 or higher", i->message))
+				{
+					found_not_supported = true;
+				}
+			}
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+			TEST_THAT(!found_not_set); // We should set it in bbackupd-config
+			TEST_THAT(!found_not_supported); // And this message should never be logged
+#else
+			TEST_THAT(!found_not_supported); // We should not set it in bbackupd-config
+			TEST_THAT(!found_not_set); // And this message should never be logged
+#endif
+		}
+	}
+
+	TEST_THAT(compare_external(BackupQueries::ReturnCode::Compare_Same,
+		"-otestfiles/tmp/bbackupquery.log", "-acQ", "testfiles/tmp/bbackupd.conf"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbackupquery.log",
+		"Connecting to store"));
+	TEST_THAT(check_output_log_file_for_ssl_security_level_warnings("testfiles/tmp/bbstored.log",
+		"Forked child process"));
+
+	TEST_THAT(StopServer());
+#endif // !WIN32
+
+	TEARDOWN_TEST_BBACKUPD();
+}
+
 int test(int argc, const char *argv[])
 {
 	// SSL library
@@ -4104,6 +4291,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_backup_many_files());
 	TEST_THAT(test_parse_incomplete_command());
 	TEST_THAT(test_parse_syncallowscript_output());
+	TEST_THAT(test_bbackupd_config_script());
 
 	TEST_THAT(kill_running_daemons());
 

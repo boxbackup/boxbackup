@@ -66,16 +66,23 @@ bool run_housekeeping_and_check_account();
 bool check_reference_counts();
 
 //! Starts the bbstored test server running, which must not already be running.
-bool StartServer();
+bool StartServer(const std::string& daemon_args = "");
 
 //! Stops the currently running bbstored test server.
 bool StopServer(bool wait_for_process = false);
 
 //! Starts the bbackupd client running, which must not already be running.
-bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf");
+bool StartClient(const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf",
+	const std::string& daemon_args = "");
 
 //! Stops the currently running bbackupd client.
 bool StopClient(bool wait_for_process = false);
+
+bool StartSimulator();
+
+bool StopSimulator();
+
+bool kill_running_daemons();
 
 //! Creates the standard test account, for example after delete_account().
 bool create_account(int soft, int hard);

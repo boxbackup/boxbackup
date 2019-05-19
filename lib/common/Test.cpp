@@ -28,7 +28,7 @@
 
 int num_tests_selected = 0;
 int num_failures = 0;
-int old_failure_count = 0;
+static int old_failure_count = 0; // do not expose!
 int first_fail_line;
 std::string original_working_dir;
 std::string first_fail_file;
@@ -97,6 +97,8 @@ bool setUp(const char* function_name)
 		if(StartsWith("TestDir", filename) ||
 			StartsWith("0_", filename) ||
 			filename == "accounts.txt" ||
+			filename == "bbackupd-data" ||
+			filename == "ca" ||
 			StartsWith("file", filename) ||
 			StartsWith("notifyran", filename) ||
 			StartsWith("notifyscript.tag", filename) ||
@@ -105,7 +107,9 @@ bool setUp(const char* function_name)
 			filename == "syncallowscript.control" ||
 			StartsWith("syncallowscript.notifyran.", filename) ||
 			filename == "test2.downloaded" ||
-			EndsWith("testfile", filename))
+			EndsWith("testfile", filename) ||
+			filename == "tmp" ||
+			EndsWith(".qdbm", filename))
 		{
 			std::string filepath = std::string("testfiles\\") + filename;
 
@@ -201,7 +205,8 @@ bool setUp(const char* function_name)
 		"testfiles/restore* testfiles/bbackupd-data "
 		"testfiles/syncallowscript.control "
 		"testfiles/syncallowscript.notifyran.* "
-		"testfiles/test2.downloaded"
+		"testfiles/test2.downloaded "
+		"testfiles/tmp "
 		) == 0);
 	TEST_THAT_THROWONFAIL(system("touch testfiles/accounts.txt") == 0);
 #endif
@@ -379,133 +384,6 @@ int ReadPidFile(const char *pidFile)
 	}
 	fclose(f);
 	
-	return pid;
-}
-
-int LaunchServer(const std::string& rCommandLine, const char *pidFile)
-{
-	BOX_INFO("Starting server: " << rCommandLine);
-
-#ifdef WIN32
-
-	PROCESS_INFORMATION procInfo;
-
-	STARTUPINFO startInfo;
-	startInfo.cb = sizeof(startInfo);
-	startInfo.lpReserved = NULL;
-	startInfo.lpDesktop  = NULL;
-	startInfo.lpTitle    = NULL;
-	startInfo.dwFlags = 0;
-	startInfo.cbReserved2 = 0;
-	startInfo.lpReserved2 = NULL;
-
-	std::string cmd = ConvertPaths(rCommandLine);
-	CHAR* tempCmd = strdup(cmd.c_str());
-
-	DWORD result = CreateProcess
-	(
-		NULL,        // lpApplicationName, naughty!
-		tempCmd,     // lpCommandLine
-		NULL,        // lpProcessAttributes
-		NULL,        // lpThreadAttributes
-		false,       // bInheritHandles
-		0,           // dwCreationFlags
-		NULL,        // lpEnvironment
-		NULL,        // lpCurrentDirectory
-		&startInfo,  // lpStartupInfo
-		&procInfo    // lpProcessInformation
-	);
-
-	free(tempCmd);
-
-	TEST_THAT_OR(result != 0,
-		BOX_LOG_WIN_ERROR("Launch failed: " << rCommandLine);
-		return -1;
-		);
-
-	CloseHandle(procInfo.hProcess);
-	CloseHandle(procInfo.hThread);
-
-	return WaitForServerStartup(pidFile, (int)procInfo.dwProcessId);
-
-#else // !WIN32
-
-	TEST_THAT_OR(RunCommand(rCommandLine) == 0,
-		TEST_FAIL_WITH_MESSAGE("Failed to start server: " << rCommandLine);
-		return -1;
-		)
-
-	return WaitForServerStartup(pidFile, 0);
-
-#endif // WIN32
-}
-
-int WaitForServerStartup(const char *pidFile, int pidIfKnown)
-{
-	#ifdef WIN32
-	if (pidFile == NULL)
-	{
-		return pidIfKnown;
-	}
-	#else
-	// on other platforms there is no other way to get 
-	// the PID, so a NULL pidFile doesn't make sense.
-	ASSERT(pidFile != NULL);
-	#endif
-
-	// time for it to start up
-	BOX_TRACE("Waiting for server to start");
-
-	for (int i = 0; i < 15; i++)
-	{
-		if (TestFileNotEmpty(pidFile))
-		{
-			break;
-		}
-
-		if (pidIfKnown && !ServerIsAlive(pidIfKnown))
-		{
-			break;
-		}
-
-		::sleep(1);
-	}
-
-	// on Win32 we can check whether the process is alive
-	// without even checking the PID file
-
-	if (pidIfKnown && !ServerIsAlive(pidIfKnown))
-	{
-		TEST_FAIL_WITH_MESSAGE("Server died!");
-		return -1;
-	}
-
-	if (!TestFileNotEmpty(pidFile))
-	{
-		TEST_FAIL_WITH_MESSAGE("Server didn't save PID file");
-		return -1;
-	}
-
-	BOX_TRACE("Server started");
-
-	// wait a second for the pid to be written to the file
-	::sleep(1);
-
-	// read pid file
-	int pid = ReadPidFile(pidFile);
-
-	// On Win32 we can check whether the PID in the pidFile matches
-	// the one returned by the system, which it always should.
-
-	if (pidIfKnown && pid != pidIfKnown)
-	{
-		BOX_ERROR("Server wrote wrong pid to file (" << pidFile <<
-			"): expected " << pidIfKnown << " but found " <<
-			pid);
-		TEST_FAIL_WITH_MESSAGE("Server wrote wrong pid to file");	
-		return -1;
-	}
-
 	return pid;
 }
 

@@ -54,7 +54,7 @@ bool delete_account()
 }
 
 std::vector<uint32_t> ExpectedRefCounts;
-int bbstored_pid = 0, bbackupd_pid = 0;
+int bbstored_pid = 0, bbackupd_pid = 0, s3simulator_pid = 0;
 
 void set_refcount(int64_t ObjectID, uint32_t RefCount)
 {
@@ -266,11 +266,11 @@ bool check_reference_counts()
 	return counts_ok;
 }
 
-bool StartServer()
+bool StartServer(const std::string& daemon_args)
 {
-	bbstored_pid = StartDaemon(bbstored_pid,
-		BBSTORED " " + bbstored_args + " testfiles/bbstored.conf",
-		"testfiles/bbstored.pid");
+	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbstored_args);
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + daemon_args_final +
+		" testfiles/bbstored.conf", "testfiles/bbstored.pid");
 	return bbstored_pid != 0;
 }
 
@@ -282,11 +282,11 @@ bool StopServer(bool wait_for_process)
 	return result;
 }
 
-bool StartClient(const std::string& bbackupd_conf_file)
+bool StartClient(const std::string& bbackupd_conf_file, const std::string& daemon_args)
 {
-	bbackupd_pid = StartDaemon(bbackupd_pid,
-		BBACKUPD " " + bbackupd_args + " " + bbackupd_conf_file,
-		"testfiles/bbackupd.pid");
+	const std::string& daemon_args_final(daemon_args.size() ? daemon_args : bbackupd_args);
+	bbackupd_pid = StartDaemon(bbackupd_pid, BBACKUPD " " + daemon_args_final + " -c " +
+		bbackupd_conf_file, "testfiles/bbackupd.pid");
 	return bbackupd_pid != 0;
 }
 
@@ -298,3 +298,40 @@ bool StopClient(bool wait_for_process)
 	return result;
 }
 
+bool StartSimulator()
+{
+	s3simulator_pid = StartDaemon(s3simulator_pid,
+		"../../bin/s3simulator/s3simulator " + bbstored_args +
+		" testfiles/s3simulator.conf", "testfiles/s3simulator.pid");
+	return s3simulator_pid != 0;
+}
+
+bool StopSimulator()
+{
+	bool result = StopDaemon(s3simulator_pid, "testfiles/s3simulator.pid",
+		"s3simulator.memleaks", true);
+	s3simulator_pid = 0;
+	return result;
+}
+
+bool kill_running_daemons()
+{
+	bool success = true;
+
+	if(FileExists("testfiles/bbstored.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbstored.pid", true), success = false);
+	}
+
+	if(FileExists("testfiles/bbackupd.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/bbackupd.pid", true), success = false);
+	}
+
+	if(FileExists("testfiles/s3simulator.pid"))
+	{
+		TEST_THAT_OR(KillServer("testfiles/s3simulator.pid", true), success = false);
+	}
+
+	return success;
+}

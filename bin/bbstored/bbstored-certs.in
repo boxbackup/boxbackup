@@ -122,7 +122,7 @@ sub cmd_init_create_root
 	
 	# make CSR
 	die "Couldn't run openssl for CSR generation" unless
-		open(CSR,"|openssl req -new -key $key -sha1 -out $csr");
+		open(CSR,"|openssl req -new -key $key -sha256 -out $csr");
 	print CSR <<__E;
 .
 .
@@ -140,7 +140,7 @@ __E
 	die "Certificate request wasn't created.\n" unless -f $csr;
 	
 	# sign it to make a self-signed root CA key
-	if(system("openssl x509 -req -in $csr -sha1 -extensions v3_ca -signkey $key -out $cert -days $root_sign_period") != 0)
+	if(system("openssl x509 -req -in $csr -sha256 -extensions v3_ca -signkey $key -out $cert -days $root_sign_period") != 0)
 	{
 		die "Couldn't generate root certificate."
 	}
@@ -201,7 +201,7 @@ __E
 	my $out_cert = "$cert_dir/clients/$acc"."-cert.pem";
 
 	# sign it!
-	if(system("openssl x509 -req -in $csr -sha1 -extensions usr_crt -CA $cert_dir/roots/clientCA.pem -CAkey $cert_dir/keys/clientRootKey.pem -out $out_cert -days $sign_period") != 0)
+	if(system("openssl x509 -req -in $csr -sha256 -extensions usr_crt -CA $cert_dir/roots/clientCA.pem -CAkey $cert_dir/keys/clientRootKey.pem -out $out_cert -days $sign_period") != 0)
 	{
 		die "Signing failed"
 	}
@@ -257,7 +257,7 @@ __E
 	my $out_cert = "$cert_dir/servers/$common_name"."-cert.pem";
 
 	# sign it!
-	if(system("openssl x509 -req -in $csr -sha1 -extensions usr_crt -CA $cert_dir/roots/serverCA.pem -CAkey $cert_dir/keys/serverRootKey.pem -out $out_cert -days $sign_period") != 0)
+	if(system("openssl x509 -req -in $csr -sha256 -extensions usr_crt -CA $cert_dir/roots/serverCA.pem -CAkey $cert_dir/keys/serverRootKey.pem -out $out_cert -days $sign_period") != 0)
 	{
 		die "Signing failed"
 	}

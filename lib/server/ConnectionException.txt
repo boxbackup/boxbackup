@@ -15,6 +15,7 @@ TLSNoPeerCertificate		36
 TLSPeerCertificateInvalid	37	Check certification process
 TLSClosedWhenWriting		38
 TLSHandshakeTimedOut		39
+TLSPeerWeakCertificate			40	The peer's certificate is too weak for the current SSL Security Level, see https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates
 Protocol_Timeout			41	Probably a network issue between client and server.
 Protocol_ObjTooBig			42
 Protocol_BadCommandRecieved				44

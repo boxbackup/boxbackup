@@ -23,6 +23,7 @@
 #define BBACKUPQUERY    "..\\..\\bin\\bbackupquery\\bbackupquery.exe"
 #define BBSTOREACCOUNTS "..\\..\\bin\\bbstoreaccounts\\bbstoreaccounts.exe"
 #define TEST_RETURN(actual, expected) TEST_EQUAL(expected, actual);
+#define TEST_RETURN_COMMAND(actual, expected, command) TEST_EQUAL_LINE(expected, actual, command);
 #else
 #define BBACKUPCTL      "../../bin/bbackupctl/bbackupctl"
 #define BBACKUPD        "../../bin/bbackupd/bbackupd"
@@ -30,12 +31,16 @@
 #define BBACKUPQUERY    "../../bin/bbackupquery/bbackupquery"
 #define BBSTOREACCOUNTS "../../bin/bbstoreaccounts/bbstoreaccounts"
 #define TEST_RETURN(actual, expected) TEST_EQUAL((expected << 8), actual);
+#define TEST_RETURN_COMMAND(actual, expected, command) TEST_EQUAL_LINE((expected << 8), actual, command);
 #endif
+
+#define DEFAULT_BBSTORED_CONFIG_FILE "testfiles/bbstored.conf"
+#define DEFAULT_BBACKUPD_CONFIG_FILE "testfiles/bbackupd.conf"
+#define DEFAULT_S3_CACHE_DIR "testfiles/bbackupd-cache"
 
 extern int num_failures;
 extern int first_fail_line;
 extern int num_tests_selected;
-extern int old_failure_count;
 extern std::string first_fail_file;
 extern std::string bbackupd_args, bbstored_args, bbackupquery_args, test_args;
 extern std::list<std::string> run_only_named_tests;
@@ -215,6 +220,7 @@ int finish_test_suite();
 
 bool TestFileExists(const char *Filename);
 bool TestDirExists(const char *Filename);
+bool TestFileNotEmpty(const char *Filename);
 
 // -1 if doesn't exist
 int TestGetFileSize(const std::string& Filename);
@@ -222,8 +228,6 @@ std::string ConvertPaths(const std::string& rOriginal);
 int RunCommand(const std::string& rCommandLine);
 bool ServerIsAlive(int pid);
 int ReadPidFile(const char *pidFile);
-int LaunchServer(const std::string& rCommandLine, const char *pidFile);
-int WaitForServerStartup(const char *pidFile, int pidIfKnown);
 
 #define TestRemoteProcessMemLeaks(filename) \
 	TestRemoteProcessMemLeaksFunc(filename, __FILE__, __LINE__)

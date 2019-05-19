@@ -122,6 +122,7 @@ public:
 	bool KeyExists(const std::string& rKeyName) const;
 	const std::string &GetKeyValue(const std::string& rKeyName) const;
 	int GetKeyValueInt(const std::string& rKeyName) const;
+	int GetKeyValueInt(const std::string& rKeyName, int default_value) const;
 	uint32_t GetKeyValueUint32(const std::string& rKeyName) const;
 	bool GetKeyValueBool(const std::string& rKeyName) const;
 	std::vector<std::string> GetKeyNames() const;

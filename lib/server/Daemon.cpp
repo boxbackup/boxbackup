@@ -42,6 +42,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "BoxPortsAndFiles.h"
 #include "Configuration.h"
 #include "Daemon.h"
 #include "FileModificationTime.h"
@@ -51,6 +52,9 @@
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
+
+const ConfigurationVerifyKey ssl_security_level_key("SSLSecurityLevel",
+	ConfigTest_IsInt | ConfigTest_LastEntry, BOX_DEFAULT_SSL_SECURITY_LEVEL);
 
 Daemon *Daemon::spDaemon = 0;
 
