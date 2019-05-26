@@ -565,7 +565,9 @@ bool test_entry_pointing_to_missing_object_is_deleted(RaidAndS3TestSpecs::Specia
 
 		// Now break the reverse dependency by deleting x1 (the file,
 		// not the directory entry)
+		fs.GetLock();
 		fs.DeleteFile(x1id);
+		fs.ReleaseLock();
 
 		dir_en_check after_entries[] = {{-1, 0, 0}};
 		static checkdepinfoen after_deps[] = {{-1, 0, 0}};
@@ -924,15 +926,18 @@ bool test_delete_directory_change_container_id_duplicate_entry_delete_objects(
 	int64_t peep_id = getID("Test1/cannes/ict/peep");
 
 	{
+		fs.GetLock();
 		BackupStoreDirectory dir;
 		fs.GetDirectory(ict_id, dir);
 		dir.SetContainerID(73773);
 		fs.PutDirectory(dir);
+		fs.ReleaseLock();
 
 		TEST_THAT(check_for_errors(1, 142, 114, 0, 0, 28, 114, &spec));
 
 		// Duplicate the second entry
 		{
+			fs.GetLock();
 			fs.GetDirectory(peep_id, dir);
 			BackupStoreDirectory::Iterator i(dir);
 			i.Next();
@@ -941,12 +946,14 @@ bool test_delete_directory_change_container_id_duplicate_entry_delete_objects(
 			duplicatedID = en->GetObjectID();
 			dir.AddEntry(*en);
 			fs.PutDirectory(dir);
+			fs.ReleaseLock();
 		}
 
 		TEST_THAT(check_for_errors(1, 142, 114, 0, 0, 28, 114, &spec));
 
 		// Adjust file size of first file
 		{
+			fs.GetLock();
 			fs.GetDirectory(peep_id, dir);
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *en = i.Next(BackupStoreDirectory::Entry::Flags_File);
@@ -955,22 +962,27 @@ bool test_delete_directory_change_container_id_duplicate_entry_delete_objects(
 			en->SetSizeInBlocks(3473874);
 			TEST_THAT(en->GetSizeInBlocks() == 3473874);
 			fs.PutDirectory(dir);
+			fs.ReleaseLock();
 		}
 
 		TEST_THAT(check_for_errors(1, 142, 114, 0, 0, 28, 114, &spec));
 
 		// Delete a directory. The checker should be able to reconstruct it using the
 		// ContainerID of the contained files.
+		fs.GetLock();
 		int64_t ming_id = getID("Test1/pass/cacted/ming");
 		fs.DeleteDirectory(ming_id);
+		fs.ReleaseLock();
 
 		TEST_THAT(check_for_errors(2, 142, 114, 0, 0, 28, 114, &spec));
 
 		// Delete a file. The checker should not be able to reconstruct it, so the number
 		// of files and blocks used by current files should both drop by its size.
+		fs.GetLock();
 		int64_t scely_id = getID("Test1/cannes/ict/scely");
 		fs.DeleteFile(scely_id);
 		set_refcount(scely_id, 0);
+		fs.ReleaseLock();
 
 		TEST_THAT(check_for_errors(6, 141, 113, 0, 0, 28, 113, &spec));
 	}
@@ -1045,6 +1057,8 @@ bool test_directory_bad_object_id_delete_empty_dir_add_reference(
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	TEST_THAT(check_for_errors(0, 142, 114, 0, 0, 28, 114, &spec));
+
+	fs.GetLock();
 	int64_t ict_id = getID("Test1/foreomizes/stemptinevidate/ict");
 	int64_t cruishery_id = getID("Test1/divel/torsines/cruishery");
 	int64_t copied_id;
@@ -1079,6 +1093,7 @@ bool test_directory_bad_object_id_delete_empty_dir_add_reference(
 	}
 
 	// Fix it
+	fs.ReleaseLock();
 	TEST_THAT(check_for_errors(14, 141, 114, 0, 0, 27, 114, &spec));
 
 	// Check everything is as it should be
