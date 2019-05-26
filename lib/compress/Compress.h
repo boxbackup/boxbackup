@@ -60,9 +60,8 @@ public:
 			}
 			else
 			{
-				THROW_EXCEPTION_MESSAGE(CompressException, EndFailed,
-					"Zlib " << (Compressing ? "compression" : "decompression")
-					<< " end failed with error code " << r);
+				DELAYED_FAIL("End of compress/decompress failed with error code " <<
+					r);
 			}
 		}
 	}

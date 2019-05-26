@@ -82,7 +82,7 @@ UnixUser::~UnixUser()
 		// Revert to "real" user and group id of the process
 		if(::setegid(::getgid()) != 0 || ::seteuid(::getuid()) != 0)
 		{
-			THROW_EXCEPTION(CommonException, CouldNotRestoreProcessUser)
+			DELAYED_FAIL(BOX_SYS_ERROR_MESSAGE("Failed to restore original UID or GID"));
 		}
 	}
 }
