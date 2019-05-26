@@ -47,7 +47,7 @@ bin/s3simulator		lib/httpserver
 # With CMake, dependency on a binary target is not enough to inherit the header files for
 # libraries that it uses, so we need to specify lib targets as well as bin dependencies:
 test/backupstore	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulator
-test/backupstorefix	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/bbackupquery	bin/bbackupd	bin/bbackupctl
+test/backupstorefix	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/bbackupquery	bin/bbackupd	bin/bbackupctl	bin/s3simulator
 test/backupstorepatch	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulator
 test/backupdiff		lib/backupclient
 test/bbackupd		lib/bbackupd	lib/bbstored	lib/bbackupquery	bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl
