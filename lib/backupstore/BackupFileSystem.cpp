@@ -389,12 +389,8 @@ RaidBackupFileSystem::~RaidBackupFileSystem()
 	}
 	catch(BoxException& e)
 	{
-		// Destructors aren't supposed to throw exceptions, so it's too late
-		// for us to do much except log a warning
-		BOX_WARNING("Failed to release a lock while destroying "
-			"RaidBackupFileSystem: " << e.what());
-		Logging::sDestructorExceptions.push_back("Failed to release a lock while "
-			"destroying RaidBackupFileSystem");
+		DELAYED_FAIL("Failed to release a lock while destroying RaidBackupFileSystem: " <<
+			e.what());
 	}
 }
 
@@ -2250,12 +2246,8 @@ S3BackupFileSystem::~S3BackupFileSystem()
 		}
 		catch(BoxException& e)
 		{
-			// Destructors aren't supposed to throw exceptions, so it's too late
-			// for us to do much except log a warning
-			BOX_WARNING("Failed to release a lock while destroying "
+			DELAYED_FAIL("Failed to release a lock while destroying "
 				"S3BackupFileSystem: " << e.what());
-			Logging::sDestructorExceptions.push_back("Failed to release a lock while "
-				"destroying S3BackupFileSystem");
 		}
 	}
 }

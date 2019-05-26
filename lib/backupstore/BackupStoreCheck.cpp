@@ -84,17 +84,15 @@ BackupStoreCheck::~BackupStoreCheck()
 	if(mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
-		// just catch and log them.
+		// catch them.
 		try
 		{
 			mpNewRefs->Discard();
 		}
 		catch(BoxException &e)
 		{
-			BOX_ERROR("Error while destroying BackupStoreCheck: discarding "
-				"the refcount database threw an exception: " << e.what());
-			Logging::sDestructorExceptions.push_back("Discarding the refcount database "
-				"threw an exception while destroying BackupStoreCheck");
+			DELAYED_FAIL("Discarding the refcount database threw an exception while "
+				"destroying BackupStoreCheck: " << e.what());
 		}
 
 		mpNewRefs = NULL;

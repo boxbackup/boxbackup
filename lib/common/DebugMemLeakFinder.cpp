@@ -141,7 +141,7 @@ MemLeakSuppressionGuard::MemLeakSuppressionGuard()
 
 MemLeakSuppressionGuard::~MemLeakSuppressionGuard()
 {
-	ASSERT(!memleakfinder_global_enable);
+	ASSERT_NOTHROW(!memleakfinder_global_enable);
 	memleakfinder_global_enable = true;
 }
 

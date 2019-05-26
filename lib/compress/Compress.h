@@ -62,7 +62,7 @@ public:
 			}
 			else
 			{
-				THROW_EXCEPTION(CompressException, EndFailed)
+				DELAYED_FAIL("End of compress/decompress failed with error code " << r);
 			}
 		}
 	}

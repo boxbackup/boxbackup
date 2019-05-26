@@ -38,6 +38,7 @@ BOX_CHECK_CXX_FLAG(-Werror=constant-logical-operand)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
 BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=exceptions)
 BOX_CHECK_CXX_FLAG(-Werror=infinite-recursion)
 BOX_CHECK_CXX_FLAG(-Werror=narrowing)
 BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)

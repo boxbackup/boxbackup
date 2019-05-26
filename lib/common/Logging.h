@@ -167,6 +167,30 @@
 	BOX_SYS_ERROR_MESSAGE(stuff << BOX_SOCKET_DESC(_type, _name, _port))
 #endif
 
+#define DELAYED_FAIL(message) \
+	{ \
+		std::ostringstream buf; \
+		buf << message << " at " __FILE__ ":" << __LINE__; \
+		BOX_WARNING(buf.str()); \
+		Logging::sDestructorExceptions.push_back(buf.str()); \
+	}
+
+#ifndef BOX_RELEASE_BUILD
+	#define ASSERT_NOTHROW(cond) \
+	{ \
+		if(!(cond)) \
+		{ \
+			DELAYED_FAIL(#cond); \
+		} \
+	}
+	#define IF_ASSERT_NOTHROW(cond) \
+		ASSERT_NOTHROW(cond); \
+		if(cond) // followed by a {block}
+#else
+	#define ASSERT_NOTHROW(cond)
+	#define IF_ASSERT_NOTHROW(cond) if(false)
+#endif
+
 #define BOX_FORMAT_HEX32(number) \
 	std::hex << \
 	std::showbase << \

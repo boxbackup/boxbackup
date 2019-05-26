@@ -854,9 +854,11 @@ LogLevelOverrideByFileGuard::~LogLevelOverrideByFileGuard()
 	{
 		auto this_pos = std::find(Logging::sLogLevelOverrideByFileGuards.begin(),
 			Logging::sLogLevelOverrideByFileGuards.end(), *this);
-		ASSERT(this_pos != Logging::sLogLevelOverrideByFileGuards.end());
-		Logging::sLogLevelOverrideByFileGuards.erase(this_pos);
-		Logging::UpdateLowestCommonLevel();
+		IF_ASSERT_NOTHROW(this_pos != Logging::sLogLevelOverrideByFileGuards.end())
+		{
+			Logging::sLogLevelOverrideByFileGuards.erase(this_pos);
+			Logging::UpdateLowestCommonLevel();
+		}
 	}
 }
 

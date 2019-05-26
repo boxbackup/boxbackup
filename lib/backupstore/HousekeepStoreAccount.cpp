@@ -83,17 +83,15 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 	if(mpNewRefs)
 	{
 		// Discard() can throw exception, but destructors aren't supposed to do that, so
-		// just catch and log them.
+		// catch them.
 		try
 		{
 			mpNewRefs->Discard();
 		}
 		catch(BoxException &e)
 		{
-			BOX_ERROR("Failed to destroy housekeeper: discarding the refcount "
-				"database threw an exception: " << e.what());
-			Logging::sDestructorExceptions.push_back("Discarding the refcount database "
-				"threw an exception while destroying HousekeepStoreAccount");
+			DELAYED_FAIL("Discarding the refcount database threw an exception while "
+				"destroying HousekeepStoreAccount: " << e.what());
 		}
 
 		mpNewRefs = NULL;
