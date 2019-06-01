@@ -120,7 +120,7 @@ bool check_new_account_info()
 	TEST_EQUAL(1, info->GetNumDirectories());
 	TEST_EQUAL(true, info->IsAccountEnabled());
 	TEST_EQUAL(true, info->IsReadOnly());
-	TEST_EQUAL(0, info->GetClientStoreMarker());
+	// ClientStoreMarker is now initialised to a pseudorandom number, so cannot test its value
 	TEST_EQUAL("test", info->GetAccountName());
 
 	FileStream root_stream("testfiles/store/subdir/0x1.dir");
