@@ -927,3 +927,22 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 
 	return reply;
 }
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolFlushDirectoryCache::DoCommand()
+//		Purpose: Flush any modified directories in the cache out to
+//		         disk. This is only intended for use in tests!
+//		Created: 2019-06-15
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolFlushDirectoryCache::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+
+	rContext.FlushDirectoryCache();
+
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(0));
+}

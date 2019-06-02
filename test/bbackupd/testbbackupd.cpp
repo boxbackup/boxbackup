@@ -873,9 +873,9 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 	TEST_THAT_OR(en != 0, return false);
 
 	int16_t flags = en->GetFlags();
-	TEST_LINE(flags && BackupStoreDirectory::Entry::Flags_Deleted,
+	TEST_LINE(flags & BackupStoreDirectory::Entry::Flags_Deleted,
 		rName + " should have been deleted");
-	return flags && BackupStoreDirectory::Entry::Flags_Deleted;
+	return flags & BackupStoreDirectory::Entry::Flags_Deleted;
 }
 
 bool compare_external(BackupQueries::ReturnCode::Type expected_status,
@@ -1945,6 +1945,10 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		{
 #ifdef WIN32
 			apClientContext.reset();
+#else
+			// We don't want housekeeping to run, but we do want to see the changes that
+			// bbackupd made to the store:
+			apClientContext->GetOpenConnection()->QueryFlushDirectoryCache();
 #endif
 		}
 

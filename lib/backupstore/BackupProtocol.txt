@@ -277,3 +277,11 @@ AccountUsage2	45	Reply
 
 # 46 is CreateDirectory2
 # 47 is Finished2
+
+# FlushDirectoryCache is used in some tests, to force modified directory entries that are still
+# in the cache to be flushed out to disk, so that we can check them. It is not intended for use
+# in normal operations, since the cache should maintain itself, and the client can and should
+# disconnect before anyone else can be guaranteed to see its changes.
+
+FlushDirectoryCache	48	Command(Success)
+	# no data members
