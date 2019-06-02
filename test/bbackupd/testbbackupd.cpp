@@ -873,9 +873,9 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 	TEST_THAT_OR(en != 0, return false);
 
 	int16_t flags = en->GetFlags();
-	TEST_LINE(flags && BackupStoreDirectory::Entry::Flags_Deleted,
+	TEST_LINE(flags & BackupStoreDirectory::Entry::Flags_Deleted,
 		rName + " should have been deleted");
-	return flags && BackupStoreDirectory::Entry::Flags_Deleted;
+	return flags & BackupStoreDirectory::Entry::Flags_Deleted;
 }
 
 bool compare_external(BackupQueries::ReturnCode::Type expected_status,

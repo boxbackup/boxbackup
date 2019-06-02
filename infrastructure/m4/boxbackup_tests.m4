@@ -33,6 +33,7 @@ BOX_CHECK_CXX_FLAG(-Wall)
 dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
 
 BOX_CHECK_CXX_FLAG(-Werror=array-bounds)
+BOX_CHECK_CXX_FLAG(-Werror=constant-logical-operand)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
