@@ -26,6 +26,10 @@
 	#include <sys/wait.h>
 #endif
 
+#ifdef HAVE_PWD_H
+	#include <pwd.h>
+#endif
+
 #ifdef HAVE_SYS_XATTR_H
 	#include <cerrno>
 	#include <sys/xattr.h>
@@ -428,7 +432,8 @@ bool kill_running_daemons()
 }
 
 bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
-	bool do_start_bbstored = true)
+	bool do_start_bbstored = true,
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	Timers::Cleanup(false); // don't throw exception if not initialised
 	Timers::Init();
@@ -469,8 +474,7 @@ bool setup_test_bbackupd(BackupDaemon& bbackupd, bool do_unpack_files = true,
 		#endif
 	}
 
-	TEST_THAT_OR(configure_bbackupd(bbackupd, "testfiles/bbackupd.conf"),
-		FAIL);
+	TEST_THAT_OR(configure_bbackupd(bbackupd, bbackupd_conf_file), FAIL);
 	spDaemon = &bbackupd;
 	return true;
 }
@@ -985,13 +989,14 @@ bool test_entry_deleted(BackupStoreDirectory& rDir,
 
 bool compare(BackupQueries::ReturnCode::Type expected_status,
 	const std::string& bbackupquery_options = "",
-	const std::string& compare_options = "-acQ")
+	const std::string& compare_options = "-acQ",
+	const std::string& bbackupd_conf_file = "testfiles/bbackupd.conf")
 {
 	std::string cmd = BBACKUPQUERY;
 	cmd += " ";
 	cmd += (expected_status == BackupQueries::ReturnCode::Compare_Same)
 		? "-Wwarning" : "-Werror";
-	cmd += " -c testfiles/bbackupd.conf ";
+	cmd += " -c " + bbackupd_conf_file;
 	cmd += " " + bbackupquery_options;
 	cmd += " \"compare " + compare_options + "\" quit";
 
@@ -4039,6 +4044,113 @@ bool test_parse_syncallowscript_output()
 	TEARDOWN_TEST_BBACKUPD();
 }
 
+
+bool test_bbackupd_config_script()
+{
+	SETUP_TEST_BBACKUPD();
+
+#ifdef WIN32
+	BOX_NOTICE("skipping test on this platform"); // TODO: write a PowerShell version
+#else
+	char buf[PATH_MAX];
+	if (getcwd(buf, sizeof(buf)) == NULL)
+	{
+		BOX_LOG_SYS_ERROR("getcwd");
+	}
+	std::string current_dir = buf;
+
+	TEST_THAT(mkdir("testfiles/tmp", 0777) == 0);
+	TEST_THAT(mkdir("testfiles/TestDir1", 0777) == 0);
+
+	// Generate a new configuration for our test bbackupd, from scratch:
+	std::string cmd = "../../../bin/bbackupd/bbackupd-config " +
+		current_dir + "/testfiles/tmp " // config-dir
+		"lazy " // backup-mode
+		"12345 " // account-num
+		"localhost " + // server-hostname
+		current_dir + "/testfiles " + // working-dir
+		current_dir + "/testfiles/TestDir1"; // backup directories
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	// Open the generated config file and add a StorePort line:
+	{
+		FileStream conf_file("testfiles/tmp/bbackupd.conf", O_WRONLY | O_APPEND);
+		conf_file.IOStream::Write("StorePort = 22011\n");
+		conf_file.Close();
+	}
+
+	// Generate a new configuration for our test bbstored, from scratch:
+	struct passwd *result = getpwuid(getuid());
+	TEST_THAT_OR(result != NULL, FAIL); // failed to get username for current user
+	std::string username = result->pw_name;
+
+	cmd = "../../../bin/bbstored/bbstored-config testfiles/tmp localhost " + username + " "
+		"testfiles/raidfile.conf";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "sed -i.orig -e 's/\\(ListenAddresses = inet:localhost\\)/\\1:22011/' "
+		"-e 's@PidFile = .*/run/bbstored.pid@PidFile = testfiles/bbstored.pid@' "
+		"testfiles/tmp/bbstored.conf";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	// Create a server certificate authority, and sign the client and server certificates:
+	cmd = "../../../bin/bbstored/bbstored-certs testfiles/tmp/ca init";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign "
+		"testfiles/tmp/bbackupd/12345-csr.pem";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "echo yes | ../../../bin/bbstored/bbstored-certs testfiles/tmp/ca sign-server "
+		"testfiles/tmp/bbstored/localhost-csr.pem";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	// Copy the certificate files into the right places
+	cmd = "cp testfiles/tmp/ca/clients/12345-cert.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/roots/serverCA.pem testfiles/tmp/bbackupd";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/servers/localhost-cert.pem testfiles/tmp/bbstored";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	cmd = "cp testfiles/tmp/ca/roots/clientCA.pem testfiles/tmp/bbstored";
+	TEST_RETURN(system(cmd.c_str()), 0)
+
+	cmd = BBSTOREACCOUNTS " -c testfiles/tmp/bbstored.conf create 12345 0 1M 2M";
+	TEST_RETURN_COMMAND(system(cmd.c_str()), 0, cmd)
+
+	bbstored_pid = StartDaemon(bbstored_pid, BBSTORED " " + bbstored_args +
+		" -o testfiles/tmp/bbstored.log testfiles/tmp/bbstored.conf",
+		"testfiles/bbstored.pid");
+
+	{
+		Capture capture;
+		Logging::TempLoggerGuard guard(&capture);
+
+		BackupDaemon bbackupd;
+		TEST_THAT(
+			setup_test_bbackupd(
+				bbackupd,
+				true, // do_unpack_files
+				false, // !do_start_bbstored
+				"testfiles/tmp/bbackupd.conf")
+			);
+
+		bbackupd.RunSyncNow();
+	}
+
+	TEST_THAT(compare(BackupQueries::ReturnCode::Compare_Same,
+		"-otestfiles/tmp/bbackupquery.log", "-acQ", "testfiles/tmp/bbackupd.conf"));
+
+	TEST_THAT(StopServer());
+#endif // !WIN32
+
+	TEARDOWN_TEST_BBACKUPD();
+}
+
+
 int test(int argc, const char *argv[])
 {
 	// SSL library
@@ -4104,6 +4216,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_backup_many_files());
 	TEST_THAT(test_parse_incomplete_command());
 	TEST_THAT(test_parse_syncallowscript_output());
+	TEST_THAT(test_bbackupd_config_script());
 
 	TEST_THAT(kill_running_daemons());
 

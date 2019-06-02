@@ -14,6 +14,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "BoxPortsAndFiles.h"
 #include "CryptoUtils.h"
 #include "SSLLib.h"
 #include "TLSContext.h"
@@ -84,6 +85,14 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 		THROW_EXCEPTION(ServerException, TLSAllocationFailed)
 	}
 	
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	BOX_WARNING("This version of Box Backup overrides the system-wide SSLSecurityLevel for "
+		"backwards compatibility. Please upgrade as soon as possible. See "
+		"https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates#workaround-2 "
+		"for details");
+	SSL_CTX_set_security_level(mpContext, BOX_DEFAULT_SSL_SECURITY_LEVEL);
+#endif
+
 	// Setup our identity
 	if(::SSL_CTX_use_certificate_chain_file(mpContext, CertificatesFile) != 1)
 	{

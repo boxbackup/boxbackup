@@ -449,6 +449,80 @@ void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainst
 	TEST_THAT(count == (24273*3));	// over 64 k of data, definately
 }
 
+bool test_security_level(int cert_level)
+{
+	int old_num_failures = num_failures;
+
+	// Context first
+	TLSContext context;
+	if(cert_level == 0)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/clientCerts.pem",
+			"testfiles/clientPrivKey.pem",
+			"testfiles/clientTrustedCAs.pem");
+	}
+	else if(cert_level == 1)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/seclevel2-sha1/ca/clients/1234567-cert.pem",
+			"testfiles/seclevel2-sha1/bbackupd/1234567-key.pem",
+			"testfiles/seclevel2-sha1/ca/roots/serverCA.pem");
+	}
+	else if(cert_level == 2)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/seclevel2-sha256/ca/clients/1234567-cert.pem",
+			"testfiles/seclevel2-sha256/bbackupd/1234567-key.pem",
+			"testfiles/seclevel2-sha256/ca/roots/serverCA.pem");
+	}
+	else
+	{
+		TEST_FAIL_WITH_MESSAGE("No certificates generated for level " << cert_level);
+		return false;
+	}
+
+	SocketStreamTLS conn;
+	conn.Open(context, Socket::TypeINET, "localhost", 2003);
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+// Test the certificates that were distributed with the Box Backup source since ancient times,
+// which have only 1024-bit keys, and thus fail with "ee key too small".
+bool test_ancient_certificates()
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(0)); // cert_level
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+// Test a set of more recent certificates, which have a longer key but are signed using the SHA1
+// algorithm instead of SHA256, which fail with "ca md too weak" instead.
+bool test_old_certificates()
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(1)); // cert_level
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+
+bool test_new_certificates()
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(2)); // cert_level
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
 
 int test(int argc, const char *argv[])
 {
@@ -682,6 +756,11 @@ int test(int argc, const char *argv[])
 				TEST_THAT(ServerIsAlive(pid));
 			#endif
 
+			// Try testing with different security levels, check that the behaviour is
+			// as documented at:
+			// https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates
+			TEST_THAT(test_ancient_certificates());
+
 			// Kill it
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
@@ -691,6 +770,24 @@ int test(int argc, const char *argv[])
 				TestRemoteProcessMemLeaks("test-srv3.memleaks");
 			#endif
 		}
+
+		cmd = TEST_EXECUTABLE " --test-daemon-args=";
+		cmd += test_args;
+		cmd += " srv3 testfiles/srv3-seclevel2-sha1.conf";
+		pid = LaunchServer(cmd, "testfiles/srv3.pid");
+
+		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(test_old_certificates());
+		TEST_THAT(KillServer(pid));
+
+		cmd = TEST_EXECUTABLE " --test-daemon-args=";
+		cmd += test_args;
+		cmd += " srv3 testfiles/srv3-seclevel2-sha256.conf";
+		pid = LaunchServer(cmd, "testfiles/srv3.pid");
+
+		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(test_new_certificates());
+		TEST_THAT(KillServer(pid));
 	}
 	
 //protocolserver:
