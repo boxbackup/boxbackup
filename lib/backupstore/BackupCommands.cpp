@@ -882,7 +882,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage::DoCommand(Ba
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolGetIsAlive::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Name:    BackupProtocolGetIsAlive::DoCommand()
 //		Purpose: Return the amount of disc space used
 //		Created: 19/4/04
 //
@@ -900,7 +900,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetIsAlive::DoCommand(BackupP
 // --------------------------------------------------------------------------
 //
 // Function
-//		Name:    BackupProtocolGetAccountUsage2::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Name:    BackupProtocolGetAccountUsage2::DoCommand()
 //		Purpose: Return the amount of disc space used
 //		Created: 26/12/13
 //
@@ -936,4 +936,23 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolGetAccountUsage2::DoCommand(
 	#undef COPY
 
 	return reply;
+}
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolFlushDirectoryCache::DoCommand()
+//		Purpose: Flush any modified directories in the cache out to
+//		         disk. This is only intended for use in tests!
+//		Created: 2019-06-15
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolFlushDirectoryCache::DoCommand(
+	BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+
+	rContext.FlushDirectoryCache();
+
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(0));
 }

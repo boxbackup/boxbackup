@@ -50,7 +50,7 @@ test/backupstore	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulat
 test/backupstorefix	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/bbackupquery	bin/bbackupd	bin/bbackupctl	bin/s3simulator
 test/backupstorepatch	lib/backupclient	bin/bbstored	bin/bbstoreaccounts	bin/s3simulator
 test/backupdiff		lib/backupclient
-test/bbackupd		lib/bbackupd	lib/bbstored	lib/bbackupquery	bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl
+test/bbackupd		lib/bbackupd	lib/bbstored	lib/bbackupquery	bin/bbackupd	bin/bbstored bin/bbstoreaccounts bin/bbackupquery bin/bbackupctl	bin/s3simulator
 test/s3store		lib/backupclient	bin/s3simulator bin/bbstoreaccounts
 
 # HTTP server system

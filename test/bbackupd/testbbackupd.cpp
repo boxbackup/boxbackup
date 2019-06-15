@@ -1651,12 +1651,25 @@ bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 
 bool test_backup_pauses_when_store_is_full(RaidAndS3TestSpecs::Specialisation& spec)
 {
+	Console& console(Logging::GetConsole());
+	Log::Level original_level = console.GetLevel();
+
 	// Temporarily enable timestamp logging, to help debug race conditions causing
 	// test failures:
-	Logger::LevelGuard temporary_verbosity(Logging::GetConsole(), Log::TRACE);
+	Logger::LevelGuard temporary_verbosity(console, Log::TRACE);
 	Console::SettingsGuard save_old_settings;
 	Console::SetShowTime(true);
 	Console::SetShowTimeMicros(true);
+
+	// But don't log all S3 requests or file open requests, unless we were already logging
+	// at TRACE level:
+	LogLevelOverrideByFileGuard dont_log_s3_commands("S3Client.cpp", "", Log::INFO);
+	LogLevelOverrideByFileGuard dont_log_file_opens("FileStream.cpp", "", Log::INFO);
+	if (original_level < Log::TRACE)
+	{
+		dont_log_s3_commands.Install();
+		dont_log_file_opens.Install();
+	}
 
 	SETUP_TEST_SPECIALISED_BBSTORED(spec);
 
@@ -1944,6 +1957,10 @@ bool test_bbackupd_exclusions(RaidAndS3TestSpecs::Specialisation& spec)
 		{
 #ifdef WIN32
 			apClientContext.reset();
+#else
+			// We don't want housekeeping to run, but we do want to see the changes that
+			// bbackupd made to the store:
+			apClientContext->GetOpenConnection()->QueryFlushDirectoryCache();
 #endif
 		}
 
@@ -2229,6 +2246,8 @@ bool test_bbackupd_responds_to_connection_failure_in_process_s3(RaidAndS3TestSpe
 	TEST_THAT(::system("rm -f testfiles/notifyran.store-full.*") == 0);
 
 	{
+		// Unless the log level is set to trace, hide all messages from this bbackupd:
+
 		Console& console(Logging::GetConsole());
 		Logger::LevelGuard guard(console);
 

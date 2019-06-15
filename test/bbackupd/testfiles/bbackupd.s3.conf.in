@@ -41,6 +41,9 @@ LogAllFileAccess = yes
 
 CommandSocket = testfiles/bbackupd.sock
 
+NotifyScript    = @TARGET_PERL@ testfiles/notifyscript.pl
+SyncAllowScript = @TARGET_PERL@ testfiles/syncallowscript.pl
+
 Server
 {
 	PidFile = testfiles/bbackupd.pid
