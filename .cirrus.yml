@@ -6,9 +6,12 @@ test_task:
   pre_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl1.0-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
-  test_script:
+  configure_script:
     - ./bootstrap
     - ./configure
+  build_client_script:
     - make build-backup-client
+  build_server_script:
     - make build-backup-server
+  test_script:
     - make debug_tests
