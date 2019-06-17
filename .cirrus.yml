@@ -1,0 +1,14 @@
+test_task:
+  container:
+    matrix:
+      - image: debian:jessie
+      - image: debian:stretch
+  pre_script:
+    - apt-get update
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl1.0-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+  test_script:
+    - ./bootstrap
+    - ./configure
+    - make build-backup-client
+    - make build-backup-server
+    - make debug_tests
