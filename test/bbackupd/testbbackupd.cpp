@@ -1610,8 +1610,9 @@ bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 	TEST_THAT_OR(file_id_3 != 0, FAIL);
 	fs.ReleaseLock();
 
-	bbackupd.Configure((spec.name() == "s3") ?
-		"testfiles/bbackupd.logall.s3.conf" : bbackupd_conf_file);
+	TEST_THAT(configure_bbackupd(bbackupd,
+			(spec.name() == "s3") ? "testfiles/bbackupd.logall.s3.conf" :
+			bbackupd_conf_file));
 
 	LogLevelOverrideByFileGuard log_directory_record_trace(
 		"BackupClientDirectoryRecord.cpp", "", Log::TRACE);
@@ -2397,6 +2398,9 @@ bool test_bbackupd_responds_to_connection_failure_out_of_process(
 		::signal(SIGPIPE, SIG_IGN);
 
 		{
+			BackupDaemon bbackupd;
+			TEST_THAT(configure_bbackupd(bbackupd, bbackupd_conf_file));
+
 			Console& console(Logging::GetConsole());
 			Logger::LevelGuard guard(console);
 
@@ -2405,9 +2409,6 @@ bool test_bbackupd_responds_to_connection_failure_out_of_process(
 				console.Filter(Log::NOTHING);
 			}
 
-			BackupDaemon bbackupd;
-			bbackupd.Configure(bbackupd_conf_file);
-			bbackupd.InitCrypto();
 			bbackupd.RunSyncNowWithExceptionHandling();
 		}
 
