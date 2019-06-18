@@ -188,7 +188,9 @@
 		if(cond) // followed by a {block}
 #else
 	#define ASSERT_NOTHROW(cond)
-	#define IF_ASSERT_NOTHROW(cond) if(false)
+	// IF_ASSERT_NOTHROW should do the if() part, but not the ASSERT part.
+	#define IF_ASSERT_NOTHROW(cond) \
+		if(cond) // followed by a {block}
 #endif
 
 #define BOX_FORMAT_HEX32(number) \
