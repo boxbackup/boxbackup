@@ -1652,6 +1652,8 @@ bool test_backup_hardlinked_files(RaidAndS3TestSpecs::Specialisation& spec)
 
 bool test_backup_pauses_when_store_is_full(RaidAndS3TestSpecs::Specialisation& spec)
 {
+	SETUP_TEST_SPECIALISED_BBSTORED(spec);
+
 	Console& console(Logging::GetConsole());
 	Log::Level original_level = console.GetLevel();
 
@@ -1671,8 +1673,6 @@ bool test_backup_pauses_when_store_is_full(RaidAndS3TestSpecs::Specialisation& s
 		dont_log_s3_commands.Install();
 		dont_log_file_opens.Install();
 	}
-
-	SETUP_TEST_SPECIALISED_BBSTORED(spec);
 
 	BackupFileSystem& fs(spec.control().GetFileSystem());
 	CREATE_LOCAL_CONTEXT_AND_PROTOCOL(fs, context, protocol, false); // !ReadOnly
