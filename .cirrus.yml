@@ -1,13 +1,13 @@
 standard_build: &standard_build
   configure_script:
-    - ./bootstrap
-    - ./configure
+    - su build -c ./bootstrap
+    - su build -c ./configure
   build_client_script:
-    - make build-backup-client
+    - su build -c 'make build-backup-client'
   build_server_script:
-    - make build-backup-server
+    - su build -c 'make build-backup-server'
   test_script:
-    - make debug_tests
+    - su build -c 'make debug_tests'
     
 debian_test_task:
   container:
@@ -16,14 +16,21 @@ debian_test_task:
         cpu: 4
         memory: 6
   pre_script:
+    - echo "User: $USER"
+    - id
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+    - useradd -m build
+    - chown -R build: .
   <<: *standard_build
 
 freebsd_test_task:
   freebsd_instance:
     image: freebsd-12-0-release-amd64
   pre_script:
-    - pkg update
+    - echo "User: $USER"
+    - id
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
+    - pw useradd build -m -w none
+    - chown -R build: .
   <<: *standard_build
