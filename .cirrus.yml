@@ -1,11 +1,12 @@
 test_task:
   container:
     matrix:
-      - image: debian:jessie
       - image: debian:stretch
+        cpu: 4
+        memory: 6
   pre_script:
     - apt-get update
-    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl1.0-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
   configure_script:
     - ./bootstrap
     - ./configure
