@@ -1,3 +1,5 @@
+gcp_credentials: ENCRYPTED[d84e50350f4a53180dc8bda3a637b0da5a7f5526b2f648b0e8e7a52379de1328b203b98296e439e8eb83e00ec6675ca1]
+
 standard_build: &standard_build
   configure_script:
     - su build -c ./bootstrap
@@ -10,11 +12,15 @@ standard_build: &standard_build
     - su build -c 'make debug_tests'
     
 debian_test_task:
-  container:
-    matrix:
-      - image: debian:stretch
-        cpu: 4
-        memory: 6
+  gce_instance:
+    image_project: debian-cloud
+    image_name: debian-9-stretch-v20190618
+    zone: europe-west2-c
+    type: n1-standard-2  # 2 vCPU, 7.5GB mem
+    disk: 10
+    use_ssd: true
+    #preemptible: $CIRRUS_BRANCH != "master"
+    
   pre_script:
     - echo "User: $USER"
     - id
