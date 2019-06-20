@@ -10,20 +10,21 @@ standard_build: &standard_build
     - su build -c 'make build-backup-server'
   test_script:
     - su build -c 'make debug_tests'
-    
+
+gce_instance:
+  zone: europe-west2-c
+  type: g1-small  # 1 shared vCPU, 1.7GB mem
+  disk: 10
+  use_ssd: true
+  #preemptible: $CIRRUS_BRANCH != "master"
+
 debian_test_task:
+  name: Debian 9
   gce_instance:
     image_project: debian-cloud
     image_name: debian-9-stretch-v20190618
-    zone: europe-west2-c
-    type: n1-standard-2  # 2 vCPU, 7.5GB mem
-    disk: 10
-    use_ssd: true
-    #preemptible: $CIRRUS_BRANCH != "master"
     
   pre_script:
-    - echo "User: $USER"
-    - id
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
@@ -31,8 +32,12 @@ debian_test_task:
   <<: *standard_build
 
 freebsd_test_task:
-  freebsd_instance:
-    image: freebsd-12-0-release-amd64
+  name: FreeBSD 12.0
+  gce_instance:
+    image_project: freebsd-org-cloud-dev
+    image_name: freebsd-12-0-release-amd64
+    disk: 30  # Image is 29GB, VM can't be smaller
+    platform: FreeBSD
   pre_script:
     - echo "User: $USER"
     - id
