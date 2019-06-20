@@ -13,7 +13,7 @@ standard_build: &standard_build
 
 gce_instance:
   zone: europe-west2-c
-  type: g1-small  # 1 shared vCPU, 1.7GB mem
+  type: n1-standard-1  # 1 vCPU, 3.75GB mem
   disk: 10
   use_ssd: true
   #preemptible: $CIRRUS_BRANCH != "master"
