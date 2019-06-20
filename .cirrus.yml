@@ -18,7 +18,7 @@ gce_instance:
   use_ssd: true
   #preemptible: $CIRRUS_BRANCH != "master"
 
-debian_test_task:
+task:
   name: Debian 9
   gce_instance:
     image_project: debian-cloud
@@ -31,7 +31,18 @@ debian_test_task:
     - chown -R build: .
   <<: *standard_build
 
-freebsd_test_task:
+task:
+  name: CentOS 7
+  gce_instance:
+    image_project: centos-cloud
+    image_name: centos-7-v20190619
+  pre_script:
+    - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
+    - useradd -m build
+    - chown -R build: .
+  <<: *standard_build
+
+task:
   name: FreeBSD 12.0
   gce_instance:
     image_project: freebsd-org-cloud-dev
@@ -39,9 +50,24 @@ freebsd_test_task:
     disk: 30  # Image is 29GB, VM can't be smaller
     platform: FreeBSD
   pre_script:
-    - echo "User: $USER"
-    - id
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
     - pw useradd build -m -w none
     - chown -R build: .
+  <<: *standard_build
+
+task:
+  matrix:
+    - name: Ubuntu 16.04
+      gce_instance:
+        image_project: ubuntu-os-cloud
+        image_name: ubuntu-1604-xenial-v20190617
+    - name: Ubuntu 18.04
+      gce_instance:
+        image_project: ubuntu-os-cloud
+        image_name: ubuntu-1804-bionic-v20190617
+  pre_script:
+    - apt-get update
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+    - useradd -m build
+    - chown -R build .
   <<: *standard_build
