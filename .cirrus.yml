@@ -11,7 +11,7 @@ standard_build: &standard_build
   test_script:
     - su build -c 'make debug_tests'
 
-gce_instance:
+standard_gce_instance: &standard_gce_instance
   zone: europe-west2-c
   type: n1-standard-1  # 1 vCPU, 3.75GB mem
   disk: 10
@@ -21,6 +21,7 @@ gce_instance:
 task:
   name: CentOS 7
   gce_instance:
+    <<: *standard_gce_instance
     image_project: centos-cloud
     image_name: centos-7-v20190619
   pre_script:
@@ -32,6 +33,7 @@ task:
 task:
   name: Debian 9
   gce_instance:
+    <<: *standard_gce_instance
     image_project: debian-cloud
     image_name: debian-9-stretch-v20190618
 
@@ -45,6 +47,7 @@ task:
 task:
   name: FreeBSD 12.0
   gce_instance:
+    <<: *standard_gce_instance
     image_project: freebsd-org-cloud-dev
     image_name: freebsd-12-0-release-amd64
     disk: 30  # Image is 29GB, VM can't be smaller
@@ -76,10 +79,12 @@ task:
   matrix:
     - name: Ubuntu 16.04
       gce_instance:
+        <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1604-xenial-v20190617
     - name: Ubuntu 18.04
       gce_instance:
+        <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1804-bionic-v20190617
   pre_script:
