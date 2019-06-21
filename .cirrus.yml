@@ -19,25 +19,25 @@ gce_instance:
   #preemptible: $CIRRUS_BRANCH != "master"
 
 task:
-  name: Debian 9
-  gce_instance:
-    image_project: debian-cloud
-    image_name: debian-9-stretch-v20190618
-    
-  pre_script:
-    - apt-get update
-    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
-    - useradd -m build
-    - chown -R build: .
-  <<: *standard_build
-
-task:
   name: CentOS 7
   gce_instance:
     image_project: centos-cloud
     image_name: centos-7-v20190619
   pre_script:
     - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
+    - useradd -m build
+    - chown -R build: .
+  <<: *standard_build
+
+task:
+  name: Debian 9
+  gce_instance:
+    image_project: debian-cloud
+    image_name: debian-9-stretch-v20190618
+
+  pre_script:
+    - apt-get update
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
     - chown -R build: .
   <<: *standard_build
