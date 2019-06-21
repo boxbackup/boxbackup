@@ -2,14 +2,14 @@ gcp_credentials: ENCRYPTED[d84e50350f4a53180dc8bda3a637b0da5a7f5526b2f648b0e8e7a
 
 standard_build: &standard_build
   configure_script:
-    - su build -c ./bootstrap
-    - su build -c ./configure
+    - ${CHROOT} su build -c ./bootstrap
+    - ${CHROOT} su build -c ./configure
   build_client_script:
-    - su build -c 'make build-backup-client'
+    - ${CHROOT} su build -c 'make build-backup-client'
   build_server_script:
-    - su build -c 'make build-backup-server'
+    - ${CHROOT} su build -c 'make build-backup-server'
   test_script:
-    - su build -c 'make debug_tests'
+    - ${CHROOT} su build -c 'make debug_tests'
 
 standard_gce_instance: &standard_gce_instance
   zone: europe-west2-c
@@ -19,40 +19,51 @@ standard_gce_instance: &standard_gce_instance
   #preemptible: $CIRRUS_BRANCH != "master"
 
 task:
-  name: CentOS 7
+  name: CentOS 7 amd64
   gce_instance:
     <<: *standard_gce_instance
     image_project: centos-cloud
     image_name: centos-7-v20190619
-  pre_script:
+  setup_script:
     - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
     - useradd -m build
     - chown -R build: .
   <<: *standard_build
 
 task:
-  name: Debian 9
-  gce_instance:
-    <<: *standard_gce_instance
-    image_project: debian-cloud
-    image_name: debian-9-stretch-v20190618
+  matrix:
+    - name: Debian 9 i386
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_name: debian-9-stretch-v20190618
+      setup_chroot_script:
+        - ./infrastructure/setup-debian-chroot.sh
+        - schroot --begin-session --session-name stretch-build --chroot stretch
+      env:
+        CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
+    - name: Debian 9 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_name: debian-9-stretch-v20190618
 
-  pre_script:
-    - apt-get update
-    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
-    - useradd -m build
-    - chown -R build: .
+  setup_script:
+    - ${CHROOT} apt-get update
+    - ${CHROOT} sh -c "DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::='--force-confold' -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev"
+    - ${CHROOT} useradd -m build
+    - ${CHROOT} chown -R build: .
   <<: *standard_build
 
 task:
-  name: FreeBSD 12.0
+  name: FreeBSD 12.0 amd64
   gce_instance:
     <<: *standard_gce_instance
     image_project: freebsd-org-cloud-dev
     image_name: freebsd-12-0-release-amd64
     disk: 30  # Image is 29GB, VM can't be smaller
     platform: FreeBSD
-  pre_script:
+  setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
     - pw useradd build -m -w none
     - chown -R build: .
@@ -65,7 +76,7 @@ task:
   env:
     CPPFLAGS: -I/usr/local/opt/openssl/include
     LDFLAGS: -L/usr/local/opt/openssl/lib
-  pre_script:
+  setup_script:
     - brew install autoconf automake openssl readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
@@ -81,17 +92,17 @@ task:
 
 task:
   matrix:
-    - name: Ubuntu 16.04
+    - name: Ubuntu 16.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1604-xenial-v20190617
-    - name: Ubuntu 18.04
+    - name: Ubuntu 18.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1804-bionic-v20190617
-  pre_script:
+  setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
