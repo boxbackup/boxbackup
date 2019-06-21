@@ -56,6 +56,23 @@ task:
   <<: *standard_build
 
 task:
+  name: MacOS Mojave
+  osx_instance:
+    image: mojave-base
+  pre_script:
+    - brew install autoconf automake openssl readline
+  # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
+  configure_script:
+    - ./bootstrap
+    - ./configure
+  build_client_script:
+    - make build-backup-client
+  build_server_script:
+    - make build-backup-server
+  test_script:
+    - make debug_tests
+
+task:
   matrix:
     - name: Ubuntu 16.04
       gce_instance:
