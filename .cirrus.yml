@@ -1,4 +1,4 @@
-gcp_credentials: ENCRYPTED[d84e50350f4a53180dc8bda3a637b0da5a7f5526b2f648b0e8e7a52379de1328b203b98296e439e8eb83e00ec6675ca1]
+gcp_credentials: ENCRYPTED[51b00226f2de108c3fa890e94efadc2d4efad2ca8d12d31794b8e8af33d1ece12c13d51dcf3cc0c0222cda3391a469b5]
 
 standard_build: &standard_build
   configure_script:
