@@ -8,8 +8,10 @@ standard_build: &standard_build
     - ${CHROOT} su build -c 'make build-backup-client'
   build_server_script:
     - ${CHROOT} su build -c 'make build-backup-server'
-  test_script:
+  debug_tests_script:
     - ${CHROOT} su build -c 'make debug_tests'
+  release_tests_script:
+    - ${CHROOT} su build -c 'make release_tests'
 
 standard_gce_instance: &standard_gce_instance
   zone: europe-west2-c
@@ -87,8 +89,10 @@ task:
     - make build-backup-client
   build_server_script:
     - make build-backup-server
-  test_script:
+  debug_tests_script:
     - make debug_tests
+  release_tests_script:
+    - make release_tests
 
 task:
   matrix:
