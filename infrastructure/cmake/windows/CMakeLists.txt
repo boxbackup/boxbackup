@@ -129,6 +129,7 @@ ExternalProject_Add(boxbackup
 		-DCMAKE_INSTALL_PREFIX=${install_dir}
 		-DAPPVEYOR_MODE=1
 		-DDEBUG=${DEBUG}
+		-DVSS=${VSS}
 		${boxbackup_cmake_args}
 		${SUB_CMAKE_EXTRA_ARGS}
 	INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "No install step needed"

@@ -23,16 +23,21 @@ environment:
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
 
+  matrix:
+    - VSS:
+    - VSS: enabled
+
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
 # - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
 # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
   - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
+  - ps: $env:vss_string="$(if ($env:VSS.equals('enabled')) {'VSS_'})"
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
   - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:APPVEYOR_REPO_BRANCH.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
-  - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:CONFIGURATION)"
+  - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:vss_string)$($env:CONFIGURATION)"
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
@@ -59,10 +64,12 @@ install:
   - echo cmake -G "%generator_name%"
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
+    -DVSS=%VSS%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
   - cmake -G "%generator_name%"
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
+    -DVSS=%VSS%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.

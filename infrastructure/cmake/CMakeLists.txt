@@ -183,9 +183,14 @@ endforeach()
 set(testmain_template_cpp
 	"${base_dir}/infrastructure/buildenv-testmain-template.cpp"
 )
-set(release_or_debug_dir
-	"${base_dir}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>$<$<CONFIG:RelWithDebInfo>:release>"
+
+string(CONCAT release_or_debug_name
+	"$<$<CONFIG:Debug>:debug>"
+	"$<$<CONFIG:Release>:release>"
+	"$<$<CONFIG:RelWithDebInfo>:release>"
 )
+
+set(release_or_debug_dir "${base_dir}/${release_or_debug_name}")
 
 file(STRINGS ${base_dir}/modules.txt module_deps REGEX "^[^#]")
 foreach(module_dep ${module_deps})
@@ -280,7 +285,7 @@ foreach(module_dep ${module_deps})
 			add_test(NAME ${test_name}
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				${appveyor_runtest_pl_switch} -c ${test_name}
-				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				"${release_or_debug_name}"
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 
@@ -294,7 +299,7 @@ foreach(module_dep ${module_deps})
 			add_custom_target(${module_name}-prepare
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				-n -c ${test_name}
-				$<$<CONFIG:Debug>:DEBUG>$<$<CONFIG:Release>:RELEASE>$<$<CONFIG:RelWithDebInfo>:RELEASE>
+				"${release_or_debug_dir}"
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")
@@ -309,6 +314,7 @@ foreach(module_dep ${module_deps})
 		target_compile_definitions(${module_name} PRIVATE -DBOX_MODULE="${module_name}")
 
 		if(dependencies)
+			# Replace whitespace with semicolons to make a CMake-compatible list:
 			string(REGEX REPLACE "[ 	]+" ";" dependency_list "${dependencies}")
 
 			foreach(dependency ${dependency_list})
@@ -349,7 +355,10 @@ endif()
 
 # We can't do anything conditional on CMAKE_BUILD_TYPE because that's not valid for multi-configuration
 # generators such as MSVC. We need to use a generator expression instead.
-target_compile_definitions(lib_common PUBLIC $<$<CONFIG:Release>:BOX_RELEASE_BUILD>)
+string(CONCAT compile_definition_build_type
+	"$<$<CONFIG:Release>:BOX_RELEASE_BUILD>"
+)
+target_compile_definitions(lib_common PUBLIC ${compile_definition_build_type})
 
 # Detect platform features and write BoxConfig.h.in. Reuse code from
 # infrastructure/m4/boxbackup_tests.m4 where possible
@@ -370,6 +379,12 @@ if(WIN32)
 	target_link_libraries(lib_common PUBLIC ws2_32 gdi32)
 	list(APPEND CMAKE_REQUIRED_LIBRARIES ws2_32 gdi32)
 endif()
+
+if(VSS STREQUAL "enabled")
+	target_compile_definitions(lib_common PUBLIC ENABLE_VSS)
+	target_link_libraries(lib_common PUBLIC vssapi)
+endif()
+target_compile_definitions(lib_common PUBLIC ${compile_definition_build_type} ${compile_definition_vss})
 
 # On Windows we want to statically link zlib to make debugging and distribution easier,
 # but FindZLIB.cmake doesn't offer that as an option, so we have to go through some
