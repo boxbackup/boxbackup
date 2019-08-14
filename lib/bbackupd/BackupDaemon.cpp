@@ -1483,6 +1483,7 @@ void BackupDaemon::CreateVssBackupComponents()
 				BOX_TRACE("VSS: Skipping already included volume " <<
 					volumeRoot << " for backup location " << path);
 				rLocation.mSnapshotVolumeId = i->second;
+				rLocation.mSnapshotPath = path.substr(volumeRoot.length());
 			}
 
 			rLocation.mIsSnapshotCreated = true;
