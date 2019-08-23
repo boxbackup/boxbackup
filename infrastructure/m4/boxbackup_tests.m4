@@ -31,23 +31,26 @@ BOX_CHECK_CXX_FLAG(-Wall)
 # -Wundef would be a good idea, but Boost is full of undefined variable use, so we need
 # to disable it for now so that we can concentrate on real errors:
 dnl AX_CHECK_COMPILE_FLAG(-Wundef, [cxxflags_strict="$cxxflags_strict -Wundef"])
-BOX_CHECK_CXX_FLAG(-Werror=return-type)
-BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
-BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
-BOX_CHECK_CXX_FLAG(-Werror=narrowing)
-BOX_CHECK_CXX_FLAG(-Werror=parentheses)
-BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
-BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
-# We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
-dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
-dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
-BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
-BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
+
+BOX_CHECK_CXX_FLAG(-Werror=array-bounds)
 # This error is detected by MSVC, but not usually by GCC/Clang:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
 BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
 BOX_CHECK_CXX_FLAG(-Werror=infinite-recursion)
-BOX_CHECK_CXX_FLAG(-Werror=array-bounds)
+BOX_CHECK_CXX_FLAG(-Werror=narrowing)
+BOX_CHECK_CXX_FLAG(-Werror=non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=overloaded-virtual)
+BOX_CHECK_CXX_FLAG(-Werror=parentheses)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+# We should really enable -Werror=sometimes-uninitialized, but QDBM violates it:
+dnl AX_CHECK_COMPILE_FLAG(-Werror=sometimes-uninitialized,
+dnl 	[cxxflags_strict="$cxxflags_strict -Werror=sometimes-uninitialized"])
+BOX_CHECK_CXX_FLAG(-Werror=terminate)
+BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
+BOX_CHECK_CXX_FLAG(-Werror=unused-private-field)
+BOX_CHECK_CXX_FLAG(-Werror=writable-strings)
+
 # Using Boost properly seems to need C++0x, or at least the "auto" type.
 # We don't need CMake to parse this, because it has built-in feature detecting macros
 # which we use instead:
