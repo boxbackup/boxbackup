@@ -37,7 +37,7 @@ class HTTPResponse;
 class SimpleDBSimulator
 {
 public:
-	SimpleDBSimulator();
+	SimpleDBSimulator(const std::string& data_store_dir);
 	~SimpleDBSimulator();
 
 	std::vector<std::string> ListDomains();

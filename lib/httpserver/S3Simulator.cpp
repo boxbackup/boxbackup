@@ -78,9 +78,9 @@ S3Simulator::S3Simulator()
 { }
 
 
-SimpleDBSimulator::SimpleDBSimulator()
-: mDomainsFile("testfiles/domains.qdbm"),
-  mItemsFile("testfiles/items.qdbm")
+SimpleDBSimulator::SimpleDBSimulator(const std::string& data_store_dir)
+: mDomainsFile(data_store_dir + "/domains.qdbm"),
+  mItemsFile(data_store_dir + "/items.qdbm")
 {
 	Open(DP_OWRITER | DP_OCREAT);
 }
@@ -159,6 +159,7 @@ const ConfigurationVerify* S3Simulator::GetConfigVerify() const
 		ConfigurationVerifyKey("AccessKey", ConfigTest_Exists),
 		ConfigurationVerifyKey("SecretKey", ConfigTest_Exists),
 		ConfigurationVerifyKey("StoreDirectory", ConfigTest_Exists),
+		ConfigurationVerifyKey("SimpleDBDirectory", ConfigTest_Exists),
 		HTTPSERVER_VERIFY_ROOT_KEYS
 	};
 
@@ -1102,7 +1103,9 @@ void ProcessConditionalRequest(const std::string& domain, HTTPRequest& rRequest,
 void S3Simulator::HandleSimpleDBGet(HTTPRequest &rRequest, HTTPResponse &rResponse,
 	bool IncludeContent)
 {
-	SimpleDBSimulator simpledb;
+	const Configuration& config(GetConfiguration());
+	SimpleDBSimulator simpledb(config.GetKeyValue("SimpleDBDirectory"));
+
 	std::string action = rRequest.GetParameterString("Action");
 	ptree response_tree;
 	rResponse.SetResponseCode(HTTPResponse::Code_OK);
