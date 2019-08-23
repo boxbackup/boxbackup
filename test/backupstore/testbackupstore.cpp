@@ -2400,6 +2400,9 @@ bool test_directory_parent_entry_tracks_directory_size(RaidAndS3TestSpecs::Speci
 
 bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Specialisation& spec)
 {
+	SETUP_TEST_SPECIALISED(spec);
+	BackupFileSystem& fs(spec.control().GetFileSystem());
+
 	// Temporarily increase logging level to trace, to show stack traces on exceptions, to help
 	// debug random failures of this test on AppVeyor.
 	Logger::LevelGuard log_all_trace(Logging::GetConsole(), Log::TRACE);
@@ -2408,9 +2411,6 @@ bool test_cannot_open_multiple_writable_connections(RaidAndS3TestSpecs::Speciali
 	// which silences log messages about opening files that we want to see, so override them:
 	LogLevelOverrideByFileGuard log_filestream_trace("FileStream.cpp", "", Log::TRACE);
 	log_filestream_trace.Install();
-
-	SETUP_TEST_SPECIALISED(spec);
-	BackupFileSystem& fs(spec.control().GetFileSystem());
 
 	// We need another filesystem to be able to create conflicting locks:
 	std::auto_ptr<Configuration> ap_config_2;
