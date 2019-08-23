@@ -1120,8 +1120,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// passed on to the main handler,
 					// retries would probably just cause
 					// more problems.
-					rNotifier.NotifyFileUploadException(
-						this, nonVssFilePath, e);
+					rNotifier.NotifyFileUploadException(this, nonVssFilePath, e);
 					throw;
 				}
 				catch(BoxException &e)
@@ -2047,8 +2046,7 @@ void BackupClientDirectoryRecord::SetErrorWhenReadingFilesystemObject(
 	// have a read error reported, we need to be able to search the logs
 	// to find out which file it was, so we need to log a consistent and
 	// clear error message.
-	BOX_WARNING("Failed to backup file, see above for details: " <<
-		rFilename);
+	BOX_WARNING("Failed to backup file, see above for details: " << rFilename);
 
 	// Mark that an error occured in the parameters object
 	rParams.mReadErrorsOnFilesystemObjects = true;
