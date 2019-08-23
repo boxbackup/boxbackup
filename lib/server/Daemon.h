@@ -110,6 +110,8 @@ protected:
 		// this to delay writing.
 		WritePidFile();
 	}
+
+	// TODO: remove the unused wait_for_shared_lock argument
 	void WritePidFile(bool wait_for_shared_lock = false);
 
 private:

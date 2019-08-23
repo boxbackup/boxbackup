@@ -721,18 +721,30 @@ void Daemon::WritePidFile(bool wait_for_shared_lock)
 		// prevent another daemon starting and overwriting it. But at least on Windows, this
 		// also stops anyone from opening the file for *reading*. So instead we close it and
 		// reopen in shared mode, to prevent another daemon from getting an exclusive lock.
-		// There is a very short window of opportunity for a race here, since we don't block
-		// if the lock fails, but raise an exception.
-		std::string pid_file_name = mapPidFile->GetFileName();
-		mapPidFile.reset();
+		//
+		// Even if we avoid blocking, the race window is nonzero, and if the daemon forks a
+		// child process (e.g. bbstored housekeeping) then we need to wait for it to close
+		// the exclusively-locked file anyway, and on some systems (e.g. Travis CI) we still
+		// can't reliably grab the shared lock immediately. So we always block, but check
+		// after acquiring the shared lock that the PID has not changed, to ensure that we
+		// detect and abort if we lost the race.
 
-		// If the parent has forked another process (e.g. bbstored housekeeping) then it may
-		// be holding an exclusive lock on the PID file too, so we might have to wait for it
-		// to be released (if wait_for_shared_lock is true), which unfortunately extends the
-		// race condition.
+		std::string pid_file_name = mapPidFile->GetFileName();
+		mapPidFile.reset(); // Close the exclusively-opened file handle
+
 		mapPidFile.reset(new FileStream(pid_file_name, O_RDONLY, 0, // mode
 			FileStream::SHARED, false, // !delete_asap
-			wait_for_shared_lock)); // wait_for_lock
+			true)); // wait_for_lock
+
+		char pid_read_buf[8] = {0};
+		mapPidFile->Read(&pid_read_buf, sizeof(pid_read_buf) - 1);
+
+		if(pid_buf.str() != pid_read_buf)
+		{
+			THROW_SYS_FILE_ERROR("PID file contents changed from '" << pid_buf.str() <<
+				"' to '" << pid_read_buf << "'", pid_file_name, ServerException,
+				PIDFileConflict);
+		}
 
 		mPidFileWritten = true;
 	}

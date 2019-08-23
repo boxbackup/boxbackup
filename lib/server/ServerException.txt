@@ -37,3 +37,4 @@ ProtocolUncertainStreamBadBlockHeader		54
 SocketPairFailed				55
 CouldNotChangePIDFileOwner		56
 SSLRandomInitFailed				57	Read from /dev/*random device failed
+PIDFileConflict				58		Another process modified the PID file
