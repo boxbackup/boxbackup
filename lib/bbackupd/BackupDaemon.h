@@ -146,6 +146,13 @@ public:
 	void TouchFileInWorkingDir(const char *Filename);
 
 protected:
+	virtual void ServerIsReady()
+	{
+		// Overridden to delay call to WritePidFile() until the command socket is ready
+		// and listening for connections, to help with test synchronization.
+		// WritePidFile();
+	}
+
 	virtual std::auto_ptr<BackupClientContext> GetNewContext
 	(
 		LocationResolver &rResolver,

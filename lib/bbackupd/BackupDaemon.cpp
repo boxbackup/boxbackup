@@ -537,6 +537,10 @@ void BackupDaemon::Run()
 		#endif
 	}
 
+	// We override ServerIsReady to avoid writing the PID file before the CommandSocket is
+	// ready. It is now, so we can do it now.
+	WritePidFile();
+
 	// Handle things nicely on exceptions
 	try
 	{

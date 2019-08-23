@@ -597,7 +597,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		BOX_NOTICE("Starting daemon, version: " << BOX_VERSION);
 		BOX_NOTICE("Using configuration file: " << mConfigFileName);
 
-		ServerIsReady();
+		ServerIsReady(); // Calls WritePidFile, unless overridden in subclass
 	}
 	catch(BoxException &e)
 	{
@@ -705,9 +705,9 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 void Daemon::WritePidFile(bool wait_for_shared_lock)
 {
-	// We only want to write the PID file once, but we might be called again by
-	// ServerStream::Run2 (via NotifyListenerIsReady) and we just want to do nothing
-	// in that case.
+	// Normally called by Daemon::ServerIsReady. We only want to write the PID file once, but
+	// we might be called again by ServerStream::Run2 (via NotifyListenerIsReady) and we just
+	// want to do nothing in that case.
 
 	if(!mPidFileWritten)
 	{
