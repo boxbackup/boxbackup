@@ -590,8 +590,7 @@ bool BackupClientDirectoryRecord::SyncDirectoryEntry(
 		else
 		{
 			rNotifier.NotifyUnsupportedFileType(this, realFileName);
-			SetErrorWhenReadingFilesystemObject(rParams,
-				realFileName);
+			SetErrorWhenReadingFilesystemObject(rParams, realFileName);
 		}
 
 		return false;
@@ -1145,10 +1144,8 @@ bool BackupClientDirectoryRecord::UpdateItems(
 					// code false, to show error in directory
 					allUpdatedSuccessfully = false;
 					// Log it.
-					SetErrorWhenReadingFilesystemObject(rParams,
-						nonVssFilePath);
-					rNotifier.NotifyFileUploadException(this,
-						nonVssFilePath, e);
+					SetErrorWhenReadingFilesystemObject(rParams, nonVssFilePath);
+					rNotifier.NotifyFileUploadException(this, nonVssFilePath, e);
 				}
 
 				// Update structures if the file was uploaded successfully:
