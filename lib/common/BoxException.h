@@ -38,6 +38,13 @@ public:
 	}
 	virtual const std::string& GetMessage() const = 0;
 
+	// Implement what() so that these exceptions can be treated as std::exceptions, e.g. in
+	// MAINHELPER_END:
+	virtual const char* what() const throw()
+	{
+		return GetMessage().c_str();
+	}
+
 private:
 };
 
