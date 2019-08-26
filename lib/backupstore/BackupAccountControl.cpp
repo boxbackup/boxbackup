@@ -511,7 +511,6 @@ int BackupStoreAccountControl::CreateAccount(int32_t DiscNumber, int32_t SoftLim
 	mapFileSystem.reset(new RaidBackupFileSystem(mAccountID, mRootDir, mDiscSetNum));
 
 	BackupAccountControl::CreateAccount(mAccountID, SoftLimit, HardLimit, "");
-
 	BOX_NOTICE("Account " << BOX_FORMAT_ACCOUNT(mAccountID) << " created.");
 
 	return 0;
@@ -596,6 +595,7 @@ int S3BackupAccountControl::CreateAccount(const std::string& name, int32_t SoftL
 
 	// Create the BackupStoreInfo and BackupStoreRefCountDatabase files:
 	BackupAccountControl::CreateAccount(S3_FAKE_ACCOUNT_ID, SoftLimit, HardLimit, name);
+	BOX_NOTICE("Account '" << name << "' created.");
 
 	return 0;
 }
