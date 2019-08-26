@@ -31,10 +31,10 @@ void mainhelper_init_win32();
 
 #define MAINHELPER_END \
 	} catch(std::exception &e) { \
-		BOX_FATAL(e.what()); \
+		BOX_FATAL("Caught unexpected std::exception: " << e.what()); \
 		return 1; \
 	} catch(...) { \
-		BOX_FATAL("UNKNOWN"); \
+		BOX_FATAL("Caught unknown exception"); \
 		return 1; \
 	}
 
