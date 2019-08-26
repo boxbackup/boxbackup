@@ -216,8 +216,18 @@ void SimpleDBClient::SendAndReceiveXML(HTTPRequest& request, ptree& response_tre
 		response.GetSize());
 	std::auto_ptr<std::istringstream> ap_response_stream(
 		new std::istringstream(response_data));
-	read_xml(*ap_response_stream, response_tree,
-		boost::property_tree::xml_parser::trim_whitespace);
+
+	try
+	{
+		read_xml(*ap_response_stream, response_tree,
+			boost::property_tree::xml_parser::trim_whitespace);
+	}
+	catch(std::exception &e)
+	{
+		THROW_EXCEPTION_MESSAGE(HTTPException, UnexpectedResponseData,
+			"Failed to parse XML response: " << e.what() << ": '" << response_data <<
+			"'");
+	}
 
 	if(response_tree.begin()->first != expected_root_element)
 	{

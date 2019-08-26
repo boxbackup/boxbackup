@@ -64,7 +64,7 @@ HTTPRequest::HTTPRequest()
 HTTPRequest::HTTPRequest(enum Method method, const std::string& rURI)
 	: mMethod(method),
 	  mRequestURI(rURI),
-	  mHTTPVersion(HTTPVersion_1_1),
+	  mHTTPVersion(HTTPVersion_1_0),
 	  mpCookies(0),
 	  mExpectContinue(false),
 	  mpStreamToReadFrom(NULL)
@@ -558,7 +558,8 @@ void HTTPRequest::SendHeaders(IOStream &rStream, int Timeout, bool ExpectContinu
 	{
 	case HTTPVersion_0_9: rStream.Write("HTTP/0.9"); break;
 	case HTTPVersion_1_0: rStream.Write("HTTP/1.0"); break;
-	case HTTPVersion_1_1: rStream.Write("HTTP/1.1"); break;
+	// We do not support HTTP/1.1, specifically chunked encoding, so do not pretend that we do.
+	// case HTTPVersion_1_1: rStream.Write("HTTP/1.1"); break;
 	default:
 		THROW_EXCEPTION_MESSAGE(HTTPException, NotImplemented,
 			"Unsupported HTTP version: " << mHTTPVersion);
