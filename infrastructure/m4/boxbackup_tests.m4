@@ -145,6 +145,7 @@ Upgrade or read the documentation for alternatives]])
   ])
 AC_CHECK_FUNCS([SSL_CTX_set_security_level], [HAVE_SSL_CTX_SET_SECURITY_LEVEL=1])
 AC_SUBST([HAVE_SSL_CTX_SET_SECURITY_LEVEL])
+AC_CHECK_FUNCS([OPENSSL_cleanup])
 
 ### Checks for header files.
 
