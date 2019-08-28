@@ -29,8 +29,10 @@ init:
 # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
   - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
+  # Ensafen e.g. "jamesog/cirrus-ci"
+  - ps: $env:safer_branch = $($env:APPVEYOR_REPO_BRANCH.replace("/", "_"))
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
-  - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:APPVEYOR_REPO_BRANCH.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
+  - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:safer_branch.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
   - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:CONFIGURATION)"
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
