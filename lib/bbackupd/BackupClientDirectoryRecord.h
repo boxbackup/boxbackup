@@ -163,6 +163,7 @@ private:
 	void UpdateAttributes(SyncParams &rParams,
 		BackupStoreDirectory *pDirOnStore,
 		const std::string &rLocalPath);
+
 protected: // to allow tests to hook in before UpdateItems() runs
 	virtual bool UpdateItems(SyncParams &rParams,
 		const std::string &rLocalPath,
@@ -172,7 +173,11 @@ protected: // to allow tests to hook in before UpdateItems() runs
 		std::vector<BackupStoreDirectory::Entry *> &rEntriesLeftOver,
 		std::vector<std::string> &rFiles,
 		const std::vector<std::string> &rDirs);
+
 private:
+	BackupStoreDirectory::Entry* CheckForRename(BackupClientContext& context,
+		BackupStoreDirectory* p_dir, const BackupStoreFilenameClear& remote_filename,
+		InodeRefType inode_num, const std::string& local_path_non_vss);
 	int64_t CreateRemoteDir(const std::string& localDirPath,
 		const std::string& nonVssDirPath,
 		const std::string& remoteDirPath,
