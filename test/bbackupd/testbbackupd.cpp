@@ -1491,13 +1491,13 @@ bool test_ssl_keepalives()
 
 		// Sleep until just before the timer expires, check that DoKeepAlive()
 		// still does nothing.
-		ShortSleep(MilliSecondsToBoxTime(900), true);
+		ShortSleep(MilliSecondsToBoxTime(800), true);
 		context.DoKeepAlive();
 		TEST_EQUAL(0, connection.mNumKeepAlivesSent);
 
 		// Sleep until just after the timer expires, check that DoKeepAlive()
 		// sends a GetIsAlive message now.
-		ShortSleep(MilliSecondsToBoxTime(200), true);
+		ShortSleep(MilliSecondsToBoxTime(400), true);
 		context.DoKeepAlive();
 		TEST_EQUAL(1, connection.mNumKeepAlivesSent);
 		TEST_EQUAL(1, connection.mNumKeepAlivesReceived);
