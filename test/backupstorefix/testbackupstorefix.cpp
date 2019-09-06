@@ -447,6 +447,11 @@ void check_and_fix_root_dir(dir_en_check after_entries[],
 
 int test(int argc, const char *argv[])
 {
+	// Add timing to logs, to find out why this test is 4x slower on Windows with VSS enabled!
+	Logging::SetProgramName("test");
+	Console::SetShowTag(true);
+	Console::SetShowTime(true);
+
 	{
 		MEMLEAKFINDER_NO_LEAKS;
 		fnames[0].SetAsClearFilename("x1");
