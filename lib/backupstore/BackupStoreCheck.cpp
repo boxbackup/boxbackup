@@ -84,7 +84,18 @@ BackupStoreCheck::~BackupStoreCheck()
 	// Avoid an exception if we forget to discard mapNewRefs
 	if (mapNewRefs.get())
 	{
-		mapNewRefs->Discard();
+		// Discard() can throw exception, but destructors aren't supposed to do that, so
+		// just catch and log them.
+		try
+		{
+			mapNewRefs->Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_ERROR("Error while destroying BackupStoreCheck: discarding "
+				"the refcount database threw an exception: " << e.what());
+		}
+
 		mapNewRefs.reset();
 	}
 }
@@ -163,9 +174,17 @@ void BackupStoreCheck::Check()
 
 	try
 	{
+		// We should be able to load a reference to the old refcount database
+		// (read-only) at the same time that we have a reference to the new one
+		// (temporary) open but not yet committed.
 		std::auto_ptr<BackupStoreRefCountDatabase> apOldRefs =
 			BackupStoreRefCountDatabase::Load(account, false);
-		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs);
+
+		// If we have created a new lost+found directory (and thus allocated it a nonzero
+		// object ID) then it's not surprising that the previous refcount DB did not have
+		// a reference to this directory, and not an error, so ignore it.
+		mNumberErrorsFound += mapNewRefs->ReportChangesTo(*apOldRefs,
+			mLostAndFoundDirectoryID); // ignore_object_id
 	}
 	catch(BoxException &e)
 	{

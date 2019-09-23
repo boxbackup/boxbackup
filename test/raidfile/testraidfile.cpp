@@ -10,7 +10,6 @@
 #include "Box.h"
 
 #include <fcntl.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -26,6 +25,7 @@
 #include "RaidFileException.h"
 #include "RaidFileRead.h"
 #include "Guards.h"
+#include "intercept.h"
 
 #include "MemLeakFindOn.h"
 
@@ -36,14 +36,6 @@
 
 #ifndef PLATFORM_CLIB_FNS_INTERCEPTION_IMPOSSIBLE
 	#define	TRF_CAN_INTERCEPT
-#endif
-
-
-#ifdef TRF_CAN_INTERCEPT
-// function in intercept.cpp for setting up errors
-void intercept_setup_error(const char *filename, unsigned int errorafter, int errortoreturn, int syscalltoerror);
-bool intercept_triggered();
-void intercept_clear_setup();
 #endif
 
 // Nice random data for testing written files
@@ -661,12 +653,21 @@ int test(int argc, const char *argv[])
 	IOStream &write1stream = write1;	// use the stream interface where possible
 	write1.Open();
 	write1stream.Write(data, sizeof(data));
+	TEST_EQUAL(sizeof(data), write1stream.GetPosition());
 	write1stream.Seek(1024, IOStream::SeekType_Absolute);
+	TEST_EQUAL(1024, write1stream.GetPosition());
 	write1stream.Write(data2, sizeof(data2));
+	TEST_EQUAL(1024 + sizeof(data2), write1stream.GetPosition());
 	write1stream.Seek(1024, IOStream::SeekType_Relative);
+	TEST_EQUAL(2048 + sizeof(data2), write1stream.GetPosition());
 	write1stream.Write(data2, sizeof(data2));
+	TEST_EQUAL(2048 + sizeof(data2) * 2, write1stream.GetPosition());
 	write1stream.Seek(0, IOStream::SeekType_End);
+	TEST_EQUAL(sizeof(data), write1stream.GetPosition());
 	write1stream.Write(data, sizeof(data));
+	TEST_EQUAL(sizeof(data) * 2, write1stream.GetPosition());
+	write1stream.Seek(-1, IOStream::SeekType_Relative);
+	TEST_EQUAL(sizeof(data) * 2 - 1, write1stream.GetPosition());
 	
 	// Before it's deleted, check to see the contents are as expected
 	int f;
@@ -821,7 +822,7 @@ int test(int argc, const char *argv[])
 		TEST_THAT(::rename("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf-NT", "testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf") == 0);
 	
 		// Delete one of the files
-		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "damage.rf") == 0); // stripe 1
+		TEST_THAT(EMU_UNLINK("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "damage.rf") == 0); // stripe 1
 		
 #ifdef TRF_CAN_INTERCEPT
 		// Open it and read...
@@ -838,7 +839,7 @@ int test(int argc, const char *argv[])
 #endif //TRF_CAN_INTERCEPT
 
 		// Delete another
-		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf") == 0); // parity
+		TEST_THAT(EMU_UNLINK("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "damage.rf") == 0); // parity
 		
 		TEST_CHECK_THROWS(
 			std::auto_ptr<RaidFileRead> pread2 = RaidFileRead::Open(0, "damage"),
@@ -880,15 +881,15 @@ int test(int argc, const char *argv[])
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_DirsOnly, names));
 		TEST_THAT(list_matches(names, dir_list1));
 		// Delete things
-		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles" DIRECTORY_SEPARATOR "0_0" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list1));
 		// Delete something else so that it's not recoverable
-		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles" DIRECTORY_SEPARATOR "0_1" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(false == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list1));
 		// And finally...
-		TEST_THAT(::unlink("testfiles" DIRECTORY_SEPARATOR "0_2" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
+		TEST_THAT(EMU_UNLINK("testfiles" DIRECTORY_SEPARATOR "0_2" DIRECTORY_SEPARATOR "dirread" DIRECTORY_SEPARATOR "sdf9873241.rf") == 0);
 		TEST_THAT(true == RaidFileRead::ReadDirectoryContents(0, std::string("dirread"), RaidFileRead::DirReadType_FilesOnly, names));
 		TEST_THAT(list_matches(names, file_list2));
 	}

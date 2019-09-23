@@ -2,7 +2,9 @@
 use strict;
 use LWP::UserAgent;
 
-my $url_base = 'http://localhost:1080';
+# Use 127.0.0.1 instead of localhost to force use of IPv4, as that is what the server
+# binds to. Windows tends to use IPv6 instead if possible, breaking the test.
+my $url_base = 'http://127.0.0.1:1080';
 
 my $ua = LWP::UserAgent->new(env_proxy => 0, keep_alive => 1, timeout => 30);
 
@@ -47,7 +49,8 @@ if($response3->code() != 200)
 print "Redirected GET request...\n";
 
 my $response4 = $ua->get("$url_base/redirect?key=value");
-exit 4 unless $response4->is_success();
+die "GET ".$response4->request()->url()." failed: ".$response4->content()
+	unless $response4->is_success();
 
 my $content4 = $response4->content();
 
@@ -110,13 +113,11 @@ sub check_url
 	my ($c,$url) = @_;
 	unless($c =~ m~URI:</b> (.+?)</p>~)
 	{
-		print "URI not found\n";
-		exit(1);
+		die "URI not found in response: '$c'\n";
 	}
 	if($url ne $1)
 	{
-		print "Wrong URI in content\n";
-		exit(1);
+		die "Wrong URI in content: expected '$url' but found '$1'\n";
 	}
 }
 

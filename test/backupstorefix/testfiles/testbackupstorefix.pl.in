@@ -2,7 +2,7 @@
 use strict;
 
 my @words = split /\s+/,<<__E;
-nes ment foreomizes restout offety nount stemptinevidate ristraigation algoughtnerge nont ict aduals backyalivers scely peep hyphs olworks ning dro rogarcer poducts eatinizers bank magird backs bud metegoguered con mes prisionsidenning oats nost vulgarmiscar pass red rad cacted ded oud ming red emeated compt sly thetter shuted defeve plagger wished brightinats tillishellult arreenies honing ation recyclingentivell milamptimaskates debaffessly battenteriset
+nes ment foreomizes restout offety nount stemptinevidate ristraigation algoughtnerge nont ict aduals backyalivers scely peep hyphs olworks ning dro rogarcer poducts eatinizers bank magird backs bud metegoguered com mes prisionsidenning oats nost vulgarmiscar pass red rad cacted ded oud ming red emeated compt sly thetter shuted defeve plagger wished brightinats tillishellult arreenies honing ation recyclingentivell milamptimaskates debaffessly battenteriset
 bostopring prearnies mailatrisepatheryingic divel ing middle torsines quarcharattendlegipsied resteivate acingladdrairevents cruishery flowdemobiologgermanciolt ents subver honer paulounces relessition dunhoutpositivessiveng suers emancess
 cons cheating winneggs flow ditiespaynes constrannotalimentievolutal ing repowellike stucablest ablemates impsychocks sorts degruman lace scons cords unsertracturce tumottenting locapersethithend pushotty polly red rialgolfillopmeninflirer skied relocis hetterabbed undaunatermisuresocioll cont posippory fibruting cannes storm callushlike warnook imulatrougge dicreamentsvily spical fishericating roes carlylisticaller
 __E
@@ -34,16 +34,26 @@ my @check_move = (
 
 if($ARGV[0] eq 'init')
 {
+	open(my $fh, ">>", "testfiles/file-listing.txt")
+		or die "cannot open testfiles/file-listing.txt: $!";
 	# create the initial tree of words
-	make_dir('testfiles/TestDir1', 0, 4, 0);
-	
+	make_dir($fh, 'testfiles/TestDir1', 0, 4, 0);
+
 	# add some useful extra bits to it
-	mkdir('testfiles/TestDir1/dir-no-members', 0755);
-	mkdir('testfiles/TestDir1/dir1', 0755);
-	mkdir('testfiles/TestDir1/dir1/dir2', 0755);
-	mkdir('testfiles/TestDir1/dir1/dir2/dir3', 0755);
-	make_file('testfiles/TestDir1/dir1/dir2/file1');
-	make_file('testfiles/TestDir1/dir1/dir2/dir3/file2');
+	foreach my $subdir (
+		'testfiles/TestDir1/dir-no-members',
+		'testfiles/TestDir1/dir1',
+		'testfiles/TestDir1/dir1/dir2',
+		'testfiles/TestDir1/dir1/dir2/dir3',
+	)
+	{
+		mkdir($subdir, 0755);
+		print $fh "$subdir/\n";
+	}
+	make_file($fh, 'testfiles/TestDir1/dir1/dir2/file1');
+	make_file($fh, 'testfiles/TestDir1/dir1/dir2/dir3/file2');
+
+	close $fh;
 }
 elsif($ARGV[0] eq 'check')
 {
@@ -138,18 +148,20 @@ elsif($ARGV[0] eq 'reroot')
 		or die "can't open copy listing file";
 	my $err = 0;
 	my $count = 0;
-	while(<LISTING>)
+	while(my $line = <LISTING>)
 	{
-		print LISTING_COPY;
-		chomp;
-		s/\[FILENAME NOT ENCRYPTED\]//;
-		next if /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
-		my ($id,$type,$name) = split / /;
+		print LISTING_COPY $line;
+		chomp $line;
+		$line =~s/\[FILENAME NOT ENCRYPTED\]//;
+		next if $line =~ /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
+		next if $line =~ /^WARNING: SSLSecurityLevel not set./;
+		my ($id,$type,$name) = split / /, $line;
 		$count++;
 		if($name !~ /\Alost\+found0/)
 		{
 			# everything must be in a lost and found dir
-			$err = 1
+			print "Expected '$name' to be in a lost+found directory, but it was not ($line)";
+			$err = 1;
 		}
 	}
 	close LISTING_COPY;
@@ -172,20 +184,19 @@ else
 
 sub make_dir
 {
-	my ($dir,$start,$quantity,$level) = @_;
-
+	my ($fh,$dir,$start,$quantity,$level) = @_;
 	return $start if $level >= 4;
 
 	mkdir $dir,0755;
-	
+	print $fh "$dir/\n";
 	return $start if $start > $#words;
-	
+
 	while($start <= $#words && $quantity > 0)
 	{
 		my $subdirs = length($words[$start]) - 2;
 		$subdirs = 2 if $subdirs > 2;
 		my $entries = $subdirs + 1;
-		
+
 		for(0 .. ($entries - 1))
 		{
 			my $w = $words[$start + $_];
@@ -198,26 +209,31 @@ sub make_dir
 			}
 			print FL "\n";
 			close FL;
+
+			print $fh "$dir/$w\n";
 		}
+
 		$start += $entries;
 		my $w = $words[$start + $_];
-		$start = make_dir("$dir/$w", $start + 1, $subdirs, $level + 1);
-	
+		$start = make_dir($fh, "$dir/$w", $start + 1, $subdirs, $level + 1);
+
 		$quantity--;
 	}
-	
+
 	return $start;
 }
 
 sub make_file
 {
-	my ($fn) = @_;
-	
+	my ($fh, $fn) = @_;
+
 	open FL,'>'.$fn or die "can't open $fn for writing";
 	for(0 .. 255)
 	{
 		print FL $fn
 	}
 	close FL;
+
+	print $fh "$fn\n";
 }
 

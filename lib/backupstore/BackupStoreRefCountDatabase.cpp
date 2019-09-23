@@ -68,7 +68,7 @@ void BackupStoreRefCountDatabase::Commit()
 	std::string Final_Filename = GetFilename(mAccount, false);
 
 	#ifdef WIN32
-	if(FileExists(Final_Filename) && unlink(Final_Filename.c_str()) != 0)
+	if(FileExists(Final_Filename) && EMU_UNLINK(Final_Filename.c_str()) != 0)
 	{
 		THROW_EMU_FILE_ERROR("Failed to delete old permanent refcount "
 			"database file", mFilename, CommonException,
@@ -106,7 +106,7 @@ void BackupStoreRefCountDatabase::Discard()
 		mapDatabaseFile.reset();
 	}
 
-	if(unlink(mFilename.c_str()) != 0)
+	if(EMU_UNLINK(mFilename.c_str()) != 0)
 	{
 		THROW_EMU_FILE_ERROR("Failed to delete temporary refcount "
 			"database file", mFilename, CommonException,
@@ -129,10 +129,18 @@ BackupStoreRefCountDatabase::~BackupStoreRefCountDatabase()
 {
 	if (mIsTemporaryFile)
 	{
-		THROW_EXCEPTION_MESSAGE(CommonException, Internal,
-			"BackupStoreRefCountDatabase destroyed without "
+		// Don't throw exceptions in a destructor.
+		BOX_ERROR("BackupStoreRefCountDatabase destroyed without "
 			"explicit commit or discard");
-		Discard();
+		try
+		{
+			Discard();
+		}
+		catch(BoxException &e)
+		{
+			BOX_LOG_SYS_ERROR("Failed to discard BackupStoreRefCountDatabase "
+				"in destructor: " << e.what());
+		}
 	}
 }
 
@@ -179,7 +187,7 @@ std::auto_ptr<BackupStoreRefCountDatabase>
 	{
 		BOX_WARNING(BOX_FILE_MESSAGE(Filename, "Overwriting existing "
 			"temporary reference count database"));
-		if (unlink(Filename.c_str()) != 0)
+		if(EMU_UNLINK(Filename.c_str()) != 0)
 		{
 			THROW_SYS_FILE_ERROR("Failed to delete old temporary "
 				"reference count database file", Filename,
@@ -339,17 +347,22 @@ bool BackupStoreRefCountDatabase::RemoveReference(int64_t ObjectID)
 	return (refcount > 0);
 }
 
-int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs)
+int BackupStoreRefCountDatabase::ReportChangesTo(BackupStoreRefCountDatabase& rOldRefs,
+	int64_t ignore_object_id)
 {
 	int ErrorCount = 0;
 	int64_t MaxOldObjectId = rOldRefs.GetLastObjectIDUsed();
 	int64_t MaxNewObjectId = GetLastObjectIDUsed();
 
 	for (int64_t ObjectID = BACKUPSTORE_ROOT_DIRECTORY_ID;
-		ObjectID < std::max(MaxOldObjectId, MaxNewObjectId);
+		ObjectID <= std::max(MaxOldObjectId, MaxNewObjectId);
 		ObjectID++)
 	{
-		typedef BackupStoreRefCountDatabase::refcount_t refcount_t;
+		if(ObjectID == ignore_object_id)
+		{
+			continue;
+		}
+
 		refcount_t OldRefs = (ObjectID <= MaxOldObjectId) ?
 			rOldRefs.GetRefCount(ObjectID) : 0;
 		refcount_t NewRefs = (ObjectID <= MaxNewObjectId) ?

@@ -144,10 +144,12 @@ int test(int argc, const char *argv[])
 		return server.Main("doesnotexist", argc - 1, argv + 1);
 	}
 
+#ifndef WIN32
 	TEST_THAT(system("rm -rf *.memleaks") == 0);
+#endif
 
 	// Start the server
-	int pid = StartDaemon(0, "./_test server testfiles/httpserver.conf",
+	int pid = StartDaemon(0, TEST_EXECUTABLE " server testfiles/httpserver.conf",
 		"testfiles/httpserver.pid");
 	TEST_THAT_OR(pid > 0, return 1);
 
@@ -375,11 +377,11 @@ int test(int argc, const char *argv[])
 		FileStream f1("testfiles/testrequests.pl");
 		FileStream f2("testfiles/newfile");
 		TEST_THAT(f1.CompareWith(f2));
-		TEST_EQUAL(0, ::unlink("testfiles/newfile"));
+		TEST_EQUAL(0, EMU_UNLINK("testfiles/newfile"));
 	}
 
 	// Start the S3Simulator server
-	pid = StartDaemon(0, "./_test s3server testfiles/s3simulator.conf",
+	pid = StartDaemon(0, TEST_EXECUTABLE " s3server testfiles/s3simulator.conf",
 		"testfiles/s3simulator.pid");
 	TEST_THAT_OR(pid > 0, return 1);
 
@@ -456,8 +458,7 @@ int test(int argc, const char *argv[])
 		SocketStream sock;
 		sock.Open(Socket::TypeINET, "localhost", 1080);
 
-		HTTPRequest request(HTTPRequest::Method_PUT,
-			"/newfile");
+		HTTPRequest request(HTTPRequest::Method_PUT, "/newfile");
 		request.SetHostName("quotes.s3.amazonaws.com");
 		request.AddHeader("Date", "Wed, 01 Mar  2006 12:00:00 GMT");
 		request.AddHeader("Authorization", "AWS 0PN5J17HBGZHT7JJ3X82:kfY1m6V3zTufRy2kj92FpQGKz4M=");
@@ -479,8 +480,8 @@ int test(int argc, const char *argv[])
 		FileStream f1("testfiles/testrequests.pl");
 		FileStream f2("testfiles/newfile");
 		TEST_THAT(f1.CompareWith(f2));
+		TEST_THAT(EMU_UNLINK("testfiles/newfile") == 0);
 	}
-
 
 	// Kill it
 	TEST_THAT(StopDaemon(pid, "testfiles/s3simulator.pid",

@@ -4,21 +4,27 @@
 
 #ifdef WIN32
 	#define EMU_STRUCT_STAT struct emu_stat
-	#define EMU_STAT  emu_stat
-	#define EMU_FSTAT emu_fstat
-	#define EMU_LSTAT emu_stat
+	#define EMU_STAT   emu_stat
+	#define EMU_FSTAT  emu_fstat
+	#define EMU_LSTAT  emu_stat
+	#define EMU_LINK   emu_link
+	#define EMU_UNLINK emu_unlink
 #else
 	#define EMU_STRUCT_STAT struct stat
-	#define EMU_STAT  ::stat
-	#define EMU_FSTAT ::fstat
-	#define EMU_LSTAT ::lstat
+	#define EMU_STAT   ::stat
+	#define EMU_FSTAT  ::fstat
+	#define EMU_LSTAT  ::lstat
+	#define EMU_LINK   ::link
+	#define EMU_UNLINK ::unlink
 #endif
 
 #if ! defined EMU_INCLUDE && defined WIN32
 #define EMU_INCLUDE
 
 // Need feature detection macros below
-#ifdef _MSC_VER
+#if defined BOX_CMAKE
+#	include "../common/BoxConfig.cmake.h"
+#elif defined _MSC_VER
 #	include "../common/BoxConfig-MSVC.h"
 #	define NEED_BOX_VERSION_H
 #else
@@ -32,30 +38,20 @@
 
 // basic types, may be required by other headers since we
 // don't include sys/types.h
-
-#ifdef __MINGW32__
-	#include <stdint.h>
-#else // MSVC
-	typedef unsigned __int64 u_int64_t;
-	typedef unsigned __int64 uint64_t;
-	typedef          __int64 int64_t;
-	typedef unsigned __int32 uint32_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef          __int32 int32_t;
-	typedef unsigned __int16 uint16_t;
-	typedef          __int16 int16_t;
-	typedef unsigned char    uint8_t;
-	typedef signed   char    int8_t;
-#endif
+#include <stdint.h>
 
 // emulated types, present on MinGW but not MSVC or vice versa
 
-#ifdef __MINGW32__
-	typedef uint32_t u_int32_t;
-#else
+#ifndef __MINGW32__
 	typedef unsigned int mode_t;
 	typedef unsigned int pid_t;
+	typedef unsigned int uid_t;
+	typedef unsigned int gid_t;
 #endif
+
+// Disable Windows' non-standard implementation of min() and max():
+// http://stackoverflow.com/a/5004874/648162
+#define NOMINMAX
 
 // Windows headers
 
@@ -80,18 +76,6 @@
 	(_result) )
 
 #define ITIMER_REAL 0
-
-#ifdef _MSC_VER
-// Microsoft decided to deprecate the standard POSIX functions. Great!
-// #define open(file,flags,mode) _open(file,flags,mode)
-// #define close(fd)             _close(fd)
-// #define dup(fd)               _dup(fd)
-// #define read(fd,buf,count)    _read(fd,buf,count) //collision with lib\httpserver\decode.h@61 (istream_in.read((char*)code, N);)
-// #define write(fd,buf,count)   _write(fd,buf,count) //collision with lib\httpserver\decode.h@64 ostream_in.write((const char*)plaintext, plainlength);
-// #define lseek(fd,off,whence)  _lseek(fd,off,whence)
-// #define fileno(struct_file)   _fileno(struct_file)
-#define strncasecmp(buf, msg, cbLength) _strnicmp(buf, msg, cbLength)
-#endif
 
 struct passwd {
 	char *pw_name;
@@ -143,7 +127,7 @@ inline struct passwd * getpwnam(const char * name)
 	#define S_ISDIR(x) (S_IFDIR & x)
 #endif
 
-inline int chown(const char * Filename, u_int32_t uid, u_int32_t gid)
+inline int chown(const char * Filename, uint32_t uid, uint32_t gid)
 {
 	//important - this needs implementing
 	//If a large restore is required then 
@@ -221,7 +205,11 @@ inline int geteuid(void)
 #define snprintf _snprintf
 inline int strcasecmp(const char *s1, const char *s2)
 {
-	return _stricmp(s1,s2);
+	return _stricmp(s1, s2);
+}
+inline int strncasecmp(const char *s1, const char *s2, size_t count)
+{
+	return _strnicmp(s1, s2, count);
 }
 #endif
 
@@ -248,7 +236,7 @@ struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
 
 // local constant to open file exclusively without shared access
-#define O_LOCK 0x10000
+#define BOX_OPEN_LOCK 0x10000
 
 extern DWORD winerrno; /* used to report errors from openfile() */
 HANDLE openfile(const char *filename, int flags, int mode);
@@ -368,12 +356,14 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 #define chdir(directory)         emu_chdir  (directory)
 #define mkdir(path,     mode)    emu_mkdir  (path)
-#define link(oldpath,   newpath) emu_link   (oldpath, newpath)
-#define unlink(file)             emu_unlink (file)
 #define utimes(buffer,  times)   emu_utimes (buffer,   times)
 #define chmod(file,     mode)    emu_chmod  (file,     mode)
 #define getcwd(buffer,  size)    emu_getcwd (buffer,   size)
 #define rename(oldname, newname) emu_rename (oldname, newname)
+
+// link() and unlink() conflict with Boost if implemented using macros like
+// the others above, so I've removed the macros and you need to use EMU_LINK
+// and EMU_UNLINK everywhere.
 
 // Not safe to replace stat/fstat/lstat on mingw at least, as struct stat
 // has a 16-bit st_ino and we need a 64-bit one.
@@ -415,6 +405,7 @@ bool ConvertConsoleToUtf8(const std::string& rSource, std::string& rDest);
 char* ConvertFromWideString(const WCHAR* pString, unsigned int codepage);
 bool ConvertFromWideString(const std::wstring& rInput, 
 	std::string* pOutput, unsigned int codepage);
+WCHAR* ConvertUtf8ToWideString(const char* pString);
 std::string ConvertPathToAbsoluteUnicode(const char *pFileName);
 
 // Utility function which returns a default config file name,

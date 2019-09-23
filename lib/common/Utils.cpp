@@ -95,6 +95,42 @@ void SplitString(std::string String, char SplitOn, std::vector<std::string> &rOu
 #endif*/
 }
 
+bool StartsWith(const std::string& prefix, const std::string& haystack)
+{
+	return haystack.size() >= prefix.size() &&
+		haystack.substr(0, prefix.size()) == prefix;
+}
+
+bool EndsWith(const std::string& suffix, const std::string& haystack)
+{
+	return haystack.size() >= suffix.size() &&
+		haystack.substr(haystack.size() - suffix.size()) == suffix;
+}
+
+std::string RemovePrefix(const std::string& prefix, const std::string& haystack)
+{
+	if(StartsWith(prefix, haystack))
+	{
+		return haystack.substr(prefix.size());
+	}
+	else
+	{
+		return "";
+	}
+}
+
+std::string RemoveSuffix(const std::string& suffix, const std::string& haystack)
+{
+	if(EndsWith(suffix, haystack))
+	{
+		return haystack.substr(0, haystack.size() - suffix.size());
+	}
+	else
+	{
+		return "";
+	}
+}
+
 static std::string demangle(const std::string& mangled_name)
 {
 	std::string demangled_name = mangled_name;
@@ -344,31 +380,4 @@ std::string FormatUsageLineStart(const std::string& rName,
 
 	return result.str();
 }
-
-std::string BoxGetTemporaryDirectoryName()
-{
-#ifdef WIN32
-	// http://msdn.microsoft.com/library/default.asp?
-	// url=/library/en-us/fileio/fs/creating_and_using_a_temporary_file.asp
-
-	DWORD dwRetVal;
-	char lpPathBuffer[1024];
-	DWORD dwBufSize = sizeof(lpPathBuffer);
-	
-	// Get the temp path.
-	dwRetVal = GetTempPath(dwBufSize,     // length of the buffer
-						   lpPathBuffer); // buffer for path 
-	if (dwRetVal > dwBufSize)
-	{
-		THROW_EXCEPTION(CommonException, TempDirPathTooLong)
-	}
-	
-	return std::string(lpPathBuffer);
-#elif defined TEMP_DIRECTORY_NAME
-	return std::string(TEMP_DIRECTORY_NAME);
-#else	
-	#error non-static temporary directory names not supported yet
-#endif
-}
-
 

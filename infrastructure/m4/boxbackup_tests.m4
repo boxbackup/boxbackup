@@ -10,10 +10,31 @@ solaris*)
   ;;
 esac
 
-if test "x$GXX" = "xyes"; then
-  # Use -Wall if we have gcc. This gives better warnings
-  AC_SUBST([CXXFLAGS_STRICT], ['-Wall -Wundef -Werror=return-type'])
+# If the compiler supports it, force errors on unknown flags, so that detection works:
+AX_CHECK_COMPILE_FLAG(-Werror=unknown-warning-option,
+	[cxxflags_force_error="-Werror=unknown-warning-option"])
 
+# Reduce compiler flag checking to a one-liner, needed for CMake to parse them
+AC_DEFUN([BOX_CHECK_CXX_FLAG],
+	AX_CHECK_COMPILE_FLAG($1,
+		[cxxflags_strict="$cxxflags_strict $1"],,
+		$cxxflags_force_error)
+)
+
+# Enable some compiler flags if the compiler supports them. This gives better warnings
+# and detects some problems early.
+BOX_CHECK_CXX_FLAG(-Wall)
+BOX_CHECK_CXX_FLAG(-Werror=return-type)
+BOX_CHECK_CXX_FLAG(-Werror=delete-non-virtual-dtor)
+BOX_CHECK_CXX_FLAG(-Werror=undefined-bool-conversion)
+# This error is detected by MSVC, but not usually by GCC/Clang:
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58114
+BOX_CHECK_CXX_FLAG(-Werror=delete-incomplete)
+BOX_CHECK_CXX_FLAG(-Wno-deprecated-declarations)
+
+AC_SUBST([CXXFLAGS_STRICT], [$cxxflags_strict])
+
+if test "x$GXX" = "xyes"; then
   # Don't check for gcc -rdynamic on Solaris as it's broken, but returns 0.
   # On Cygwin it does nothing except cause gcc to emit a warning message.
   case $build_os in
@@ -37,7 +58,6 @@ if test "x$GXX" = "xyes"; then
     LDFLAGS=$save_LDFLAGS
     ;;
   esac
-
 fi
 
 AC_PATH_PROG([PERL], [perl], [AC_MSG_ERROR([[perl executable was not found]])])
@@ -101,13 +121,14 @@ AX_PATH_BDB([1.x or 4.1], [
 ])
 
 # need to find libdl before trying to link openssl, apparently
-AC_SEARCH_LIBS([dlsym], ["dl"])
+AC_SEARCH_LIBS([dlsym], [dl])
 AC_CHECK_FUNCS([dlsym dladdr])
 
 ## Check for Open SSL, use old versions only if explicitly requested
 AC_SEARCH_LIBS([gethostbyname], [nsl socket resolv])
 AC_SEARCH_LIBS([shutdown], [nsl socket resolv])
 AX_CHECK_SSL(, [AC_MSG_ERROR([[OpenSSL is not installed but is required]])])
+AC_CHECK_DECLS([SSL_R_EE_KEY_TOO_SMALL],,, [[#include <openssl/ssl.h>]])
 AC_ARG_ENABLE(
   [old-ssl],
   [AC_HELP_STRING([--enable-old-ssl],
@@ -122,24 +143,18 @@ AC_SEARCH_LIBS(
 Upgrade or read the documentation for alternatives]])
   fi
   ])
-
+AC_CHECK_FUNCS([SSL_CTX_set_security_level], [HAVE_SSL_CTX_SET_SECURITY_LEVEL=1])
+AC_SUBST([HAVE_SSL_CTX_SET_SECURITY_LEVEL])
+AC_CHECK_FUNCS([OPENSSL_cleanup])
 
 ### Checks for header files.
 
-case $target_os in
-mingw32*) ;;
-winnt*)   ;;
-*)
-  AC_HEADER_DIRENT
-  ;;
-esac
-
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
-AC_CHECK_HEADERS([syslog.h time.h cxxabi.h])
+AC_CHECK_HEADERS([cxxabi.h dirent.h dlfcn.h fcntl.h getopt.h netdb.h process.h pwd.h signal.h])
+AC_CHECK_HEADERS([syslog.h time.h unistd.h])
 AC_CHECK_HEADERS([netinet/in.h netinet/tcp.h])
-AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/time.h])
+AC_CHECK_HEADERS([sys/file.h sys/param.h sys/poll.h sys/socket.h sys/stat.h sys/time.h])
 AC_CHECK_HEADERS([sys/types.h sys/uio.h sys/un.h sys/wait.h sys/xattr.h])
 AC_CHECK_HEADERS([sys/ucred.h],,, [
 	#ifdef HAVE_SYS_PARAM_H
@@ -193,11 +208,11 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 
-AC_CHECK_MEMBERS([struct stat.st_flags])
-AC_CHECK_MEMBERS([struct stat.st_atim])
-AC_CHECK_MEMBERS([struct stat.st_atimespec])
-AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec])
-AC_CHECK_MEMBERS([struct stat.st_atimensec])
+AC_CHECK_MEMBERS([struct stat.st_flags],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atim],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atimespec],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atim.tv_nsec],,, [[#include <sys/stat.h>]])
+AC_CHECK_MEMBERS([struct stat.st_atimensec],,, [[#include <sys/stat.h>]])
 AC_CHECK_MEMBERS([struct sockaddr_in.sin_len],,, [[
   #include <sys/types.h>
   #include <netinet/in.h>
@@ -206,13 +221,14 @@ AC_CHECK_MEMBERS([DIR.d_fd],,,  [[#include <dirent.h>]])
 AC_CHECK_MEMBERS([DIR.dd_fd],,, [[#include <dirent.h>]])
 AC_CHECK_MEMBERS([struct tcp_info.tcpi_rtt],,, [[#include <netinet/tcp.h>]])
 
-AC_CHECK_DECLS([O_BINARY])
+AC_CHECK_DECLS([O_BINARY],,, [[#include <fcntl.h>]])
 
 AC_CHECK_DECLS([ENOTSUP],,, [[#include <sys/errno.h>]])
 AC_CHECK_DECLS([INFTIM],,, [[#include <poll.h>]])
 AC_CHECK_DECLS([SO_PEERCRED],,, [[#include <sys/socket.h>]])
 AC_CHECK_DECLS([SOL_TCP],,, [[#include <netinet/tcp.h>]])
 AC_CHECK_DECLS([TCP_INFO],,, [[#include <netinet/tcp.h>]])
+AC_CHECK_DECLS([SYS_open, SYS_openat],,, [[#include <sys/syscall.h>]])
 
 if test -n "$have_sys_socket_h"; then
   AC_CHECK_DECLS([SO_SNDBUF],,, [[#include <sys/socket.h>]])
@@ -285,7 +301,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_CHECK_FUNCS([ftruncate getpeereid getpeername getpid gettimeofday lchown])
 AC_CHECK_FUNCS([setproctitle utimensat])
-AC_SEARCH_LIBS([setproctitle], ["bsd"])
+AC_SEARCH_LIBS([setproctitle], [bsd])
 
 # NetBSD implements kqueue too differently for us to get it fixed by 0.10
 # TODO: Remove this when NetBSD kqueue implementation is working. The main
@@ -298,7 +314,8 @@ if test "$netbsd_hack" != "netbsd"; then
 fi
 
 AX_FUNC_SYSCALL
-AX_CHECK_SYSCALL_LSEEK
+AX_CHECK_SYSCALL_LSEEK_DUMMY_PARAM
+AX_CHECK_SYSCALL_LSEEK_64_BIT
 AC_CHECK_FUNCS([listxattr llistxattr getxattr lgetxattr setxattr lsetxattr])
 AC_CHECK_DECLS([XATTR_NOFOLLOW],,, [[#include <sys/xattr.h>]])
 
@@ -345,4 +362,10 @@ fi
 ;;
 esac
 
-
+AC_CHECK_PROGS(default_debugger, [lldb gdb])
+AC_ARG_WITH([debugger],
+            [AS_HELP_STRING([--with-debugger=<gdb|lldb|...>],
+              [use this debugger in t-gdb scripts to debug tests @<:@default=lldb if present, otherwise gdb@:>@])],
+            [],
+            [with_debugger=$default_debugger])
+AC_SUBST([with_debugger])

@@ -15,7 +15,6 @@
 	#include <sys/syscall.h>
 #endif
 #include <sys/types.h>
-#include <unistd.h>
 
 #ifdef HAVE_SYS_UIO_H
 	#include <sys/uio.h>
@@ -243,6 +242,10 @@ extern "C" int
 	open(const char *path, int flags, ...)
 #endif // DEFINE_ONLY_OPEN64
 {
+	// Some newer architectures don't have an open() syscall, but use openat() instead.
+	// In these cases we will need to call sys_openat() instead of sys_open().
+	// https://chromium.googlesource.com/linux-syscall-support/
+
 	if(intercept_count > 0)
 	{
 		if(intercept_filename != NULL &&
@@ -265,6 +268,8 @@ extern "C" int
 
 #ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_open(path, flags, mode);
+#elif HAVE_DECL_SYS_OPENAT && !HAVE_DECL_SYS_OPEN
+	int r = syscall(SYS_openat, AT_FDCWD, path, flags, mode);
 #else
 	int r = syscall(SYS_open, path, flags, mode);
 #endif
@@ -385,23 +390,23 @@ lseek(int fildes, off_t offset, int whence)
 {
 	// random magic for lseek syscall, see /usr/src/lib/libc/sys/lseek.c
 	CHECK_FOR_FAKE_ERROR_COND(fildes, 0, SYS_lseek, -1);
+
 #ifdef PLATFORM_NO_SYSCALL
 	int r = TEST_lseek(fildes, offset, whence);
+#elif defined HAVE_LSEEK_DUMMY_PARAM
+	off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, (int32_t)offset,
+		whence);
+#elif defined HAVE_LSEEK_64_BIT
+	off_t r = syscall(SYS_lseek, fildes, (int64_t)offset, whence);
 #else
-	#ifdef HAVE_LSEEK_DUMMY_PARAM
-		off_t r = syscall(SYS_lseek, fildes, 0 /* extra 0 required here! */, offset, whence);
-	#elif defined(_FILE_OFFSET_BITS)
-		// Don't bother trying to call SYS__llseek on 32 bit since it is
-		// fiddly and not needed for the tests
-		off_t r = syscall(SYS_lseek, fildes, (uint32_t)offset, whence);
-	#else
-		off_t r = syscall(SYS_lseek, fildes, offset, whence);
-	#endif
+	off_t r = syscall(SYS_lseek, fildes, (int32_t)offset, whence);
 #endif
+
 	if(r != -1)
 	{
 		intercept_filepos = r;
 	}
+
 	return r;
 }
 

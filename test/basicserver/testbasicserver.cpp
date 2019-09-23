@@ -11,23 +11,21 @@
 #include "Box.h"
 
 #include <stdio.h>
-#include <unistd.h>
 #include <time.h>
 
 #include <typeinfo>
 
-#include "Test.h"
-#include "Daemon.h"
-#include "Configuration.h"
-#include "ServerStream.h"
-#include "SocketStream.h"
-#include "IOStreamGetLine.h"
-#include "ServerTLS.h"
 #include "CollectInBufferStream.h"
-
+#include "Configuration.h"
+#include "Daemon.h"
+#include "IOStreamGetLine.h"
+#include "ServerControl.h"
+#include "ServerStream.h"
+#include "ServerTLS.h"
+#include "SocketStream.h"
+#include "Test.h"
 #include "TestContext.h"
 #include "autogen_TestProtocol.h"
-#include "ServerControl.h"
 
 #include "MemLeakFindOn.h"
 
@@ -36,7 +34,10 @@
 // in ms
 #define COMMS_READ_TIMEOUT					4
 #define COMMS_SERVER_WAIT_BEFORE_REPLYING	40
-#define SHORT_TIMEOUT 5000
+// Use a longer timeout to give Srv2TestConversations time to write 20 MB to each of
+// three child processes before starting to read it back again, without the children
+// timing out and aborting.
+#define SHORT_TIMEOUT 30000
 
 class basicdaemon : public Daemon
 {
@@ -96,7 +97,7 @@ void testservers_connection(SocketStream &rStream)
 	while(!getline.IsEOF())
 	{
 		std::string line;
-		while(!getline.GetLine(line))
+		while(!getline.GetLine(line, false, SHORT_TIMEOUT))
 			;
 		if(line == "QUIT")
 		{
@@ -104,6 +105,12 @@ void testservers_connection(SocketStream &rStream)
 		}
 		if(line == "LARGEDATA")
 		{
+			// This part of the test is timing-sensitive, because we write
+			// 20 MB to the test and then have to wait while it reads 20 MB
+			// from the other two children before writing anything back to us.
+			// We could timeout waiting for it to talk to us again. So we
+			// increased the SHORT_TIMEOUT from 5 seconds to 30 to allow 
+			// more time.
 			{
 				// Send lots of data
 				char data[LARGE_DATA_BLOCK_SIZE];
@@ -200,11 +207,16 @@ const ConfigurationVerify *testserver::GetConfigVerify() const
 		}
 	};
 
+	static ConfigurationVerifyKey root_keys[] =
+	{
+		ssl_security_level_key,
+	};
+
 	static ConfigurationVerify verify =
 	{
 		"root", /* mName */
 		verifyserver, /* mpSubConfigurations */
-		0, /* mpKeys */
+		root_keys, // mpKeys
 		ConfigTest_Exists | ConfigTest_LastEntry,
 		0
 	};
@@ -340,6 +352,11 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 	{
 		conns[c]->Write("LARGEDATA\n", 10, SHORT_TIMEOUT);
 	}
+	// This part of the test is timing-sensitive, because we read 20 MB from each of
+	// three daemon processes, then write 20 MB to each of them, then read back 
+	// another 20 MB from each of them. Each child could timeout waiting for us to
+	// read from it, or write to it, while we're servicing another child. So we
+	// increased the SHORT_TIMEOUT from 5 seconds to 30 to allow enough time.
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
 		// Receive lots of data
@@ -436,6 +453,151 @@ void TestStreamReceive(TestProtocolClient &protocol, int value, bool uncertainst
 	TEST_THAT(count == (24273*3));	// over 64 k of data, definately
 }
 
+bool test_security_level(int cert_level, int test_level, bool expect_failure_on_connect = false)
+{
+	int old_num_failures = num_failures;
+
+	// Context first
+	TLSContext context;
+	if(cert_level == 0)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/clientCerts.pem",
+			"testfiles/clientPrivKey.pem",
+			"testfiles/clientTrustedCAs.pem",
+			test_level); // SecurityLevel
+	}
+	else if(cert_level == 1)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/seclevel2-sha1/ca/clients/1234567-cert.pem",
+			"testfiles/seclevel2-sha1/bbackupd/1234567-key.pem",
+			"testfiles/seclevel2-sha1/ca/roots/serverCA.pem",
+			test_level); // SecurityLevel
+	}
+	else if(cert_level == 2)
+	{
+		context.Initialise(false /* client */,
+			"testfiles/seclevel2-sha256/ca/clients/1234567-cert.pem",
+			"testfiles/seclevel2-sha256/bbackupd/1234567-key.pem",
+			"testfiles/seclevel2-sha256/ca/roots/serverCA.pem",
+			test_level); // SecurityLevel
+	}
+	else
+	{
+		TEST_FAIL_WITH_MESSAGE("No certificates generated for level " << cert_level);
+		return false;
+	}
+
+	SocketStreamTLS conn;
+
+	if(expect_failure_on_connect)
+	{
+		TEST_CHECK_THROWS(
+			conn.Open(context, Socket::TypeINET, "localhost", 2003),
+			ConnectionException, TLSPeerWeakCertificate);
+	}
+	else
+	{
+		conn.Open(context, Socket::TypeINET, "localhost", 2003);
+	}
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+// Test the certificates that were distributed with the Box Backup source since ancient times,
+// which have only 1024-bit keys, and thus fail with "ee key too small".
+bool test_ancient_certificates()
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(0, -1)); // cert_level, test_level
+
+	// We do not test level 0 (system-wide default) because the system
+	// may have it set high, and our old certificate will not be usable
+	// in that case, and the user has no way to fix that, so it's not a
+	// useful test.
+
+	// Level 1 (allow weaker, without a warning) should pass with any certificates:
+	TEST_THAT(test_security_level(0, 1)); // cert_level, test_level
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	// Level 2 (disallow weaker, without a warning) should NOT pass with old certificates:
+	TEST_CHECK_THROWS(
+		test_security_level(0, 2), // cert_level, test_level
+		ServerException, TLSServerWeakCertificate);
+#else
+	// We have no way to increase the security level, so it should still pass:
+	test_security_level(0, 2); // cert_level, test_level
+#endif
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+// Test a set of more recent certificates, which have a longer key but are signed using the SHA1
+// algorithm instead of SHA256, which fail with "ca md too weak" instead.
+bool test_old_certificates()
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(1, -1)); // cert_level, test_level
+
+	// We do not test level 0 (system-wide default) because the system
+	// may have it set high, and our old certificate will not be usable
+	// in that case, and the user has no way to fix that, so it's not a
+	// useful test.
+
+	// Level 1 (allow weaker, without a warning) should pass with any certificates:
+	TEST_THAT(test_security_level(1, 1)); // cert_level, test_level
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	// Level 2 (disallow weaker, without a warning) should NOT pass with old certificates:
+	TEST_CHECK_THROWS(
+		test_security_level(1, 2), // cert_level, test_level
+		ServerException, TLSServerWeakCertificate);
+#else
+	// We have no way to increase the security level, so it should still pass:
+	test_security_level(1, 2); // cert_level, test_level
+#endif
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
+
+bool test_new_certificates(bool expect_failure_level_2)
+{
+	int old_num_failures = num_failures;
+
+	// Level -1 (allow weaker, with warning) should pass with any certificates:
+	TEST_THAT(test_security_level(2, -1)); // cert_level, test_level
+
+	// Level 0 (system dependent). This will fail if the user (or their
+	// distro) sets the system-wide security level very high. We check
+	// this because *we* may need to update Box Backup if this happens
+	// again, as it did when Debian increased the default level.
+	// Newly generated certificates may need to be strengthened.
+	// And we may need to update the documentation.
+	TEST_THAT(test_security_level(2, 0)); // cert_level, test_level
+
+	// Level 1 (allow weaker, without a warning) should pass with any certificates:
+	TEST_THAT(test_security_level(2, 1)); // cert_level, test_level
+
+#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	// Level 2 (disallow weaker, without a warning) should pass with new certificates,
+	// but might fail to connect to a peer with weak (insecure) certificates:
+	TEST_THAT(test_security_level(2, 2, expect_failure_level_2));
+	// cert_level, test_level, expect_failure
+#else
+	// We have no way to increase the security level, so it should not fail to connect to a
+	// daemon with weak certificates:
+	test_security_level(2, 2, false); // cert_level, test_level, expect_failure
+#endif
+
+	return (num_failures == old_num_failures); // no new failures -> good
+}
+
 
 int test(int argc, const char *argv[])
 {
@@ -486,7 +648,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a basic server
 	{
-		std::string cmd = "./_test --test-daemon-args=";
+		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv1 testfiles/srv1.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv1.pid");
@@ -501,7 +663,7 @@ int test(int argc, const char *argv[])
 
 			// Move the config file over
 			#ifdef WIN32
-				TEST_THAT(::unlink("testfiles"
+				TEST_THAT(EMU_UNLINK("testfiles"
 					DIRECTORY_SEPARATOR "srv1.conf") != -1);
 			#endif
 
@@ -532,7 +694,7 @@ int test(int argc, const char *argv[])
 	
 	// Launch a test forking server
 	{
-		std::string cmd = "./_test --test-daemon-args=";
+		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv2 testfiles/srv2.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv2.pid");
@@ -602,7 +764,7 @@ int test(int argc, const char *argv[])
 
 	// Launch a test SSL server
 	{
-		std::string cmd = "./_test --test-daemon-args=";
+		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
 		cmd += " srv3 testfiles/srv3.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv3.pid");
@@ -631,6 +793,7 @@ int test(int argc, const char *argv[])
 						"testfiles/clientCerts.pem",
 						"testfiles/clientPrivKey.pem",
 						"testfiles/clientTrustedCAs.pem");
+				// SecurityLevel == -1 by default (old security + warnings)
 
 				SocketStreamTLS conn1;
 				conn1.Open(context, Socket::TypeINET, "localhost", 2003);
@@ -669,6 +832,11 @@ int test(int argc, const char *argv[])
 				TEST_THAT(ServerIsAlive(pid));
 			#endif
 
+			// Try testing with different security levels, check that the behaviour is
+			// as documented at:
+			// https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates
+			TEST_THAT(test_ancient_certificates());
+
 			// Kill it
 			TEST_THAT(KillServer(pid));
 			::sleep(1);
@@ -678,14 +846,44 @@ int test(int argc, const char *argv[])
 				TestRemoteProcessMemLeaks("test-srv3.memleaks");
 			#endif
 		}
+
+		cmd = TEST_EXECUTABLE " --test-daemon-args=";
+		cmd += test_args;
+		cmd += " srv3 testfiles/srv3-seclevel2-sha1.conf";
+		pid = LaunchServer(cmd, "testfiles/srv3.pid");
+
+		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(test_old_certificates());
+		TEST_THAT(KillServer(pid));
+
+		cmd = TEST_EXECUTABLE " --test-daemon-args=";
+		cmd += test_args;
+		cmd += " srv3 testfiles/srv3-seclevel2-sha256.conf";
+		pid = LaunchServer(cmd, "testfiles/srv3.pid");
+
+		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(test_new_certificates(false)); // !expect_failure_level_2
+		TEST_THAT(KillServer(pid));
+
+		// Start a daemon using old, insecure certificates. We should get an error when we
+		// try to connect to it:
+
+		cmd = TEST_EXECUTABLE " --test-daemon-args=";
+		cmd += test_args;
+		cmd += " srv3 testfiles/srv3-insecure-daemon.conf";
+		pid = LaunchServer(cmd, "testfiles/srv3.pid");
+
+		TEST_THAT(pid != -1 && pid != 0);
+		TEST_THAT(test_new_certificates(true)); // expect_failure_level_2
+		TEST_THAT(KillServer(pid));
 	}
 	
 //protocolserver:
 	// Launch a test protocol handling server
 	{
-		std::string cmd = "./_test --test-daemon-args=";
+		std::string cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
-		cmd += " srv4 testfiles/srv4.conf";
+		cmd += " srv4 testfiles/srv4-seclevel1.conf";
 		int pid = LaunchServer(cmd, "testfiles/srv4.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);

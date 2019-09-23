@@ -27,7 +27,6 @@
 #include "BoxPortsAndFiles.h"
 #include "HousekeepStoreAccount.h"
 #include "MainHelper.h"
-#include "NamedLock.h"
 #include "RaidFileController.h"
 #include "StoreStructure.h"
 #include "UnixUser.h"

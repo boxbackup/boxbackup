@@ -186,8 +186,8 @@ protected:
 	void CheckAndReadHdr(void *hdr);	// don't use type here to avoid dependency
 	
 	// Will be used for logging
-	virtual void InformStreamReceiving(u_int32_t Size);
-	virtual void InformStreamSending(u_int32_t Size);
+	virtual void InformStreamReceiving(uint32_t Size);
+	virtual void InformStreamSending(uint32_t Size);
 	
 private:
 	void EnsureBufferAllocated(int Size);

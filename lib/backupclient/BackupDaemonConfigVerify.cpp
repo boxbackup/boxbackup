@@ -8,10 +8,11 @@
 // --------------------------------------------------------------------------
 
 #include "Box.h"
-#include "BackupDaemonConfigVerify.h"
-#include "Daemon.h"
-#include "BoxPortsAndFiles.h"
+
 #include "BackupConstants.h"
+#include "BackupDaemonConfigVerify.h"
+#include "BoxPortsAndFiles.h"
+#include "Daemon.h"
 
 #include "MemLeakFindOn.h"
 
@@ -150,7 +151,9 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 		ConfigTest_IsUint32),
 	ConfigurationVerifyKey("CertificateFile", 0),
 	ConfigurationVerifyKey("PrivateKeyFile", 0),
-	ConfigurationVerifyKey("TrustedCAsFile", ConfigTest_LastEntry),
+	ConfigurationVerifyKey("TrustedCAsFile", 0),
+	ConfigurationVerifyKey("SSLSecurityLevel", ConfigTest_IsInt | ConfigTest_LastEntry,
+		BOX_DEFAULT_SSL_SECURITY_LEVEL),
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =

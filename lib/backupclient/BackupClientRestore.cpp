@@ -277,7 +277,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					"out of the way of restored directory. "
 					"Use specific restore with ID to "
 					"restore this object.");
-				if(::unlink(rLocalDirectoryName.c_str()) != 0)
+				if(EMU_UNLINK(rLocalDirectoryName.c_str()) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to delete "
 						"file '" << 
@@ -513,7 +513,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 				// files already there.
 				if(ObjectExists(localFilename)
 					!= ObjectExists_NoObject &&
-					::unlink(localFilename.c_str()) != 0)
+					EMU_UNLINK(localFilename.c_str()) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to delete "
 						"file '" << localFilename << 
@@ -915,7 +915,7 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	}
 	
 	// Delete the resume information file
-	::unlink(params.mRestoreResumeInfoFilename.c_str());
+	EMU_UNLINK(params.mRestoreResumeInfoFilename.c_str());
 
 	return params.ContinuedAfterError ? Restore_CompleteWithErrors
 		: Restore_Complete;

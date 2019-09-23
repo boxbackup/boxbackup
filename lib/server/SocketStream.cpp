@@ -171,6 +171,10 @@ void SocketStream::Open(Socket::Type Type, const std::string& rName, int Port)
 	Socket::NameLookupToSockAddr(addr, sockDomain, Type, rName, Port,
 		addrLen);
 
+	std::ostringstream oss;
+	oss << rName << ":" << Port;
+	mPeerSocketDesc = oss.str();
+
 	// Create the socket
 	mSocketHandle = ::socket(sockDomain, SOCK_STREAM,
 		0 /* let OS choose protocol */);

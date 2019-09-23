@@ -139,7 +139,7 @@ static const char *uploads_filenames[] = {"49587fds", "cvhjhj324", "sdfcscs324",
 #define UPLOAD_FILE_TO_MOVE	8
 
 #define UNLINK_IF_EXISTS(filename) \
-	if (FileExists(filename)) { TEST_THAT(unlink(filename) == 0); }
+	if (FileExists(filename)) { TEST_THAT(EMU_UNLINK(filename) == 0); }
 
 //! Simplifies calling setUp() with the current function name in each test.
 #define SETUP_TEST_BACKUPSTORE() \
@@ -274,81 +274,95 @@ bool test_filename_encoding()
 	SETUP_TEST_BACKUPSTORE();
 
 	// test some basics -- encoding and decoding filenames
+
+	// Make some filenames in various ways
+	BackupStoreFilenameClear fn1;
+	fn1.SetClearFilename(std::string("filenameXYZ"));
+	BackupStoreFilenameClear fn2(std::string("filenameXYZ"));
+	BackupStoreFilenameClear fn3(fn1);
+	TEST_THAT(fn1 == fn2);
+	TEST_THAT(fn1 == fn3);
+
+	// Check that it's been encrypted
+	std::string name(fn2.GetEncodedFilename());
+	TEST_THAT(name.find("name") == name.npos);
+
+	// Bung it in a stream, get it out in a Clear filename
 	{
-		// Make some filenames in various ways
-		BackupStoreFilenameClear fn1;
-		fn1.SetClearFilename(std::string("filenameXYZ"));
-		BackupStoreFilenameClear fn2(std::string("filenameXYZ"));
-		BackupStoreFilenameClear fn3(fn1);
-		TEST_THAT(fn1 == fn2);
-		TEST_THAT(fn1 == fn3);
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn4;
+		fn4.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn4.GetClearFilename() == "filenameXYZ");
+		TEST_THAT(fn4 == fn1);
+	}
 
-		// Check that it's been encrypted
-		std::string name(fn2.GetEncodedFilename());
-		TEST_THAT(name.find("name") == name.npos);
+	// Bung it in a stream, get it out in a server non-Clear filename (two of them into the same var)
+	{
+		BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		fno.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilename fn5;
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5 == fn1);
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5 == fno);
+	}
 
-		// Bung it in a stream, get it out in a Clear filename
+	// Same again with clear strings
+	{
+		BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
+		CollectInBufferStream stream;
+		fn1.WriteToStream(stream);
+		fno.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn5;
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5.GetClearFilename() == "filenameXYZ");
+		fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn5.GetClearFilename() == "pinglet dksfnsf jksjdf ");
+	}
+
+	// Test a very big filename
+	{
+		const char *fnr = "01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789"
+			"01234567890123456789012345678901234567890123456789";
+		BackupStoreFilenameClear fnLong(fnr);
+		CollectInBufferStream stream;
+		fnLong.WriteToStream(stream);
+		stream.SetForReading();
+		BackupStoreFilenameClear fn9;
+		fn9.ReadFromStream(stream, IOStream::TimeOutInfinite);
+		TEST_THAT(fn9.GetClearFilename() == fnr);
+		TEST_THAT(fn9 == fnLong);
+	}
+
+	// Test a filename which went wrong once
+	{
+		BackupStoreFilenameClear dodgy("content-negotiation.html");
+	}
+
+	// Test that we can decrypt filenames in a previously-encrypted directory, to detect
+	// regressions of the encryption setup:
+	{
+		FileStream dir_file("testfiles/encrypted.dir");
+		BackupStoreDirectory dir(dir_file);
+		TEST_EQUAL(2, dir.GetNumberOfEntries());
+		BackupStoreDirectory::Entry* en = dir.FindEntryByID(0x2);
+		TEST_THAT(en != NULL);
+		if(en)
 		{
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn4;
-			fn4.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn4.GetClearFilename() == "filenameXYZ");
-			TEST_THAT(fn4 == fn1);
-		}
-
-		// Bung it in a stream, get it out in a server non-Clear filename (two of them into the same var)
-		{
-			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			fno.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilename fn5;
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5 == fn1);
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5 == fno);
-		}
-
-		// Same again with clear strings
-		{
-			BackupStoreFilenameClear fno("pinglet dksfnsf jksjdf ");
-			CollectInBufferStream stream;
-			fn1.WriteToStream(stream);
-			fno.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn5;
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5.GetClearFilename() == "filenameXYZ");
-			fn5.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn5.GetClearFilename() == "pinglet dksfnsf jksjdf ");
-		}
-
-		// Test a very big filename
-		{
-			const char *fnr = "01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789"
-				"01234567890123456789012345678901234567890123456789";
-			BackupStoreFilenameClear fnLong(fnr);
-			CollectInBufferStream stream;
-			fnLong.WriteToStream(stream);
-			stream.SetForReading();
-			BackupStoreFilenameClear fn9;
-			fn9.ReadFromStream(stream, IOStream::TimeOutInfinite);
-			TEST_THAT(fn9.GetClearFilename() == fnr);
-			TEST_THAT(fn9 == fnLong);
-		}
-
-		// Test a filename which went wrong once
-		{
-			BackupStoreFilenameClear dodgy("content-negotiation.html");
+			BackupStoreFilenameClear clear(en->GetName());
+			TEST_EQUAL("lovely_directory", clear.GetClearFilename());
 		}
 	}
 
@@ -482,7 +496,7 @@ void test_test_file(int t, IOStream &rStream)
 
 	free(data);
 	in.Close();
-	TEST_THAT(unlink("testfiles/test_download") == 0);
+	TEST_THAT(EMU_UNLINK("testfiles/test_download") == 0);
 }
 
 void assert_everything_deleted(BackupProtocolCallable &protocol, int64_t DirID)
@@ -1362,11 +1376,21 @@ bool test_multiple_uploads()
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("1");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 		TEST_THAT(run_housekeeping_and_check_account());
 		apProtocol = connect_and_login(context);
 		protocolReadOnly.Reopen();
+
+#ifdef _MSC_VER
+		BOX_TRACE("2");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check that the block index can be obtained by name even though it's been deleted
 		{
@@ -1395,6 +1419,11 @@ bool test_multiple_uploads()
 			test_test_file(t, *filestream);
 		}
 
+#ifdef _MSC_VER
+		BOX_TRACE("3");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		{
 			StreamableMemBlock attrtest(attr3, sizeof(attr3));
 
@@ -1408,6 +1437,11 @@ bool test_multiple_uploads()
 
 		// sleep to ensure that the timestamp on the file will change
 		::safe_sleep(1);
+
+#ifdef _MSC_VER
+		BOX_TRACE("4");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 
 		// Check diffing and rsync like stuff...
 		// Build a modified file
@@ -1432,6 +1466,11 @@ bool test_multiple_uploads()
 		// ourselves) and check that it doesn't change the numbers
 		// of files
 
+#ifdef _MSC_VER
+		BOX_TRACE("5");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
+
 		apProtocol->QueryFinished();
 		protocolReadOnly.QueryFinished();
 
@@ -1439,6 +1478,10 @@ bool test_multiple_uploads()
 			BackupStoreAccountDatabase::Read("testfiles/accounts.txt"));
 		BackupStoreAccountDatabase::Entry account =
 			apAccounts->GetEntry(0x1234567);
+#ifdef _MSC_VER
+		BOX_TRACE("6");
+		system("dir testfiles\\0_0\\backup\\01234567");
+#endif
 		TEST_EQUAL(0, run_housekeeping(account));
 
 		// Also check that bbstoreaccounts doesn't change anything,
@@ -2431,29 +2474,23 @@ bool test_encoding()
 
 bool test_symlinks()
 {
-#ifndef WIN32 // no symlinks on Win32
 	SETUP_TEST_BACKUPSTORE();
 
-	// TODO FIXME indentation
+#ifndef WIN32 // no symlinks on Win32
+	UNLINK_IF_EXISTS("testfiles/testsymlink");
+	TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
+	BackupStoreFilenameClear name("testsymlink");
+	std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
 
-		// Try out doing this on a symlink
-		{
-			UNLINK_IF_EXISTS("testfiles/testsymlink");
-			TEST_THAT(::symlink("does/not/exist", "testfiles/testsymlink") == 0);
-			BackupStoreFilenameClear name("testsymlink");
-			std::auto_ptr<IOStream> encoded(BackupStoreFile::EncodeFile("testfiles/testsymlink", 32, name));
+	// Can't decode it from the stream, because it's in file order, and doesn't have the
+	// required properties to be able to reorder it. So buffer it...
+	CollectInBufferStream b;
+	encoded->CopyStreamTo(b);
+	b.SetForReading();
 
-			// Can't decode it from the stream, because it's in file order, and doesn't have the
-			// required properties to be able to reorder it. So buffer it...
-			CollectInBufferStream b;
-			encoded->CopyStreamTo(b);
-			b.SetForReading();
-
-			// Decode it
-			UNLINK_IF_EXISTS("testfiles/testsymlink_2");
-			BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
-		}
-	teardown_test_backupstore();
+	// Decode it
+	UNLINK_IF_EXISTS("testfiles/testsymlink_2");
+	BackupStoreFile::DecodeFile(b, "testfiles/testsymlink_2", IOStream::TimeOutInfinite);
 #endif
 
 	TEARDOWN_TEST_BACKUPSTORE();
@@ -2607,7 +2644,7 @@ bool test_login_with_disabled_account()
 
 		// Login
 		TEST_COMMAND_RETURNS_ERROR(protocol, QueryLogin(0x01234567, 0),
-			BackupProtocolError::Err_DisabledAccount);
+			Err_DisabledAccount);
 
 		// Finish the connection
 		protocol.QueryFinished();
@@ -2628,7 +2665,7 @@ bool test_login_with_no_refcount_db()
 	// Delete the refcount database and try to log in again. Check that
 	// we're locked out of the account until housekeeping has recreated
 	// the refcount db.
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(BackupProtocolLocal2 protocolLocal(0x01234567,
 		"test", "backup/01234567/", 0, false), // Not read-only
 		BackupStoreException, CorruptReferenceCountDatabase);
@@ -2653,7 +2690,7 @@ bool test_login_with_no_refcount_db()
 	// because housekeeping may fix the refcount database while we're
 	// stepping through.
 	TEST_THAT_THROWONFAIL(StartServer());
-	TEST_EQUAL(0, ::unlink("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
+	TEST_EQUAL(0, EMU_UNLINK("testfiles/0_0/backup/01234567/refcount.rdb.rfw"));
 	TEST_CHECK_THROWS(connect_and_login(context),
 		ConnectionException, Protocol_UnexpectedReply);
 
@@ -2825,8 +2862,8 @@ bool test_open_files_with_limited_win32_permissions()
 	DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 	HANDLE h1 = CreateFileA(file, accessRights, shareMode,
-		NULL, OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h1 != INVALID_HANDLE_VALUE);
+		NULL, OPEN_ALWAYS, // create file if it doesn't exist
+		FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	TEST_THAT(h1 != INVALID_HANDLE_VALUE);
 
 	accessRights = FILE_READ_ATTRIBUTES |
@@ -2834,7 +2871,6 @@ bool test_open_files_with_limited_win32_permissions()
 
 	HANDLE h2 = CreateFileA(file, accessRights, shareMode,
 		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	assert(h2 != INVALID_HANDLE_VALUE);
 	TEST_THAT(h2 != INVALID_HANDLE_VALUE);
 
 	CloseHandle(h2);

@@ -9,15 +9,19 @@
 
 #include "Box.h"
 
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-
 #include <errno.h>
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
+
+#ifdef HAVE_PROCESS_H
+#	include <process.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
 
 #ifdef HAVE_BSD_UNISTD_H
 	#include <bsd/unistd.h>
@@ -26,7 +30,6 @@
 #ifdef WIN32
 	#include <Strsafe.h>
 	#include <ws2tcpip.h>
-	#include <process.h>
 #endif
 
 #include "depot.h"
@@ -39,6 +42,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "BoxPortsAndFiles.h"
 #include "Configuration.h"
 #include "Daemon.h"
 #include "FileModificationTime.h"
@@ -48,6 +52,9 @@
 #include "Utils.h"
 
 #include "MemLeakFindOn.h"
+
+const ConfigurationVerifyKey ssl_security_level_key("SSLSecurityLevel",
+	ConfigTest_IsInt | ConfigTest_LastEntry, BOX_DEFAULT_SSL_SECURITY_LEVEL);
 
 Daemon *Daemon::spDaemon = 0;
 
@@ -702,7 +709,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		
 		// Delete the PID file
-		::unlink(pidFileName.c_str());
+		EMU_UNLINK(pidFileName.c_str());
 		
 		// Log
 		BOX_NOTICE("Terminating daemon");

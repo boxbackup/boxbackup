@@ -23,7 +23,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #ifdef HAVE_NETDB_H
 #	include <netdb.h>
@@ -44,6 +43,10 @@
 #include <iostream>
 #include <list>
 #include <string>
+
+#ifdef HAVE_OPENSSL_CLEANUP
+#	include <openssl/crypto.h>
+#endif
 
 #include "box_getopt.h"
 #include "depot.h"
@@ -393,6 +396,14 @@ int main(int argc, char * const * argv)
 		{
 			Logging::GetSyslog().Shutdown();
 
+			// On Ubuntu 18.04, initialising OpenSSL 1.1.1 leaves open file handles to
+			// /dev/[u]random which are not easy to close (the docs for OPENSSL_cleanup
+			// recommend not to call it), but we want to avoid detecting those as
+			// leaking file descriptors
+#ifdef HAVE_OPENSSL_CLEANUP
+			OPENSSL_cleanup();
+#endif
+
 			bool filesleftopen = !checkfilesleftopen();
 
 			fflush(stdout);
@@ -417,12 +428,6 @@ int main(int argc, char * const * argv)
 		}
 		
 		return returncode;
-	}
-	catch(BoxException &e)
-	{
-		printf("FAILED: Exception caught: %s: %s\n", e.what(),
-			e.GetMessage().c_str());
-		return 1;
 	}
 	catch(std::exception &e)
 	{

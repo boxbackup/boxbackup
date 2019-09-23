@@ -13,19 +13,19 @@
 #include <time.h>
 #include <string.h> // for stderror
 
-// c.f. http://bugs.debian.org/512510
-#include <cstdio>
+#ifdef HAVE_PROCESS_H
+#	include <process.h>
+#endif
 
 #ifdef HAVE_SYSLOG_H
-	#include <syslog.h>
-#endif
-#ifdef HAVE_UNISTD_H
-	#include <unistd.h>
-#endif
-#ifdef WIN32
-	#include <process.h>
+#	include <syslog.h>
 #endif
 
+#ifdef HAVE_UNISTD_H
+#	include <unistd.h>
+#endif
+
+#include <cstdio>
 #include <cstring>
 #include <iomanip>
 

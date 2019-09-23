@@ -95,7 +95,6 @@ AC_CONFIG_FILES([infrastructure/BoxPlatform.pm
                  test/bbackupd/testfiles/bbackupd-temploc.conf
   		 ])
 AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
-                   bin/bbackupquery/makedocumentation.pl
                    bin/bbstored/bbstored-certs
                    bin/bbstored/bbstored-config
                    contrib/debian/bbackupd
@@ -108,8 +107,8 @@ AX_CONFIG_SCRIPTS([bin/bbackupd/bbackupd-config
                    contrib/solaris/bbstored-smf-method
                    contrib/windows/installer/boxbackup.mpi
                    infrastructure/makebuildenv.pl
-                   infrastructure/makeparcels.pl
                    infrastructure/makedistribution.pl
+                   lib/bbackupquery/makedocumentation.pl
                    lib/common/makeexception.pl
                    lib/raidfile/raidfile-config
                    lib/server/makeprotocol.pl
@@ -124,8 +123,7 @@ AC_OUTPUT
 
 # Configure the Box build system
 echo
-if ! $PERL ./infrastructure/makebuildenv.pl \
-|| ! $PERL ./infrastructure/makeparcels.pl; then
+if ! $PERL ./infrastructure/makebuildenv.pl; then
 	echo "Making infrastructure failed!"
 	exit 1
 fi
@@ -141,6 +139,7 @@ Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
+Debugger:            ${with_debugger:-neither GDB nor LLDB detected!}
 EOC
 
 cat > config.env <<EOC

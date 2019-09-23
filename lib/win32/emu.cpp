@@ -536,7 +536,10 @@ std::string GetErrorMessage(DWORD errorCode)
 
 	if (chars == 0 || pMsgBuf == NULL)
 	{
-		return std::string("failed to get error message");
+		std::ostringstream oss;
+		oss << "Failed to get error message for error code " << errorCode << ": error " <<
+			GetLastError();
+		return oss.str();
 	}
 
 	// remove embedded newline
@@ -613,7 +616,7 @@ HANDLE openfile(const char *pFileName, int flags, int mode)
 		createDisposition = CREATE_NEW;
 	}
 
-	if (flags & O_LOCK)
+	if (flags & BOX_OPEN_LOCK)
 	{
 		shareMode = 0;
 	}
@@ -1310,7 +1313,7 @@ int poll (struct pollfd *ufds, unsigned long nfds, int timeout)
 
 BOOL AddEventSource
 (
-	LPTSTR pszSrcName, // event source name
+	const std::string& name, // event source name
 	DWORD  dwNum       // number of categories
 )
 {
@@ -1332,7 +1335,7 @@ BOOL AddEventSource
 
 	std::string regkey("SYSTEM\\CurrentControlSet\\Services\\EventLog\\"
 		"Application\\");
-	regkey += pszSrcName; 
+	regkey += name;
  
 	HKEY hk;
 	DWORD dwDisp;
@@ -1340,10 +1343,16 @@ BOOL AddEventSource
 	winerrno = RegCreateKeyEx(HKEY_LOCAL_MACHINE, regkey.c_str(), 
 		 0, NULL, REG_OPTION_NON_VOLATILE,
 		 KEY_WRITE, NULL, &hk, &dwDisp);
-	if (winerrno != ERROR_SUCCESS)
+	if (winerrno == ERROR_ACCESS_DENIED)
 	{
-		::syslog(LOG_ERR, "Failed to create the registry key: %s",
-			GetErrorMessage(winerrno).c_str());
+		::syslog(LOG_ERR, "Failed to create the registry key: access denied. You must "
+			"be an Administrator to register new event sources in %s", regkey.c_str());
+		return FALSE;
+	}
+	else if (winerrno != ERROR_SUCCESS)
+	{
+		::syslog(LOG_ERR, "Failed to create the registry key: %s: %s",
+			GetErrorMessage(winerrno).c_str(), regkey.c_str());
 		return FALSE;
 	}
 
@@ -1416,7 +1425,7 @@ BOOL AddEventSource
 	return TRUE;
 }
 
-static HANDLE gSyslogH = 0;
+static HANDLE gSyslogH = INVALID_HANDLE_VALUE;
 static bool sHaveWarnedEventLogFull = false;
 
 void openlog(const char * daemonName, int, int)
@@ -1425,19 +1434,21 @@ void openlog(const char * daemonName, int, int)
 	nameStr += daemonName;
 	nameStr += ")";
 
-	// register a default event source, so that we can
-	// log errors with the process of adding or registering our own.
+	// Don't try to open a new handle when one is already open. It will leak handles.
+	assert(gSyslogH == INVALID_HANDLE_VALUE);
+
+	// Register a default event source, so that we can log errors with the process of
+	// adding or registering our own, which follows. If this fails, there's not much we
+	// can do about it, certainly not send anything to the event log!
 	gSyslogH = RegisterEventSource(
 		NULL,        // uses local computer 
 		nameStr.c_str()); // source name
 	if (gSyslogH == NULL) 
 	{
+		gSyslogH = INVALID_HANDLE_VALUE;
 	}
 
-	char* name = strdup(nameStr.c_str());
-	BOOL success = AddEventSource(name, 0);
-	free(name);
-
+	BOOL success = AddEventSource(nameStr, 0);
 	if (!success)
 	{
 		::syslog(LOG_ERR, "Failed to add our own event source");
@@ -1459,7 +1470,11 @@ void openlog(const char * daemonName, int, int)
 
 void closelog(void)
 {
-	DeregisterEventSource(gSyslogH); 
+	if(gSyslogH != INVALID_HANDLE_VALUE)
+	{
+		DeregisterEventSource(gSyslogH);
+		gSyslogH = INVALID_HANDLE_VALUE;
+	}
 }
 
 void syslog(int loglevel, const char *frmt, ...)
@@ -1514,7 +1529,7 @@ void syslog(int loglevel, const char *frmt, ...)
 
 	va_end(args);
 
-	if (gSyslogH == 0)
+	if (gSyslogH == INVALID_HANDLE_VALUE)
 	{
 		printf("%s\r\n", buffer);
 		fflush(stdout);
@@ -1567,16 +1582,14 @@ void syslog(int loglevel, const char *frmt, ...)
 			if (!sHaveWarnedEventLogFull)
 			{
 				printf("Unable to send message to Event Log "
-					"(Event Log is full):\r\n");
-				fflush(stdout);
+					"(Event Log is full): %s\r\n", buffer);
 				sHaveWarnedEventLogFull = TRUE;
 			}
 		}
 		else
 		{
-			printf("Unable to send message to Event Log: %s:\r\n",
-				GetErrorMessage(winerrno).c_str());
-			fflush(stdout);
+			printf("Unable to send message to Event Log: %s: %s\r\n",
+				GetErrorMessage(winerrno).c_str(), buffer);
 		}
 	}
 	else

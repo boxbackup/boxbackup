@@ -21,11 +21,13 @@
 
 #define PLATFORM_DEV_NULL			"/dev/null"
 
-#ifdef _MSC_VER
-#include "BoxConfig-MSVC.h"
-#define NEED_BOX_VERSION_H
+#if defined BOX_CMAKE
+#	include "BoxConfig.cmake.h"
+#elif defined _MSC_VER
+#	include "BoxConfig-MSVC.h"
+#	define NEED_BOX_VERSION_H
 #else
-#include "BoxConfig.h"
+#	include "BoxConfig.h"
 #endif
 
 #ifdef WIN32
@@ -96,67 +98,19 @@
 #endif
 
 // Handle differing xattr APIs
-#ifdef HAVE_SYS_XATTR_H
-	#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
-	#endif
-	#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
-		#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
-	#endif
+#if !defined(HAVE_LLISTXATTR) && defined(HAVE_LISTXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define llistxattr(a,b,c) listxattr(a,b,c,XATTR_NOFOLLOW)
+	#define HAVE_LLISTXATTR
 #endif
 
-#if defined WIN32 && !defined __MINGW32__
-    typedef signed char  int8_t;
-	typedef unsigned char  u_int8_t;
-	typedef __int16 int16_t;
-	typedef __int32 int32_t;
-	typedef __int64 int64_t;
-
-	//typedef unsigned __int8  u_int8_t;
-	typedef unsigned __int16 u_int16_t;
-	typedef unsigned __int32 u_int32_t;
-	typedef unsigned __int64 u_int64_t;
-
-	#define HAVE_U_INT8_T
-	#define HAVE_U_INT16_T
-	#define HAVE_U_INT32_T
-	#define HAVE_U_INT64_T
-#endif // WIN32 && !__MINGW32__
-
-// Define missing types
-#ifndef HAVE_UINT8_T
-	typedef u_int8_t uint8_t;
+#if !defined(HAVE_LGETXATTR) && defined(HAVE_GETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define lgetxattr(a,b,c,d) getxattr(a,b,c,d,0,XATTR_NOFOLLOW)
+	#define HAVE_LGETXATTR
 #endif
 
-#ifndef HAVE_UINT16_T
-	typedef u_int16_t uint16_t;
-#endif
-
-#ifndef HAVE_UINT32_T
-	typedef u_int32_t uint32_t;
-#endif
-
-#ifndef HAVE_UINT64_T
-	typedef u_int64_t uint64_t;
-#endif
-
-#ifndef HAVE_U_INT8_T
-	typedef uint8_t u_int8_t;
-#endif
-
-#ifndef HAVE_U_INT16_T
-	typedef uint16_t u_int16_t;
-#endif
-
-#ifndef HAVE_U_INT32_T
-	typedef uint32_t u_int32_t;
-#endif
-
-#ifndef HAVE_U_INT64_T
-	typedef uint64_t u_int64_t;
+#if !defined(HAVE_LSETXATTR) && defined(HAVE_SETXATTR) && HAVE_DECL_XATTR_NOFOLLOW
+	#define lsetxattr(a,b,c,d,e) setxattr(a,b,c,d,0,(e)|XATTR_NOFOLLOW)
+	#define HAVE_LSETXATTR
 #endif
 
 #if !HAVE_DECL_INFTIM
@@ -177,7 +131,7 @@
 #endif
 
 #ifdef WIN32
-	typedef u_int64_t InodeRefType;
+	typedef uint64_t InodeRefType;
 #else
 	typedef ino_t InodeRefType;
 #endif

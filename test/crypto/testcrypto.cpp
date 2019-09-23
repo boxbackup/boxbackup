@@ -10,16 +10,17 @@
 #include "Box.h"
 
 #include <string.h>
-#include <strings.h>
 #include <openssl/rand.h>
 
-#include "Test.h"
 #include "CipherContext.h"
 #include "CipherBlowfish.h"
 #include "CipherAES.h"
 #include "CipherException.h"
+#include "CollectInBufferStream.h"
+#include "Guards.h"
 #include "RollingChecksum.h"
 #include "Random.h"
+#include "Test.h"
 
 #include "MemLeakFindOn.h"
 
@@ -33,6 +34,12 @@
 #define CHECKSUM_BLOCK_SIZE_BASE	(65*1024)
 #define CHECKSUM_BLOCK_SIZE_LAST	(CHECKSUM_BLOCK_SIZE_BASE + 64)
 #define CHECKSUM_ROLLS				16
+
+// Copied from BackupClientCryptoKeys.h
+#define BACKUPCRYPTOKEYS_FILENAME_KEY_START				0
+#define BACKUPCRYPTOKEYS_FILENAME_KEY_LENGTH			56
+#define BACKUPCRYPTOKEYS_FILENAME_IV_START				(0 + BACKUPCRYPTOKEYS_FILENAME_KEY_LENGTH)
+#define BACKUPCRYPTOKEYS_FILENAME_IV_LENGTH				8
 
 void check_random_int(uint32_t max)
 {
@@ -263,11 +270,75 @@ int test(int argc, const char *argv[])
 	::printf("Skipping AES -- not supported by version of OpenSSL in use.\n");
 #endif
 	
+	// Test with known plaintext and ciphertext (correct algorithm used, etc)
+	{
+		FileStream keyfile("testfiles/bbackupd.keys");
+		// Ideally we would use a 448 bit (56 byte) key here, since that's what we do in
+		// real life, but unfortunately the OpenSSL command-line tool only supports 128-bit
+		// Blowfish keys, so it's hard to generate a reference ciphertext unless we restrict
+		// ourselves to what OpenSSL can support too.
+		// https://security.stackexchange.com/questions/25393/openssl-blowfish-key-limited-to-256-bits
+		char key[16], iv[BACKUPCRYPTOKEYS_FILENAME_IV_LENGTH];
+
+		if(!keyfile.ReadFullBuffer(key, sizeof(key), 0))
+		{
+			TEST_FAIL_WITH_MESSAGE("Failed to read full key length from file");
+		}
+
+		keyfile.Seek(BACKUPCRYPTOKEYS_FILENAME_KEY_LENGTH, IOStream::SeekType_Absolute);
+		if(!keyfile.ReadFullBuffer(iv, sizeof(iv), 0))
+		{
+			TEST_FAIL_WITH_MESSAGE("Failed to read full IV length from file");
+		}
+
+		CipherContext encryptor;
+		CipherContext decryptor;
+
+		encryptor.Reset();
+		encryptor.Init(CipherContext::Encrypt, CipherBlowfish(CipherDescription::Mode_CBC, key, sizeof(key)));
+		ASSERT(encryptor.GetIVLength() == sizeof(iv));
+		encryptor.SetIV(iv);
+
+		decryptor.Reset();
+		decryptor.Init(CipherContext::Decrypt, CipherBlowfish(CipherDescription::Mode_CBC, key, sizeof(key)));
+		ASSERT(decryptor.GetIVLength() == sizeof(iv));
+		decryptor.SetIV(iv);
+
+		// The encrypted file bfdlink.h.enc was generated with the following command:
+		// key=`dd if=bbackupd.keys bs=1 count=16 | hexdump -e '/1 "%02x"'`
+		// iv=`dd if=bbackupd.keys bs=1 skip=56 count=8 | hexdump -e '/1 "%02x"'`
+		// openssl enc -bf -in bfdlink.h -K $key -iv $iv
+		// And has MD5 checksum 586b65fdd07474bc139c0795d344d8ad
+		FileStream plaintext_file("testfiles/bfdlink.h", O_RDONLY);
+		FileStream ciphertext_file("testfiles/bfdlink.h.enc", O_RDONLY);
+
+		CollectInBufferStream plaintext, ciphertext;
+		plaintext_file.CopyStreamTo(plaintext);
+		ciphertext_file.CopyStreamTo(ciphertext);
+		plaintext.SetForReading();
+		ciphertext.SetForReading();
+
+		MemoryBlockGuard<void *> encrypted(
+			encryptor.MaxOutSizeForInBufferSize(ciphertext.GetSize()));
+
+		int encrypted_size = encryptor.TransformBlock(encrypted.GetPtr(),
+			encrypted.GetSize(), plaintext.GetBuffer(), plaintext.GetSize());
+		TEST_EQUAL(ciphertext.GetSize(), encrypted_size);
+		TEST_EQUAL(0, memcmp(encrypted.GetPtr(), ciphertext.GetBuffer(), encrypted_size));
+
+		MemoryBlockGuard<void *> decrypted(ciphertext.GetSize() + 16);
+
+		int decrypted_size = decryptor.TransformBlock(decrypted.GetPtr(),
+			decrypted.GetSize(), encrypted.GetPtr(), encrypted_size);
+		TEST_EQUAL(plaintext.GetSize(), decrypted_size);
+		TEST_EQUAL(0, memcmp(decrypted.GetPtr(), plaintext.GetBuffer(), decrypted_size));
+	}
+
 	::printf("Misc...\n");
 	// Check rolling checksums
 	uint8_t *checkdata_blk = (uint8_t *)malloc(CHECKSUM_DATA_SIZE);
 	uint8_t *checkdata = checkdata_blk;
-	RAND_pseudo_bytes(checkdata, CHECKSUM_DATA_SIZE);
+	RAND_bytes(checkdata, CHECKSUM_DATA_SIZE);
 	for(int size = CHECKSUM_BLOCK_SIZE_BASE; size <= CHECKSUM_BLOCK_SIZE_LAST; ++size)
 	{
 		// Test skip-roll code

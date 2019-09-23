@@ -1,12 +1,12 @@
 
 MAKEPROTOCOL = ../../lib/server/makeprotocol.pl
 
-GEN_CMD = $(MAKEPROTOCOL) testprotocol.txt
+GEN_CMD = $(MAKEPROTOCOL) TestProtocol.txt
 
 # AUTOGEN SEEDING
-autogen_TestProtocol.cpp:	$(MAKEPROTOCOL) testprotocol.txt
+autogen_TestProtocol.cpp:	$(MAKEPROTOCOL) TestProtocol.txt
 	$(_PERL) $(GEN_CMD)
 
-autogen_TestProtocolServer.h:	$(MAKEPROTOCOL) testprotocol.txt
+autogen_TestProtocolServer.h:	$(MAKEPROTOCOL) TestProtocol.txt
 	$(_PERL) $(GEN_CMD)
 

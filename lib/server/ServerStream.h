@@ -208,7 +208,7 @@ public:
 								}
 
 								// unlink anything there
-								::unlink(c[1].c_str());
+								EMU_UNLINK(c[1].c_str());
 								
 								psocket->Listen(Socket::TypeUNIX, c[1].c_str());
 							#endif // WIN32
@@ -306,7 +306,16 @@ public:
 						#endif // !WIN32
 							// Just handle in this process
 							SetProcessTitle("handling");
-							HandleConnection(connection);
+							try
+							{
+								HandleConnection(connection);
+							}
+							catch(BoxException &e)
+							{
+								BOX_ERROR("Error in child handler, terminating connection: "
+									"exception " << e.what() << "(" << e.GetType() << "/" <<
+									e.GetSubType() << ")");
+							}
 							SetProcessTitle("idle");										
 						#ifndef WIN32
 						}
