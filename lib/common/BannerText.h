@@ -14,9 +14,37 @@
 #	include "BoxVersion.h"
 #endif
 
+// How to identify a 64-bit build: https://stackoverflow.com/a/687902/648162
+#if UINTPTR_MAX == 0xffffffff
+#	define BOX_BUILD_BITS 64
+#else
+#	define BOX_BUILD_BITS 32
+#endif
+
+#ifdef BOX_RELEASE_BUILD
+#	define BOX_BUILD_TYPE Release
+#else
+#	define BOX_BUILD_TYPE Debug
+#endif
+
+#define STRINGIFY1(x) #x
+#define STRINGIFY2(x) STRINGIFY1(x)
+#ifdef _MSC_VER
+#	define BOX_COMPILER "MSVC " STRINGIFY2(_MSC_VER)
+#elif defined __GNUC__
+#	define BOX_COMPILER "GCC " __VERSION__
+#elif defined __VERSION__
+// It might be an integer, not a string!
+#	define BOX_COMPILER "Unknown " STRINGIFY2(__VERSION__)
+#else
+#	define BOX_COMPILER "Unknown"
+#endif
+
+#define BOX_BUILD_SIGNATURE STRINGIFY2(BOX_COMPILER " " STRINGIFY2(BOX_BUILD_BITS) "bit " BOX_BUILD_TYPE)
+
 #define BANNER_TEXT(UtilityName) \
-	"Box " UtilityName " v" BOX_VERSION ", (c) Ben Summers and " \
-	"contributors 2003-2014"
+	"Box Backup " UtilityName " v" BOX_VERSION "\n" \
+	"(c) Ben Summers and contributors 2003-2020. " BOX_BUILD_SIGNATURE
 
 #endif // BANNERTEXT__H
 
