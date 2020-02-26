@@ -14,9 +14,15 @@
 #	include "BoxVersion.h"
 #endif
 
+#ifdef ENABLE_VSS
+#	define VSS_TEXT " (VSS)"
+#else
+#	define VSS_TEXT ""
+#endif
+
 #define BANNER_TEXT(UtilityName) \
-	"Box " UtilityName " v" BOX_VERSION ", (c) Ben Summers and " \
-	"contributors 2003-2014"
+	"Box " UtilityName " v" BOX_VERSION VSS_TEXT \
+	", (c) Ben Summers and contributors 2003-2019"
 
 #endif // BANNERTEXT__H
 

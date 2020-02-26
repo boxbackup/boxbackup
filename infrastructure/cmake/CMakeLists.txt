@@ -299,7 +299,7 @@ foreach(module_dep ${module_deps})
 			add_custom_target(${module_name}-prepare
 				COMMAND ${PERL_EXECUTABLE} ${base_dir}/runtest.pl
 				-n -c ${test_name}
-				"${release_or_debug_dir}"
+				"${release_or_debug_name}"
 				"$<TARGET_FILE:${module_name}>" "${test_command_internal}"
 				WORKING_DIRECTORY ${base_dir})
 		elseif(module_name MATCHES "^(lib_.*|qdbm)$")

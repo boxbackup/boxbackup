@@ -89,6 +89,7 @@
 
 #	ifdef ENABLE_VSS
 #		include <comdef.h>
+#		include <objbase.h>
 #		include <Vss.h>
 #		include <VsWriter.h>
 #		include <VsBackup.h>
@@ -463,16 +464,6 @@ int BackupDaemon::Main(const std::string &rConfigFileName)
 	{
 		return RemoveService(mServiceName);
 	}
-
-#ifdef ENABLE_VSS
-	HRESULT result = CoInitialize(NULL);
-	if(result != S_OK)
-	{
-		BOX_ERROR("VSS: Failed to initialize COM: " << 
-			GetMsgForHresult(result));
-		return 1;
-	}
-#endif
 
 	CreateMutexes("__boxbackup_mutex__");
 
@@ -1266,9 +1257,17 @@ bool BackupDaemon::CallAndWaitForAsync(AsyncMethod method,
 
 void BackupDaemon::CreateVssBackupComponents()
 {
+	HRESULT result = CoInitialize(NULL);
+	if(result != S_OK)
+	{
+		BOX_ERROR("VSS: Failed to initialize COM: " << 
+			GetMsgForHresult(result));
+		return;
+	}
+
 	std::map<char, VSS_ID> volumesIncluded;
 
-	HRESULT result = ::CreateVssBackupComponents(&mpVssBackupComponents);
+	result = ::CreateVssBackupComponents(&mpVssBackupComponents);
 	if(result != S_OK)
 	{
 		BOX_ERROR("VSS: Failed to create backup components: " << 
@@ -1281,9 +1280,9 @@ void BackupDaemon::CreateVssBackupComponents()
 	{
 		std::string message = GetMsgForHresult(result);
 
-		if (result == VSS_E_UNEXPECTED)
+		if (result == VSS_E_UNEXPECTED || result == E_UNEXPECTED)
 		{
-			message = "Check the Application Log for details, and ensure "
+			message = "Unexpected error. Check the Application Log for details, and ensure "
 				"that the Volume Shadow Copy, COM+ System Application, "
 				"and Distributed Transaction Coordinator services "
 				"are running";
@@ -1754,6 +1753,8 @@ void BackupDaemon::CleanupVssBackupComponents()
 
 	mpVssBackupComponents->Release();
 	mpVssBackupComponents = NULL;
+
+	CoUninitialize();
 }
 #endif
 
