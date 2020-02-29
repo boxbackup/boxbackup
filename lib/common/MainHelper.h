@@ -16,6 +16,7 @@
 #	include "BoxVersion.h"
 #endif
 
+#include "BannerText.h"
 #include "BoxException.h"
 #include "Logging.h"
 
