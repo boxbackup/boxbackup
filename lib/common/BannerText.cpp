@@ -7,6 +7,8 @@
 //
 // --------------------------------------------------------------------------
 
+#include "Box.h"
+
 #include "BannerText.h"
 
 #pragma message("Build signature: " BOX_BUILD_SIGNATURE)
