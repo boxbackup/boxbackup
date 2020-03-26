@@ -21,9 +21,14 @@
 #include "Logging.h"
 
 #define MAINHELPER_START \
-	if(argc == 2 && ::strcmp(argv[1], "--version") == 0) \
-	{ printf(BOX_VERSION "\n"); return 0; } \
+	/* need to init memleakfinder early because we already called MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT */ \
 	MEMLEAKFINDER_INIT \
+	if(argc == 2 && ::strcmp(argv[1], "--version") == 0) \
+	{ \
+		printf("Version: " BOX_VERSION "\n"); \
+		printf("Build: " BOX_BUILD_SIGNATURE "\n"); \
+		return 0; \
+	} \
 	MEMLEAKFINDER_START \
 	try {
 
