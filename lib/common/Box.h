@@ -39,7 +39,7 @@
 #include "CommonException.h"
 #include "Logging.h"
 
-#ifndef BOX_RELEASE_BUILD
+#ifndef BOX_RELEASE_BUILD // this is a debug build:
 	extern bool AssertFailuresToSyslog;
 	#define ASSERT_FAILS_TO_SYSLOG_ON {AssertFailuresToSyslog = true;}
 	void BoxDebugAssertFailed(const char *cond, const char *file, int line);
@@ -70,7 +70,7 @@
 	
 	// Exception names
 	#define EXCEPTION_CODENAMES_EXTENDED
-#else
+#else // this is a release build:
 	#define ASSERT_FAILS_TO_SYSLOG_ON
 	#define ASSERT(cond)
 
@@ -80,19 +80,19 @@
 	// Box Backup builds release get extra information for exception logging
 	#define EXCEPTION_CODENAMES_EXTENDED
 	#define EXCEPTION_CODENAMES_EXTENDED_WITH_DESCRIPTION
+
+	#ifdef BOX_MEMORY_LEAK_TESTING
+		#error BOX_MEMORY_LEAK_TESTING should not already be defined in release builds!
+	#endif
 #endif
 
-#if defined DEBUG_LEAKS
+#if defined DEBUG_LEAKS // optionally enable memory leak debugging even in release builds
 	#ifdef PLATFORM_DISABLE_MEM_LEAK_TESTING
 		#error Compiling with DEBUG_LEAKS enabled, but not supported on this platform
 	#else
 		#define BOX_MEMORY_LEAK_TESTING
 	#endif
-#elif defined BOX_RELEASE_BUILD
-	#ifndef PLATFORM_DISABLE_MEM_LEAK_TESTING
-		#define BOX_MEMORY_LEAK_TESTING
-	#endif
-#endif // DEBUG_LEAKS || BOX_RELEASE_BUILD
+#endif // DEBUG_LEAKS
 
 #ifdef BOX_MEMORY_LEAK_TESTING
 	// Memory leak testing
