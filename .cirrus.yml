@@ -38,17 +38,41 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190618
+        image_name: debian-9-stretch-v20190813
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name stretch-build --chroot stretch
       env:
         CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
+
     - name: Debian 9 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190618
+        image_name: debian-9-stretch-v20190813
+
+    - name: Debian 10 i386
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_name: debian-10-buster-v20190813
+      setup_chroot_script:
+        - ./infrastructure/setup-debian-chroot.sh
+        - schroot --begin-session --session-name buster-build --chroot buster
+      env:
+        CHROOT: schroot --run-session --chroot buster-build --directory /tmp/cirrus-ci-build --
+
+    - name: Debian 10 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_name: debian-10-buster-v20190813
+
+    - name: Debian Testing
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud-testing
+        image_name: debian-sid-v20190812
 
   setup_script:
     - ${CHROOT} apt-get update
@@ -57,14 +81,31 @@ task:
     - ${CHROOT} chown -R build: .
   <<: *standard_build
 
+freebsd_gce_instance: &freebsd_gce_instance
+  <<: *standard_gce_instance
+  platform: FreeBSD
+  image_project: freebsd-org-cloud-dev
+  # Need to use image_name for now: https://github.com/cirruslabs/cirrus-ci-docs/issues/422
+  disk: 30  # Image is 29GB, VM can't be smaller
+
 task:
-  name: FreeBSD 12.0 amd64
-  gce_instance:
-    <<: *standard_gce_instance
-    image_project: freebsd-org-cloud-dev
-    image_name: freebsd-12-0-release-amd64
-    disk: 30  # Image is 29GB, VM can't be smaller
-    platform: FreeBSD
+  matrix:
+    - name: FreeBSD 13.0 (pre) amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_name: freebsd-13-0-current-amd64-v20190829
+    - name: FreeBSD 12.0 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_name: freebsd-12-0-release-amd64
+    - name: FreeBSD 11.3 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_name: freebsd-11-3-release-amd64
+    - name: FreeBSD 10.4 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_name: freebsd-10-4-release-amd64
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
     - pw useradd build -m -w none
