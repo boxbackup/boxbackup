@@ -522,7 +522,7 @@ void BackupDaemon::Run()
 			mapCommandSocketInfo->mListeningSocket.Listen(
 				socketName);
 		#else
-			::unlink(socketName);
+			EMU_UNLINK(socketName);
 			mapCommandSocketInfo->mListeningSocket.Listen(
 				Socket::TypeUNIX, socketName);
 		#endif
@@ -2505,12 +2505,32 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 			}
 		}
 			
-		const Configuration& rConfig(
-			rLocationsConf.GetSubConfiguration(*pLocName));
+		const Configuration& rConfig(rLocationsConf.GetSubConfiguration(*pLocName));
 		std::auto_ptr<Location> apLoc;
+
+		BackupStoreFilenameClear dirname(*pLocName); // generate the filename
+		bool local_dir_exists = true;
+		int64_t existing_remote_dir_id = 0;
+
+		box_time_t attrModTime = 0;
+		BackupClientFileAttributes attr;
 
 		try
 		{
+			// Does this exist on the server? Remove from dir object early, so that if
+			// we fail to stat the local directory, we still don't consider to remote
+			// one for deletion.
+			BackupStoreDirectory::Iterator iter(dir);
+			BackupStoreDirectory::Entry *en = iter.FindMatchingClearName(dirname);
+			if(en != NULL)
+			{
+				existing_remote_dir_id = en->GetObjectID();
+
+				// Delete the entry from the directory, so we get a list of
+				// unused root directories at the end of this.
+				dir.DeleteEntry(existing_remote_dir_id);
+			}
+
 			if(pLoc == NULL)
 			{
 				// Create a record for it
@@ -2525,59 +2545,42 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				pLoc->mPath = rConfig.GetKeyValue("Path");
 			}
 
-			// Read the exclude lists from the Configuration
-			pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
-			pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
+			// Get the directory's attributes and modification time. We need this to
+			// check whether the local directory exists, even if we don't have
+			// stat[v]fs(). Otherwise we must skip it.
+			attr.ReadAttributes(pLoc->mPath.c_str(),
+				true /* directories have zero mod times */,
+				0 /* not interested in mod time */,
+				&attrModTime /* get the attribute modification time */);
 
-			// Does this exist on the server?
-			// Remove from dir object early, so that if we fail
-			// to stat the local directory, we still don't
-			// consider to remote one for deletion.
-			BackupStoreDirectory::Iterator iter(dir);
-			BackupStoreFilenameClear dirname(pLoc->mName);	// generate the filename
-			BackupStoreDirectory::Entry *en = iter.FindMatchingClearName(dirname);
-			int64_t oid = 0;
-			if(en != 0)
-			{
-				oid = en->GetObjectID();
-				
-				// Delete the entry from the directory, so we get a list of
-				// unused root directories at the end of this.
-				dir.DeleteEntry(oid);
-			}
-		
 			// Do a fsstat on the pathname to find out which mount it's on
 			{
 
 #if defined HAVE_STRUCT_STATFS_F_MNTONNAME || defined HAVE_STRUCT_STATVFS_F_MNTONNAME || defined WIN32
 
 				// BSD style statfs -- includes mount point, which is nice.
-#ifdef HAVE_STRUCT_STATVFS_F_MNTONNAME
+# ifdef HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statvfs s;
 				if(::statvfs(pLoc->mPath.c_str(), &s) != 0)
-#else // HAVE_STRUCT_STATVFS_F_MNTONNAME
+# else // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				struct statfs s;
 				if(::statfs(pLoc->mPath.c_str(), &s) != 0)
-#endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
+# endif // HAVE_STRUCT_STATVFS_F_MNTONNAME
 				{
-					THROW_SYS_ERROR("Failed to stat path "
-						"'" << pLoc->mPath << "' "
-						"for location "
-						"'" << pLoc->mName << "'",
+					THROW_SYS_FILE_ERROR(pLoc->mPath, "Failed to stat local path",
 						CommonException, OSFileError);
 				}
 
 				// Where the filesystem is mounted
 				std::string mountName(s.f_mntonname);
 
-#else // !HAVE_STRUCT_STATFS_F_MNTONNAME && !WIN32
+#else // !HAVE_STRUCT_STAT*FS_F_MNTONNAME && !WIN32
 
 				// Warn in logs if the directory isn't absolute
 				if(pLoc->mPath[0] != '/')
 				{
-					BOX_WARNING("Location path '"
-						<< pLoc->mPath 
-						<< "' is not absolute");
+					BOX_WARNING(BOX_FILE_MESSAGE(pLoc->mPath,
+						"location path is not absolute"));
 				}
 				// Go through the mount points found, and find a suitable one
 				std::string mountName("/");
@@ -2598,12 +2601,10 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 							break;
 						}
 					}
-					BOX_TRACE("mount point chosen for "
-						<< pLoc->mPath << " is "
-						<< mountName);
+					BOX_TRACE("mount point chosen for " << pLoc->mPath <<
+						" is " << mountName);
 				}
-
-#endif
+#endif // !HAVE_STRUCT_STAT*FS_F_MNTONNAME && !WIN32
 				
 				// Got it?
 				std::map<std::string, int>::iterator f(mounts.find(mountName));
@@ -2625,89 +2626,68 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 					++numIDMaps;
 				}
 			}
-		
-			// Does this exist on the server?
-			if(en == 0)
-			{
-				// Doesn't exist, so it has to be created on the server. Let's go!
-				// First, get the directory's attributes and modification time
-				box_time_t attrModTime = 0;
-				BackupClientFileAttributes attr;
-				try
-				{
-					attr.ReadAttributes(pLoc->mPath.c_str(), 
-						true /* directories have zero mod times */,
-						0 /* not interested in mod time */, 
-						&attrModTime /* get the attribute modification time */);
-				}
-				catch (BoxException &e)
-				{
-					BOX_ERROR("Failed to get attributes "
-						"for path '" << pLoc->mPath
-						<< "', skipping location '" <<
-						pLoc->mName << "'");
-					throw;
-				}
-				
-				// Execute create directory command
-				try
-				{
-					std::auto_ptr<IOStream> attrStream(
-						new MemBlockStream(attr));
-					std::auto_ptr<BackupProtocolSuccess>
-						dirCreate(connection.QueryCreateDirectory(
-						BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
-						attrModTime, dirname, attrStream));
-						
-					// Object ID for later creation
-					oid = dirCreate->GetObjectID();
-				}
-				catch (BoxException &e)
-				{
-					BOX_ERROR("Failed to create remote "
-						"directory '/" << pLoc->mName <<
-						"', skipping location '" <<
-						pLoc->mName << "'");
-					throw;
-				}
-
-			}
-
-			// Create and store the directory object for the root of this location
-			ASSERT(oid != 0);
-			if(pLoc->mapDirectoryRecord.get() == NULL)
-			{
-				pLoc->mapDirectoryRecord.reset(
-					new BackupClientDirectoryRecord(oid, *pLocName));
-			}
-			
-			// Remove it from the temporary list to avoid deletion
-			tmpLocations.remove(pLoc);
-
-			// Push it back on the vector of locations
-			mLocations.push_back(pLoc);
-
-			if(apLoc.get() != NULL)
-			{
-				// Don't delete it now!
-				apLoc.release();
-			}
 		}
 		catch (std::exception &e)
 		{
-			BOX_ERROR("Failed to configure location '"
-				<< pLoc->mName << "' path '"
-				<< pLoc->mPath << "': " << e.what() <<
-				": please check for previous errors");
-			mReadErrorsOnFilesystemObjects = true;
+			BOX_ERROR("Failed to configure location '" << pLoc->mName << "': " <<
+				e.what());
+			local_dir_exists = false;
 		}
 		catch(...)
 		{
-			BOX_ERROR("Failed to configure location '"
-				<< pLoc->mName << "' path '"
-				<< pLoc->mPath << "': please check for "
-				"previous errors");
+			BOX_ERROR("Failed to configure location '" << pLoc->mName << "': please "
+				"check for previous errors");
+			local_dir_exists = false;
+		}
+
+		// Remove it from the temporary list to avoid deletion, even if it doesn't actually
+		// exist locally at this time:
+		tmpLocations.remove(pLoc);
+
+		// Does this exist on the server?
+		if(!local_dir_exists)
+		{
 			mReadErrorsOnFilesystemObjects = true;
+			// Don't try to create it remotely, just skip it.
+			continue;
+		}
+
+		if(existing_remote_dir_id == 0)
+		{
+			// Doesn't exist, so it has to be created on the server. Let's go!
+
+			// Create the remote directory for this location. If this fails, then we
+			// abort the whole backup, otherwise the error isn't reported sufficiently
+			// severely for test_bbackupd_responds_to_connection_failure_in_process_s3.
+			std::auto_ptr<IOStream> attrStream(new MemBlockStream(attr));
+			std::auto_ptr<BackupProtocolSuccess> dirCreate(
+				connection.QueryCreateDirectory(
+					BACKUPSTORE_ROOT_DIRECTORY_ID, // containing directory
+					attrModTime, dirname, attrStream));
+
+			// Object ID for later creation
+			existing_remote_dir_id = dirCreate->GetObjectID();
+		}
+
+		// Create and store the directory object for the root of this location
+		ASSERT(existing_remote_dir_id != 0);
+		if(pLoc->mapDirectoryRecord.get() == NULL)
+		{
+			pLoc->mapDirectoryRecord.reset(
+				new BackupClientDirectoryRecord(existing_remote_dir_id, *pLocName));
+		}
+
+		// Read the exclude lists from the Configuration
+		pLoc->mapExcludeFiles.reset(BackupClientMakeExcludeList_Files(rConfig));
+		pLoc->mapExcludeDirs.reset(BackupClientMakeExcludeList_Dirs(rConfig));
+
+		// Push it back on the vector of locations
+		mLocations.push_back(pLoc);
+
+		if(apLoc.get() != NULL)
+		{
+			// Don't delete it now!
+			apLoc.release();
 		}
 	}
 
@@ -2716,8 +2696,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 		i  = tmpLocations.begin();
 		i != tmpLocations.end(); i++)
 	{
-		BOX_INFO("Removing obsolete location from memory: " <<
-			(*i)->mName);
+		BOX_INFO("Removing obsolete location from memory: " << (*i)->mName);
 		delete *i;
 	}
 
@@ -2747,8 +2726,7 @@ void BackupDaemon::SetupLocations(BackupClientContext &rClientContext, const Con
 				SecondsToBoxTime(mDeleteRedundantLocationsAfter);
 		}
 
-		int secs = BoxTimeToSeconds(mDeleteUnusedRootDirEntriesAfter
-			- now);
+		int secs = BoxTimeToSeconds(mDeleteUnusedRootDirEntriesAfter - now);
 
 		BOX_NOTICE(dir.GetNumberOfEntries() << " redundant locations "
 			"in root directory found, will delete from store "
@@ -2831,7 +2809,7 @@ void BackupDaemon::FillIDMapVector(std::vector<BackupClientInodeToIDMap *> &rVec
 				BOX_NOTICE("Found an incomplete ID map "
 					"database, deleting it to start "
 					"afresh: " << filename);
-				if(unlink(filename.c_str()) != 0)
+				if(EMU_UNLINK(filename.c_str()) != 0)
 				{
 					BOX_LOG_NATIVE_ERROR(BOX_FILE_MESSAGE(
 						filename, "Failed to delete "
@@ -2880,14 +2858,14 @@ void BackupDaemon::DeleteCorruptBerkelyDbFiles()
 		
 		// Delete the file
 		BOX_TRACE("Deleting " << filename);
-		::unlink(filename.c_str());
+		EMU_UNLINK(filename.c_str());
 		
 		// Add a suffix for the new map
 		filename += ".n";
 
 		// Delete that too
 		BOX_TRACE("Deleting " << filename);
-		::unlink(filename.c_str());
+		EMU_UNLINK(filename.c_str());
 	}
 }
 
@@ -3638,7 +3616,7 @@ bool BackupDaemon::DeleteStoreObjectInfo() const
 	}
 
 	// Actually delete it
-	if(::unlink(storeObjectInfoFile.c_str()) != 0)
+	if(EMU_UNLINK(storeObjectInfoFile.c_str()) != 0)
 	{
 		BOX_LOG_SYS_ERROR("Failed to delete the old "
 			"StoreObjectInfoFile: " << storeObjectInfoFile);

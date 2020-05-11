@@ -4,14 +4,18 @@
 
 #ifdef WIN32
 	#define EMU_STRUCT_STAT struct emu_stat
-	#define EMU_STAT  emu_stat
-	#define EMU_FSTAT emu_fstat
-	#define EMU_LSTAT emu_stat
+	#define EMU_STAT   emu_stat
+	#define EMU_FSTAT  emu_fstat
+	#define EMU_LSTAT  emu_stat
+	#define EMU_LINK   emu_link
+	#define EMU_UNLINK emu_unlink
 #else
 	#define EMU_STRUCT_STAT struct stat
-	#define EMU_STAT  ::stat
-	#define EMU_FSTAT ::fstat
-	#define EMU_LSTAT ::lstat
+	#define EMU_STAT   ::stat
+	#define EMU_FSTAT  ::fstat
+	#define EMU_LSTAT  ::lstat
+	#define EMU_LINK   ::link
+	#define EMU_UNLINK ::unlink
 #endif
 
 #if ! defined EMU_INCLUDE && defined WIN32
@@ -352,12 +356,14 @@ int   emu_rename (const char* pOldName, const char* pNewName);
 
 #define chdir(directory)         emu_chdir  (directory)
 #define mkdir(path,     mode)    emu_mkdir  (path)
-#define link(oldpath,   newpath) emu_link   (oldpath, newpath)
-#define unlink(file)             emu_unlink (file)
 #define utimes(buffer,  times)   emu_utimes (buffer,   times)
 #define chmod(file,     mode)    emu_chmod  (file,     mode)
 #define getcwd(buffer,  size)    emu_getcwd (buffer,   size)
 #define rename(oldname, newname) emu_rename (oldname, newname)
+
+// link() and unlink() conflict with Boost if implemented using macros like
+// the others above, so I've removed the macros and you need to use EMU_LINK
+// and EMU_UNLINK everywhere.
 
 // Not safe to replace stat/fstat/lstat on mingw at least, as struct stat
 // has a 16-bit st_ino and we need a 64-bit one.

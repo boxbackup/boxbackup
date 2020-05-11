@@ -702,7 +702,7 @@ int Daemon::Main(const std::string &rConfigFileName)
 		}
 		
 		// Delete the PID file
-		::unlink(pidFileName.c_str());
+		EMU_UNLINK(pidFileName.c_str());
 		
 		// Log
 		BOX_NOTICE("Terminating daemon");

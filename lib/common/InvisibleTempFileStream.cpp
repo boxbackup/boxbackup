@@ -31,7 +31,7 @@ InvisibleTempFileStream::InvisibleTempFileStream(const std::string& Filename,
 #endif
 {
 	#ifndef WIN32
-	if(unlink(Filename.c_str()) != 0)
+	if(EMU_UNLINK(Filename.c_str()) != 0)
 	{
 		MEMLEAKFINDER_NOT_A_LEAK(this);
 		THROW_EXCEPTION(CommonException, OSFileOpenError)

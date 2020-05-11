@@ -44,6 +44,10 @@
 #include <list>
 #include <string>
 
+#ifdef HAVE_OPENSSL_CLEANUP
+#	include <openssl/crypto.h>
+#endif
+
 #include "box_getopt.h"
 #include "depot.h"
 #include "Logging.h"
@@ -391,6 +395,14 @@ int main(int argc, char * const * argv)
 		if(fulltestmode)
 		{
 			Logging::GetSyslog().Shutdown();
+
+			// On Ubuntu 18.04, initialising OpenSSL 1.1.1 leaves open file handles to
+			// /dev/[u]random which are not easy to close (the docs for OPENSSL_cleanup
+			// recommend not to call it), but we want to avoid detecting those as
+			// leaking file descriptors
+#ifdef HAVE_OPENSSL_CLEANUP
+			OPENSSL_cleanup();
+#endif
 
 			bool filesleftopen = !checkfilesleftopen();
 
