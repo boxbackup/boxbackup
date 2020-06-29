@@ -36,6 +36,13 @@
 
 #include <iostream>
 
+#ifdef HAVE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#ifdef HAVE_PTHREAD
+#include <pthread.h>
+#endif
+#endif
+
 #ifdef NEED_BOX_VERSION_H
 #	include "BoxVersion.h"
 #endif
@@ -435,6 +442,19 @@ bool Daemon::Configure(const Configuration& rConfig)
 	return true;
 }
 
+#ifdef HAVE_SYSTEMD
+void * systemd_watchdog(void * arg)
+{
+	while ( true ) {
+		sd_notifyf(0, "WATCHDOG=1");
+		::sleep(5);
+
+	}
+
+	return NULL;
+}
+#endif
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -445,6 +465,8 @@ bool Daemon::Configure(const Configuration& rConfig)
 // --------------------------------------------------------------------------
 int Daemon::Main(const std::string &rConfigFileName)
 {
+
+
 	// Banner (optional)
 	{
 		BOX_SYSLOG(Log::NOTICE, DaemonBanner());
@@ -627,9 +649,30 @@ int Daemon::Main(const std::string &rConfigFileName)
 		// Log the start message
 		BOX_NOTICE("Starting daemon, version: " << BOX_VERSION);
 		BOX_NOTICE("Using configuration file: " << mConfigFileName);
+#ifdef HAVE_SYSTEMD
+			sd_notifyf(0, "READY=1\n"
+			"STATUS=Processing requests…\n"
+			"MAINPID=%lu",
+			(unsigned long) getpid());
+			pthread_t threadId;
+			pthread_create(&threadId, NULL, &systemd_watchdog, NULL);
+#endif
+
+			
+
 	}
 	catch(BoxException &e)
 	{
+#ifdef HAVE_SYSTEMD
+		sd_notifyf(0, "STATUS=Failed to start up\n"
+		"ERRNO=%i\n"
+		"MESSAGE=%s"
+		"DETAILS=%s",
+       	e.GetType(),
+		e.GetMessage().c_str(),
+		e.what());
+#endif
+
 		BOX_FATAL("Failed to start: exception " << e.what() 
 			<< " (" << e.GetType() 
 			<< "/"  << e.GetSubType() << ")");
@@ -751,6 +794,9 @@ int Daemon::Main(const std::string &rConfigFileName)
 
 	return retcode;
 }
+
+
+
 
 // --------------------------------------------------------------------------
 //

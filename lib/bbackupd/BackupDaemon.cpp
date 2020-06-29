@@ -508,7 +508,7 @@ void BackupDaemon::Run()
 {
 	// initialise global timer mechanism
 	Timers::Init();
-	
+
 	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
 		"CommandSocketPollTimer"));
 
