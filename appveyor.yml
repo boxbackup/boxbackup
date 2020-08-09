@@ -8,7 +8,7 @@ skip_tags: true
 os: Windows Server 2012
 
 platform:
-  - Win32 # CMake sucks
+  - Win32 # Confusingly, CMake forces us to use this instead of x86
   - x64
 
 configuration:
@@ -16,16 +16,20 @@ configuration:
   - Release
 
 environment:
-  VisualStudioVersion: 11.0
-  Generator_Base: Visual Studio 11 2012
+  VisualStudioVersion: 14.0
+  Generator_Base: Visual Studio 14 2015
   OPENSSL_VERSION: 1.1.0f
   PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
+  build_tool: msbuild
 
   matrix:
     - VSS:
     - VSS: enabled
+
+cache:
+  - '%CMAKE_UNIBUILD_DIR%\cache -> appveyor.yml, infrastructure\cmake\windows\CMakeLists.txt'
 
 init:
 # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
@@ -36,16 +40,31 @@ init:
   # Ensafen e.g. "jamesog/cirrus-ci"
   - ps: $env:safer_branch = $($env:APPVEYOR_REPO_BRANCH.replace("/", "_"))
   - ps: $env:vss_string="$(if ($env:VSS.equals('enabled')) {'VSS_'})"
+  - ps: $env:vcvarsall_platform = $(if ($env:PLATFORM.equals('x64')) {'x86_amd64'} else {'x86'})
+  - ps: $env:public_config = $($env:CONFIGURATION.replace("RelWithDebInfo", "Release"))
   # http://help.appveyor.com/discussions/problems/2874-how-can-i-add-commit-id-to-build-version
   - ps: $env:boxbackup_version_full="$env:BOXBACKUP_VERSION_BASE.$env:safer_branch.$env:date_string.$($env:APPVEYOR_REPO_COMMIT.substring(0,7))"
   - ps: Update-AppveyorBuild -Version "$env:boxbackup_version_full"
   - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:vss_string)$($env:CONFIGURATION)"
+
+# scripts that run after cloning repository (before the build step, not after!)
+install:
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
   - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
-# scripts that run after cloning repository (before the build step, not after!)
-install:
+before_build:
+  # - ps: $env:cmake_toolset_args = $(if ($env:build_tool.equals('msbuild')) {'-T $(DefaultPlatformToolset)'} else {''})
+  # Force 64-bit build if necessary: https://cmake.org/pipermail/cmake/2018-September/068257.html
+  - ps: >
+      $env:cmake_toolset_args_2 = $(
+      if ($env:build_tool.equals('msbuild') -and $env:PLATFORM.equals('x64'))
+      {'-T host=x64'} else {''})
+
+  # Remove Xamarin to remove 500 lines of junk from build logs
+  # http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
+  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
+
   # test_bbackupd needs 7zip (or cmake -E tar) to extract tar archives on Windows:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
@@ -53,52 +72,74 @@ install:
   # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
   # If you are doing this on a fresh box for development, you would probably want to
   # install Chocolatey and then run:
-  # cinst -y cmake.portable strawberryperl git vim visualstudio2012wdx
+  # cinst -y cmake.portable strawberryperl git vim-tux.portable visualstudio2012wdx
   # We install cmake.portable instead of cmake, to get it on the path again
   # <http://disq.us/p/xdknrt>.
 
-  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+  # Set environment to build x86 or amd64 code using the x86 compiler:
+  # https://www.appveyor.com/docs/lang/cpp/. But calling SetEnv with /x64 never works!
+  # Call it with /x86 instead, because that does work, and reset to 64-bit target afterwards:
+  - echo "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /%sane_platform%
+  - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /%sane_platform%
+  # Calling vcvarsall.bat also never works?
+  - echo "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %vcvarsall_platform%
+  - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %vcvarsall_platform%
+  - echo %PATH%
+
   - if not exist %CMAKE_UNIBUILD_DIR% md %CMAKE_UNIBUILD_DIR%
   - cd %CMAKE_UNIBUILD_DIR%
+  - cmake --version
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
-  # the current PATH.
-  - echo cmake -G "%generator_name%"
+  # the current PATH. We also need to specify -T $(DefaultPlatformToolset) to stop CMake
+  # from defaulting to v140 (etc) which AppVeyor says causes problems on some images
+  # (and indeed the build often fails with errors about nonexistent toolsets).
+  - echo cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
+    %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DVSS=%VSS%
+    -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%"
+  - cmake -G "%generator_name%" %cmake_toolset_args% %cmake_toolset_args_2%
+    %generator_args%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     -DVSS=%VSS%
+    -DPLATFORM=%sane_platform%
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
+
+  # Check contents of the cache. We can't do this until after running cmake, because if the cache
+  # was invalidated then it won't be restored and the directory won't exist until this point.
+  - md %CMAKE_UNIBUILD_DIR%\cache
+  - dir %CMAKE_UNIBUILD_DIR%\cache
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
-
-# Remove Xamarin to remove 500 lines of junk from build logs
-# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
-before_build:
-  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
 
 build:
   parallel: true
   project: ..\cmake\BoxBackup_Windows.sln
   verbosity: minimal
 
+on_failure:
+  - dir %CMAKE_UNIBUILD_DIR%\install\openssl
+  - dir %CMAKE_UNIBUILD_DIR%\install\openssl\lib
+
 test_script:
+  # Check the results of the build (cmake directory), and the contents of the cache
   - cd %CMAKE_UNIBUILD_DIR%\Build\boxbackup
-  # - dir
+  - dir
   # - dir bin_bbackupd.dir
   # - dir %PLATFORM%
   # - dir %PLATFORM%\%CONFIGURATION%
+  - dir %CMAKE_UNIBUILD_DIR%\cache
+
   - ctest -C %CONFIGURATION% -V --interactive-debug-mode 0
 
   # After running tests successfully, build the artifacts that we want to upload:
   - cmake --build . --config %CONFIGURATION% --target package
 
   # AppVeyor refuses to package files outside of the project directory, so we need to push them:
-  - dir
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.zip -DeploymentName BoxBackup-%compiled_version%
   - appveyor PushArtifact -path BoxBackup-%compiled_version%.exe -DeploymentName BoxBackup-%compiled_version%
 
@@ -115,7 +156,4 @@ deploy:
     on:
       branch:
         - master
-        - mark_master_builds_as_full_releases
 
-cache:
-  - '%TEMP%\chocolatey'
