@@ -48,6 +48,10 @@
 	#include <sys/types.h>
 #endif
 
+// Need to define this before including stdint.h to ensure access to UINTPTR_MAX in C99:
+// https://stackoverflow.com/questions/986426/what-do-stdc-limit-macros-and-stdc-constant-macros-mean
+#define __STDC_LIMIT_MACROS
+
 #ifdef HAVE_INTTYPES_H
 	#include <inttypes.h>
 #else
