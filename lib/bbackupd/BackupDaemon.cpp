@@ -756,6 +756,11 @@ void BackupDaemon::Run2()
 					"scheduled for " <<
 					FormatTime(mNextSyncTime, false));
 				continue;
+			} else if (d==-1) {
+				// script asks the backup to not be started
+				BOX_INFO("SyncAllowScript returned an error "
+				"skipping backup");
+				break;
 			}
 		}
 
@@ -1844,8 +1849,9 @@ void BackupDaemon::OnBackupFinish(SysadminNotifier::EventCode status)
 // Function
 //		Name:    BackupDaemon::UseScriptToSeeIfSyncAllowed()
 //		Purpose: Private. Use a script to see if the sync should be
-//			 allowed now (if configured). Returns -1 if it's
-//			 allowed, time in seconds to wait otherwise.
+//			 allowed now (if configured). Returns 0 if it's
+//			 allowed, time in seconds to wait or -1 if the script would 
+//           prevent the backup to be ran.
 //		Created: 21/6/04
 //
 // --------------------------------------------------------------------------
@@ -1857,7 +1863,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	if(!conf.KeyExists("SyncAllowScript"))
 	{
 		// No. Do sync.
-		return -1;
+		return 0;
 	}
 
 	// If there's no result, try again in five minutes
@@ -1930,7 +1936,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 	if(delay == "now")
 	{
 		// Script says do it now. Obey.
-		waitInSeconds = -1;
+		waitInSeconds = 0;
 
 		BOX_NOTICE("SyncAllowScript requested a backup now "
 			"(" << script << ")");
