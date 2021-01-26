@@ -40,6 +40,7 @@ class SysadminNotifier
 		BackupFinish,
 		BackupOK,
 		BackupCanceled,
+		SyncAllowScriptError,
 		MAX
 		// When adding notifications, remember to add
 		// strings to NotifySysadmin()

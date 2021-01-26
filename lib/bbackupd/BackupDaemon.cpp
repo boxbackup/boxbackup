@@ -760,6 +760,10 @@ void BackupDaemon::Run2()
 				// script asks the backup to not be started
 				BOX_INFO("SyncAllowScript returned an error "
 				"skipping backup");
+				SysadminNotifier::EventCode status = SysadminNotifier::SyncAllowScriptError;
+		        NotifySysadmin(status);
+				setEndSync(status);
+
 				break;
 			}
 		}
@@ -3156,6 +3160,7 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		"backup-finish",
 		"backup-ok",
 		"backup-canceled",
+		"syncallowscript-error",
 		0
 	};
 
