@@ -738,6 +738,7 @@ void BackupDaemon::Run2()
 		// logged something at INFO level or higher to explain why.
 
 		// Use a script to see if sync is allowed now?
+		bool do_backup = true;
 		if(mDoSyncForcedByCommand)
 		{
 			BOX_INFO("Skipping SyncAllowScript due to bbackupctl "
@@ -760,9 +761,16 @@ void BackupDaemon::Run2()
 				// script asks the backup to not be started
 				BOX_INFO("SyncAllowScript returned an error "
 				"skipping backup");
+
+				// notify, record and reset stats...
 				SysadminNotifier::EventCode status = SysadminNotifier::SyncAllowScriptError;
-		        NotifySysadmin(status);
+				    
+				setStartSync(SysadminNotifier::BackupStart);
 				setEndSync(status);
+				NotifySysadmin(status);
+				SendSyncStartOrFinish(false);
+				TouchFileInWorkingDir("last_sync_finish");
+				SetState(State_Idle);
 
 				break;
 			}
