@@ -157,6 +157,11 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 	{
 		THROW_EXCEPTION(ServerException, SocketSetNonBlockingFailed)
 	}
+	struct timeval tv;
+
+	tv.tv_sec = 60; // 60 seconds
+	tv.tv_usec = 0;
+	setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 #endif
 
 	// FIXME: This is less portable than the above. However, it MAY be needed
