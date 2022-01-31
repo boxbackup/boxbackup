@@ -38,7 +38,7 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190813
+        image_family: debian-9
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name stretch-build --chroot stretch
@@ -49,13 +49,14 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190813
+        image_family: debian-9
 
     - name: Debian 10 i386
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-10-buster-v20190813
+        image_family: debian-10
+
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name buster-build --chroot buster
@@ -66,13 +67,25 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-10-buster-v20190813
+        image_family: debian-10
 
-    - name: Debian Testing
+    - name: Debian 11 i386
       gce_instance:
         <<: *standard_gce_instance
-        image_project: debian-cloud-testing
-        image_name: debian-sid-v20190812
+        image_project: debian-cloud
+        image_family: debian-11
+
+      setup_chroot_script:
+        - ./infrastructure/setup-debian-chroot.sh
+        - schroot --begin-session --session-name bullseye-build --chroot bullseye
+      env:
+        CHROOT: schroot --run-session --chroot bullseye-build --directory /tmp/cirrus-ci-build --
+
+    - name: Debian 11 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_family: debian-11
 
   setup_script:
     - ${CHROOT} apt-get update
@@ -90,22 +103,24 @@ freebsd_gce_instance: &freebsd_gce_instance
 
 task:
   matrix:
-    - name: FreeBSD 13.0 (pre) amd64
+    - name: FreeBSD 14.0 (pre) amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_family: freebsd-14-0-snap
+    - name: FreeBSD 13.0 amd64
       gce_instance:
         <<: *freebsd_gce_instance
         image_name: freebsd-13-0-current-amd64-v20190829
-    - name: FreeBSD 12.0 amd64
+        image_family: freebsd-13-0
+    - name: FreeBSD 12.3 amd64
       gce_instance:
         <<: *freebsd_gce_instance
-        image_name: freebsd-12-0-release-amd64
-    - name: FreeBSD 11.3 amd64
+        image_family: freebsd-12-3
+    - name: FreeBSD 11.4 amd64
       gce_instance:
         <<: *freebsd_gce_instance
-        image_name: freebsd-11-3-release-amd64
-    - name: FreeBSD 10.4 amd64
-      gce_instance:
-        <<: *freebsd_gce_instance
-        image_name: freebsd-10-4-release-amd64
+        image_family: freebsd-11-4
+
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
     - pw useradd build -m -w none
@@ -137,16 +152,24 @@ task:
 
 task:
   matrix:
-    - name: Ubuntu 16.04 amd64
-      gce_instance:
-        <<: *standard_gce_instance
-        image_project: ubuntu-os-cloud
-        image_name: ubuntu-1604-xenial-v20190617
     - name: Ubuntu 18.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_name: ubuntu-1804-bionic-v20190617
+        image_family: ubuntu-minimal-1804-lts
+
+    - name: Ubuntu 20.04 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-2004-lts
+
+    - name: Ubuntu 21.04 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2104
+
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
