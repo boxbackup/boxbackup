@@ -89,7 +89,7 @@ task:
 
   setup_script:
     - ${CHROOT} apt-get update
-    - ${CHROOT} sh -c "DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::='--force-confold' -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev"
+    - ${CHROOT} sh -c "DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::='--force-confold' -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev make xsltproc libwww-perl libboost-dev"
     - ${CHROOT} useradd -m build
     - ${CHROOT} chown -R build: .
   <<: *standard_build
@@ -172,7 +172,7 @@ task:
 
   setup_script:
     - apt-get update
-    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
     - chown -R build .
   <<: *standard_build
