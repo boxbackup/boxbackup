@@ -20,9 +20,9 @@ set(OPENSSL_VERSION 1.1.0g)
 set(OPENSSL_HASH SHA256=de4d501267da39310905cb6dc8c6121f7a2cad45a7707f76df828fe1b85073af)
 
 # Version of PCRE to download, build, and compile Box Backup against:
-set(PCRE_VERSION    8.42)
+set(PCRE_VERSION    8.45)
 # Hash of pcre-${PCRE_VERSION}.tar.bz2, to be verified after download:
-set(PCRE_HASH SHA256=2cd04b7c887808be030254e8d77de11d3fe9d4505c39d4b15d2664ffe8bf9301)
+set(PCRE_HASH SHA256=4dae6fdcd2bb0bb6c37b5f97c33c2be954da743985369cddac3546e3218bffb8)
 
 # Version of Boost to download, unpack, and compile Box Backup against:
 set(BOOST_VERSION    1.62.0)
@@ -87,7 +87,7 @@ else()
 endif()
 
 ExternalProject_Add(pcre
-	URL "https://ftp.pcre.org/pub/pcre/pcre-${PCRE_VERSION}.tar.bz2"
+	URL "https://downloads.sourceforge.net/project/pcre/pcre/${PCRE_VERSION}/pcre-${PCRE_VERSION}.tar.bz2"
 	URL_HASH ${PCRE_HASH}
 	DOWNLOAD_NO_PROGRESS 1
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${install_dir} ${SUB_CMAKE_EXTRA_ARGS}
