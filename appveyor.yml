@@ -5,7 +5,7 @@ clone_depth: 1
 # Do not build on tags (GitHub only)
 skip_tags: true
 
-os: Windows Server 2012
+image: Visual Studio 2015
 
 platform:
   - Win32 # CMake sucks
@@ -16,10 +16,8 @@ configuration:
   - Release
 
 environment:
-  VisualStudioVersion: 11.0
-  Generator_Base: Visual Studio 11 2012
+  Generator_Base: Visual Studio 14 2015
   OPENSSL_VERSION: 1.1.0f
-  PCRE_VERSION: 8.38
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
 
