@@ -633,6 +633,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		adjustment.mBlocksInCurrentFiles += newObjectBlocksUsed;
 		adjustment.mNumCurrentFiles++;
 
+		mStatistics.mAddedFilesSize += newObjectBlocksUsed;
+		mStatistics.mAddedFilesCount++;
+
 		// Exceeds the hard limit?
 		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			adjustment.mBlocksUsed;
@@ -720,6 +723,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
                             adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
                             adjustment.mNumOldFiles++;
                             adjustment.mNumCurrentFiles--;
+						
                         }
 
                         oldEntries.push_back(e);
@@ -891,6 +895,9 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				int64_t blocks = e->GetSizeInBlocks();
 				mapStoreInfo->AdjustNumDeletedFiles(1);
 				mapStoreInfo->ChangeBlocksInDeletedFiles(blocks);
+
+				mStatistics.mDeletedFilesCount++;
+				mStatistics.mDeletedFilesSize += blocks;
 
 				// We're marking all old versions as deleted.
 				// This is how a file can be old and deleted
@@ -1249,6 +1256,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 
 	// Save the store info (may not be postponed)
 	mapStoreInfo->AdjustNumDirectories(1);
+	mStatistics.mAddedDirectoriesCount ++;
 	SaveStoreInfo(false);
 
 	// tell caller what the ID was
@@ -1325,6 +1333,8 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 
 		// Update blocks deleted count
 		SaveStoreInfo(false);
+			mStatistics.mDeletedDirectoriesCount ++;
+
 	}
 	catch(...)
 	{

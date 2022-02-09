@@ -221,9 +221,20 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 {
 	// can be called in any phase
 
+	const BackupStoreInfo &rinfo(rContext.GetBackupStoreInfo());
+
+	Statistics& stats = rContext.GetStatistics();
+
 	BOX_NOTICE("Session finished for Client ID " <<
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
-		"(name=" << rContext.GetAccountName() << ")");
+		"(name=" << rContext.GetAccountName() << ")"
+		"infos " << rContext.GetConnectionDetails() << ","
+		"added files : "<<stats.mAddedFilesCount  << " (" << stats.mAddedFilesSize << " blocks), " 
+		"deleted files : "<<stats.mDeletedFilesCount  << " (" << stats.mDeletedFilesSize << " blocks)"
+		"added dirs : "<<stats.mAddedDirectoriesCount  << ", " 
+		"deleted dirs : "<<stats.mDeletedDirectoriesCount  << " " 
+
+		);
 
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();

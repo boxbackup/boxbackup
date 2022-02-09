@@ -34,6 +34,27 @@ class HousekeepingInterface
 	virtual void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen) = 0;
 };
 
+class Statistics {
+	public:
+		Statistics() {
+			mAddedFilesCount = 0;
+			mAddedFilesSize = 0;
+			mDeletedFilesCount = 0;
+			mDeletedFilesSize = 0;
+			mAddedDirectoriesCount = 0;
+			mDeletedDirectoriesCount = 0;
+			mDeletedDirectoriesSize = 0;
+		}
+		int64_t mAddedFilesCount;
+		int64_t mAddedFilesSize;
+		int64_t mDeletedFilesCount;
+		int64_t mDeletedFilesSize;
+		int64_t mAddedDirectoriesCount;
+		int64_t mDeletedDirectoriesCount;
+		int64_t mDeletedDirectoriesSize;
+};
+
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -174,6 +195,8 @@ public:
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
 
+	Statistics &GetStatistics() { return mStatistics; }
+
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
 	BackupStoreDirectory &GetDirectoryInternal(int64_t ObjectID,
@@ -205,6 +228,8 @@ private:
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
 
+	// Statistics
+	Statistics mStatistics;
 public:
 	class TestHook
 	{
