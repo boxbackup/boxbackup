@@ -5,7 +5,7 @@ clone_depth: 1
 # Do not build on tags (GitHub only)
 skip_tags: true
 
-image: Visual Studio 2015
+image: Visual Studio 2019
 
 platform:
   - Win32 # CMake sucks
@@ -16,7 +16,7 @@ configuration:
   - Release
 
 environment:
-  Generator_Base: Visual Studio 14 2015
+  Generator_Base: Visual Studio 16 2019
   OPENSSL_VERSION: 1.1.0f
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
