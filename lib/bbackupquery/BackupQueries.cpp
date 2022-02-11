@@ -2350,9 +2350,9 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	}
 
 	// Check arguments
-	if(args.size() != 1)
+	if(args.size() < 1)
 	{
-		BOX_ERROR("Incorrect usage. delete <name>");
+		BOX_ERROR("Incorrect usage. delete <name> [now]");
 		return;
 	}
 
@@ -2363,6 +2363,17 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	const std::string& storeDirEncoded(args[0]);
 #endif
 
+	int16_t listFlags = BackupProtocolListDirectory::Flags_OldVersion |
+		BackupProtocolListDirectory::Flags_Deleted;
+	
+	bool removeASAP = false;
+	if(args.size() == 2) {
+		if(args[1] == "now" ) { // going to tag the Flags_RemoveASAP
+			removeASAP = true;
+			listFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
+		}
+	}
+
 	// Find object ID somehow
 	int64_t fileId, parentId;
 	std::string fileName;
@@ -2371,9 +2382,7 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
 		/* include files and directories */
 		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-		/* exclude old and deleted files */
-		BackupProtocolListDirectory::Flags_OldVersion |
-		BackupProtocolListDirectory::Flags_Deleted,
+		listFlags,
 		&flagsOut);
 
 	if (fileId == 0)
@@ -2390,11 +2399,11 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 		// Delete object
 		if(flagsOut & BackupProtocolListDirectory::Flags_File)
 		{
-			mrConnection.QueryDeleteFile(parentId, fn);
+			mrConnection.QueryDeleteFile(parentId, fn, removeASAP);
 		}
 		else
 		{
-			mrConnection.QueryDeleteDirectory(fileId);
+			mrConnection.QueryDeleteDirectory(fileId, removeASAP);
 		}
 	}
 	catch (BoxException &e)

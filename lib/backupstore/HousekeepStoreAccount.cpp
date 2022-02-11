@@ -579,7 +579,7 @@ bool HousekeepStoreAccount::ScanDirectory(int32_t flags, int64_t ObjectID,
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount::DelEn &x, const HousekeepStoreAccount::DelEn &y)
+bool HousekeepStoreAccount::DelEnCompare::operator()(const HousekeepStoreAccount::DelEn &x, const HousekeepStoreAccount::DelEn &y) const
 {
 	// STL spec says this:
 	// A Strict Weak Ordering is a Binary Predicate that compares two objects, returning true if the first precedes the second.

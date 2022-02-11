@@ -852,7 +852,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
+bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut, bool RemoveASAP)
 {
 	// Essential checks!
 	if(mapStoreInfo.get() == 0)
@@ -888,6 +888,11 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				ASSERT(!e->IsDeleted());
 				// Set deleted flag
 				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				
+				if ( RemoveASAP ) {
+					e->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
+				} 
+				
 				// Mark as made a change
 				madeChanges = true;
 
@@ -984,7 +989,7 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 				// Check that it's definitely already deleted
 				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0);
 				// Clear deleted flag
-				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_RemoveASAP );
 				// Mark as made a change
 				madeChanges = true;
 				blocksDel -= e->GetSizeInBlocks();
@@ -1271,7 +1276,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
+void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete, bool RemoveASAP)
 {
 	// Essential checks!
 	if(mapStoreInfo.get() == 0)
@@ -1315,11 +1320,15 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 				// This is the one to delete
 				if(Undelete)
 				{
-					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_RemoveASAP);
 				}
 				else
 				{
 					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					if ( RemoveASAP ) {
+						en->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
+					}
+
 				}
 
 				// Save it

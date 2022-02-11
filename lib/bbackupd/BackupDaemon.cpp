@@ -1241,6 +1241,10 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 	return mapClientContext; // releases mapClientContext
 }
 
+
+
+
+
 #ifdef ENABLE_VSS
 bool BackupDaemon::WaitForAsync(IVssAsync *pAsync,
 	const std::string& description)
@@ -2408,7 +2412,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 	// by code, rather than the OS.
 	typedef struct
 	{
-		bool operator()(const std::string &s1, const std::string &s2)
+		bool operator()(const std::string &s1, const std::string &s2) const
 		{
 			if(s1.size() == s2.size())
 			{
@@ -3289,7 +3293,7 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 		i(mUnusedRootDirEntries.begin());
 		i != mUnusedRootDirEntries.end(); ++i)
 	{
-		connection.QueryDeleteDirectory(i->first);
+		connection.QueryDeleteDirectory(i->first, false);
 		rContext.GetProgressNotifier().NotifyFileDeleted(
 			i->first, i->second);
 	}

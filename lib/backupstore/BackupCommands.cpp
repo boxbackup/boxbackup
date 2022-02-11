@@ -636,7 +636,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFile::DoCommand(BackupP
 
 	// Context handles this
 	int64_t objectID = 0;
-	rContext.DeleteFile(mFilename, mInDirectory, objectID);
+	rContext.DeleteFile(mFilename, mInDirectory, objectID, mRemoveASAP);
 
 	// return the object ID or zero for not found
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
@@ -687,7 +687,7 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	}
 
 	// Context handles this
-	rContext.DeleteDirectory(mObjectID);
+	rContext.DeleteDirectory(mObjectID, false, mRemoveASAP);
 
 	// return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
