@@ -266,7 +266,7 @@ void BackupStoreDaemon::Run()
 		}
 	}
 }
-
+#include <iostream>
 // --------------------------------------------------------------------------
 //
 // Function

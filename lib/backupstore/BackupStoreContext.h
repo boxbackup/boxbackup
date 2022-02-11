@@ -44,7 +44,13 @@ class Statistics {
 			mAddedDirectoriesCount = 0;
 			mDeletedDirectoriesCount = 0;
 			mDeletedDirectoriesSize = 0;
+			mCreationTime=time(NULL);
 		}
+
+		time_t ElapsedTime() {
+			return time(NULL) - mCreationTime;
+		}
+		
 		int64_t mAddedFilesCount;
 		int64_t mAddedFilesSize;
 		int64_t mDeletedFilesCount;
@@ -52,6 +58,12 @@ class Statistics {
 		int64_t mAddedDirectoriesCount;
 		int64_t mDeletedDirectoriesCount;
 		int64_t mDeletedDirectoriesSize;
+
+
+
+	private:
+		time_t mCreationTime;
+
 };
 
 
@@ -219,6 +231,7 @@ private:
 	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
 
+	
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
 

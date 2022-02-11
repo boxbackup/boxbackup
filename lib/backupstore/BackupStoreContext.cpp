@@ -64,8 +64,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mStoreDiscSet(-1),
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
-  mpTestHook(NULL)
-// If you change the initialisers, be sure to update
+  mpTestHook(NULL)// If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
 {
 }

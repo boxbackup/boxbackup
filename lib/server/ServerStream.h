@@ -262,6 +262,7 @@ public:
 						#ifndef WIN32 // no fork on Win32
 						if(ForkToHandleRequests && !IsSingleProcess())
 						{
+							
 							pid_t pid = ::fork();
 							switch(pid)
 							{
