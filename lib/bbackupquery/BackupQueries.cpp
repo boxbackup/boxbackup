@@ -48,6 +48,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "PathUtils.h"
+#include "BoxTime.h"
 #include "SelfFlushingStream.h"
 #include "Utils.h"
 #include "autogen_BackupProtocol.h"
@@ -2084,8 +2085,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	}
 
 	// Go and restore...
+	RestoreInfos infos;
 	int result;
-
 	try
 	{
 		// At TRACE level, we print a line for each file and
@@ -2096,7 +2097,9 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 			true /* print progress dots */, restoreDeleted, 
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
-			opts['f'] /* force continue after errors */);
+			opts['f'] /* force continue after errors */,
+			infos /* gather some infos */);
+		infos.endTime = GetCurrentBoxTime();
 	}
 	catch(std::exception &e)
 	{
@@ -2114,7 +2117,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	switch(result)
 	{
 	case Restore_Complete:
-		BOX_INFO("Restore complete.");
+		BOX_INFO("Restore complete. ");
 		break;
 	
 	case Restore_CompleteWithErrors:
@@ -2151,6 +2154,21 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		SetReturnCode(ReturnCode::Command_Error);
 		break;
 	}
+
+	// print some stats from infos
+	BOX_INFO("Restore finished: "
+		<< "status: " << result << ", "
+		<< "start: " << infos.startTime << ", "
+		<< "end: " << infos.endTime << ", "
+		<< "dirs: " << infos.totalDirsRestored << ", "
+		<< "files: " << infos.totalFilesRestored << ", "
+		<< "size: " << infos.totalBytesRestored << " B, "
+		<< "warnings: "<< infos.totalWarnings << ", "
+		<< "skipped: " << infos.totalFilesSkipped 
+		);
+
+
+
 }
 
 

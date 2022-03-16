@@ -213,7 +213,8 @@ typedef struct
 static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID, const std::string &rRemoteDirectoryName,
 	const std::string &rLocalDirectoryName,
-	RestoreParams &Params, RestoreResumeInfo &rLevel)
+	RestoreParams &Params, RestoreResumeInfo &rLevel,
+	RestoreInfos &infos)
 {
 	// If we're resuming... check that we haven't got a next level to
 	// look at
@@ -226,7 +227,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 		BackupClientRestoreDir(rConnection, rLevel.mNextLevelID,
 			rRemoteDirectoryName + '/' +
 			rLevel.mNextLevelLocalName, localDirname,
-			Params, *rLevel.mpNextLevel);
+			Params, *rLevel.mpNextLevel, infos);
 		
 		// Add it to the list of done itmes
 		rLevel.mRestoredObjects.insert(rLevel.mNextLevelID);
@@ -403,6 +404,8 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 		}
 	}
 
+	infos.totalDirsRestored++;
+
 	// Save the restore info, in case it's needed later
 	try
 	{
@@ -459,6 +462,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	try
 	{
 		dirAttr.WriteAttributes(rLocalDirectoryName.c_str(), true);
+
 	}
 	catch(std::exception &e)
 	{
@@ -467,6 +471,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 
 		if (Params.ContinueAfterErrors)
 		{
+			infos.totalWarnings++;
 			Params.ContinuedAfterError = true;
 		}
 		else
@@ -481,6 +486,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 
 		if (Params.ContinueAfterErrors)
 		{
+			infos.totalWarnings++;
 			Params.ContinuedAfterError = true;
 		}
 		else
@@ -518,13 +524,15 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					BOX_LOG_SYS_ERROR("Failed to delete "
 						"file '" << localFilename << 
 						"'");
-
+					
 					if (Params.ContinueAfterErrors)
 					{
+						infos.totalFilesSkipped++;
 						Params.ContinuedAfterError = true;
 					}
 					else
 					{
+						infos.totalFilesFailed++;
 						return Restore_UnknownError;
 					}
 				}
@@ -565,15 +573,18 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					BOX_ERROR("Failed to restore file '" <<
 						localFilename << "': " <<
 						e.what());
-
+					
+					
 					if (Params.ContinueAfterErrors)
 					{
+						infos.totalFilesSkipped++;
 						Params.ContinuedAfterError = true;
 						// ensure that protocol remains usable
 						objectStream->Flush();
 					}
 					else
 					{
+						infos.totalFilesFailed++;
 						return Restore_UnknownError;
 					}
 				}
@@ -582,13 +593,16 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					BOX_ERROR("Failed to restore file '" <<
 						localFilename <<
 						"': unknown error");
-
+					
+					
 					if (Params.ContinueAfterErrors)
 					{
+						infos.totalFilesSkipped++;
 						Params.ContinuedAfterError = true;
 					}
 					else
 					{
+						infos.totalFilesFailed++;
 						return Restore_UnknownError;
 					}
 				}
@@ -602,7 +616,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 
 				// Add it to the list of done itmes
 				rLevel.mRestoredObjects.insert(en->GetObjectID());
-
+					
 				// Save restore info?
 				int64_t fileSize;
 				bool exists = false;
@@ -621,13 +635,15 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 						"whether file exists: '" <<
 						localFilename << "': " <<
 						e.what());
-
+					
 					if (Params.ContinueAfterErrors)
 					{
+						infos.totalFilesSkipped++;
 						Params.ContinuedAfterError = true;
 					}
 					else
 					{
+						infos.totalFilesFailed++;
 						return Restore_UnknownError;
 					}
 				}
@@ -637,26 +653,31 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 						"whether file exists: '" <<
 						localFilename << "': "
 						"unknown error");
-
+					
 					if (Params.ContinueAfterErrors)
 					{
+						infos.totalFilesSkipped++;
 						Params.ContinuedAfterError = true;
 					}
 					else
 					{
+						infos.totalFilesFailed++;
 						return Restore_UnknownError;
 					}
 				}
 
                 BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(en->GetObjectID()) <<
                     " fetched successfully. ("<<fileSize<<" B)");
+				infos.totalFilesRestored++;
+				infos.totalBytesRestored += fileSize;
 
 				if(exists)
 				{
 					// File exists...
 					bytesWrittenSinceLastRestoreInfoSave
 						+= fileSize;
-					
+				
+
 					if(bytesWrittenSinceLastRestoreInfoSave > MAX_BYTES_WRITTEN_BETWEEN_RESTORE_INFO_SAVES)
 					{
 						// Save the restore info, in
@@ -670,6 +691,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 							BOX_ERROR("Failed to save resume info file '" <<
 								Params.mRestoreResumeInfoFilename <<
 								"': " << e.what());
+							infos.totalFilesFailed++;
 							return Restore_UnknownError;
 						}
 						catch(...)
@@ -677,6 +699,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 							BOX_ERROR("Failed to save resume info file '" <<
 								Params.mRestoreResumeInfoFilename <<
 								"': unknown error");
+							infos.totalFilesFailed++;
 							return Restore_UnknownError;
 						}
 
@@ -761,7 +784,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					rConnection, en->GetObjectID(), 
 					rRemoteDirectoryName + '/' + 
 					nm.GetClearFilename(), localDirname,
-					Params, rnextLevel);
+					Params, rnextLevel, infos);
 
 				if (result != Restore_Complete)
 				{
@@ -847,7 +870,8 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID, const std::string& RemoteDirectoryName,
 	const std::string& LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
 	bool UndeleteAfterRestoreDeleted, bool Resume,
-	bool ContinueAfterErrors)
+	bool ContinueAfterErrors,
+	RestoreInfos &infos)
 {
 	// Parameter block
 	RestoreParams params;
@@ -894,7 +918,8 @@ int BackupClientRestore(BackupProtocolCallable &rConnection,
 	// Restore the directory
 	int result = BackupClientRestoreDir(rConnection, DirectoryID,
 		RemoteDirectoryName, LocalDirectoryName, params,
-		params.mResumeInfo);
+		params.mResumeInfo,
+		infos);
 	if (result != Restore_Complete)
 	{
 		return result;

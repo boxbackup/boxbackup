@@ -114,6 +114,9 @@ bool HousekeepStoreAccount::DoHousekeeping(int32_t flags, bool KeepTryingForever
 	if ( (flags & HousekeepStoreAccount::RemoveOldVersions) !=0 ) {
 		BOX_INFO("RemoveOldVersions option activated.")
 	}
+	if ( (flags & HousekeepStoreAccount::DisableAutoClean) !=0 ) {
+		BOX_INFO("AutoClean option deactivated.")
+	}
 
 	// Attempt to lock the account
 	std::string writeLockFilename;

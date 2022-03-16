@@ -1838,6 +1838,19 @@ void BackupDaemon::OnBackupFinish(SysadminNotifier::EventCode status)
             << ", " << mStats.front().NumFilesUploaded << " files uploaded, "
             << mStats.front().NumDirsCreated << " dirs created");
 
+		BOX_NOTICE("Backup finished: "
+			<< "status: " << status << ", "
+			<< "start: " << mStats.front().startTime << ", "
+			<< "end: " << mStats.front().endTime << ", "
+			<< "files: " << mStats.front().NumFilesUploaded << ", "
+			<< "size: " << mStats.front().TotalSizeUploaded << " B, "
+			<< "dirs: " << mStats.front().NumDirsCreated << ", "
+			<< "uploaded: " << BackupStoreFile::msStats.mBytesInEncodedFiles << " B, "
+			<< "on_server: " << BackupStoreFile::msStats.mBytesAlreadyOnServer << " B, "
+			<< "encoded: " << BackupStoreFile::msStats.mTotalFileStreamSize << " B"
+		);
+
+
 		// Reset statistics again
 		BackupStoreFile::ResetStats();
 

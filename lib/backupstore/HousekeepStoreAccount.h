@@ -42,8 +42,8 @@ public:
 	typedef enum {
 		DefaultAction=0x0,
 		RemoveDeleted=0x1,
-		RemoveOldVersions=0x2
-
+		RemoveOldVersions=0x2,
+		DisableAutoClean=0x4,
 	}ActionFlags;
 
 	HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot,

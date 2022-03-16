@@ -68,7 +68,7 @@ void PrintUsageAndExit()
 "        Changes the \"name\" of the account to the specified string.\n"
 "        The name is purely cosmetic and intended to make it easier to\n"
 "        identify your accounts.\n"
-"  housekeep <account> [remove-deleted] [remove-old]\n"
+"  housekeep <account> [remove-deleted] [remove-old] [disable-auto-clean]\n"
 "        Runs housekeeping immediately on the account. If it cannot be locked,\n"
 "        bbstoreaccounts returns an error status code (1), otherwise success\n"
 "        (0) even if any errors were fixed by housekeeping.\n"
@@ -290,6 +290,11 @@ int main(int argc, const char *argv[])
 			else if(::strcmp(argv[o], "remove-old") == 0)
 			{
 				flags|=HousekeepStoreAccount::RemoveOldVersions;
+			}
+			else if(::strcmp(argv[o], "disable-auto-clean") == 0)
+			{
+				// no default action here, this should remove only the deleted or old version marked with Flags_RemoveASAP
+				flags |= HousekeepStoreAccount::DisableAutoClean; 
 			}
 			else
 			{
