@@ -27,7 +27,7 @@ task:
     image_project: centos-cloud
     image_name: centos-7-v20190619
   setup_script:
-    - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
+    - yum install -y --disablerepo=google-cloud-sdk --disablerepo=google-compute-engine git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
     - useradd -m build
     - chown -R build: .
   <<: *standard_build
@@ -44,6 +44,7 @@ task:
         - schroot --begin-session --session-name stretch-build --chroot stretch
       env:
         CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
+
     - name: Debian 9 amd64
       gce_instance:
         <<: *standard_gce_instance
@@ -57,14 +58,33 @@ task:
     - ${CHROOT} chown -R build: .
   <<: *standard_build
 
+freebsd_gce_instance: &freebsd_gce_instance
+  <<: *standard_gce_instance
+  platform: FreeBSD
+  image_project: freebsd-org-cloud-dev
+  # Need to use image_name for now: https://github.com/cirruslabs/cirrus-ci-docs/issues/422
+  disk: 30  # Image is 29GB, VM can't be smaller
+
 task:
-  name: FreeBSD 12.0 amd64
-  gce_instance:
-    <<: *standard_gce_instance
-    image_project: freebsd-org-cloud-dev
-    image_name: freebsd-12-0-release-amd64
-    disk: 30  # Image is 29GB, VM can't be smaller
-    platform: FreeBSD
+  matrix:
+    - name: FreeBSD 14.0 (pre) amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_family: freebsd-14-0-snap
+    - name: FreeBSD 13.0 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_name: freebsd-13-0-current-amd64-v20190829
+        image_family: freebsd-13-0
+    - name: FreeBSD 12.3 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_family: freebsd-12-3
+    - name: FreeBSD 11.4 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_family: freebsd-11-4
+
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
     - pw useradd build -m -w none
