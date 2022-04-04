@@ -27,7 +27,7 @@ task:
     image_project: centos-cloud
     image_name: centos-7-v20190619
   setup_script:
-    - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
+    - yum install -y --disablerepo=google-cloud-sdk git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
     - useradd -m build
     - chown -R build: .
   <<: *standard_build
