@@ -130,19 +130,35 @@ int main(int argc, const char *argv[])
 
 	// Read in the configuration file
 	std::string errs;
-	std::auto_ptr<Configuration> config(
+	std::auto_ptr<Configuration> apConfig(
 		Configuration::LoadAndVerify
 			(configFilename, &BackupConfigFileVerify, errs));
 
-	if(config.get() == 0 || !errs.empty())
+	if(apConfig.get() == 0 || !errs.empty())
 	{
 		BOX_ERROR("Invalid configuration file " << configFilename <<
 			":" << errs);
 	}
 
+#ifndef WIN32
+	// Handle changing to a different user, to match bbstored, to ensure that files don't end up
+	// owned by the wrong user.
+	const Configuration &serverConfig(
+		apConfig->GetSubConfiguration("Server"));
+
+	if(serverConfig.KeyExists("User"))
+	{
+		// Config file specifies an user -- look up
+		UnixUser daemonUser(serverConfig.GetKeyValue("User").c_str());
+
+		// Change the process ID
+		daemonUser.ChangeProcessUser(); // temporary=false
+	}
+#endif
+
 	// Initialise the raid file controller
 	RaidFileController &rcontroller(RaidFileController::GetController());
-	rcontroller.Initialise(config->GetKeyValue("RaidFileConf").c_str());
+	rcontroller.Initialise(apConfig->GetKeyValue("RaidFileConf").c_str());
 
 	// Then... check we have two arguments
 	if(argc < 2)
@@ -158,7 +174,7 @@ int main(int argc, const char *argv[])
 	}
 	
 	std::string command = argv[0];
-	BackupStoreAccountsControl control(*config, machineReadableOutput);
+	BackupStoreAccountsControl control(*apConfig, machineReadableOutput);
 	
 	// Now do the command.
 	if(command == "create")
