@@ -15,9 +15,9 @@ set(ZLIB_VERSION    1.2.12)
 set(ZLIB_HASH SHA256=91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9)
 
 # Version of OpenSSL to download, build, and compile Box Backup against:
-set(OPENSSL_VERSION 1.1.0g)
+set(OPENSSL_VERSION 1.1.1n)
 # Hash of openssl-${OPENSSL_VERSION}.tar.gz, to be verified after download:
-set(OPENSSL_HASH SHA256=de4d501267da39310905cb6dc8c6121f7a2cad45a7707f76df828fe1b85073af)
+set(OPENSSL_HASH SHA256=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a)
 
 # Version of PCRE to download, build, and compile Box Backup against:
 set(PCRE_VERSION    8.45)
