@@ -10,9 +10,9 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 # as used by AppVeyor.
 
 # Version of zlib to download, build, and compile Box Backup against:
-set(ZLIB_VERSION    1.2.11)
+set(ZLIB_VERSION    1.2.12)
 # Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download:
-set(ZLIB_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1)
+set(ZLIB_HASH SHA256=789e49eaa1fae9e186444db3ec0526ad87254406be27e76c687a0761524b7127)
 
 # Version of OpenSSL to download, build, and compile Box Backup against:
 set(OPENSSL_VERSION 1.1.0g)
