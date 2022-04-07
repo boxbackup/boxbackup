@@ -26,6 +26,8 @@ init:
   - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
+  # vcvarsall.bat overwrites the PLATFORM variable, so back it up:
+  - ps: $env:orig_platform = $($env:PLATFORM)
   - ps: $env:sane_platform = $($env:PLATFORM.replace("Win32", "x86"))
   # Ensafen e.g. "jamesog/cirrus-ci"
   - ps: $env:safer_branch = $($env:APPVEYOR_REPO_BRANCH.replace("/", "_"))
@@ -56,11 +58,11 @@ install:
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
-  - echo cmake -G "%Generator_Name%" -A %Platform%
+  - echo cmake -G "%Generator_Name%" -A %orig_platform%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%Generator_Name%" -A %Platform%
+  - cmake -G "%Generator_Name%" -A %orig_platform%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
