@@ -23,8 +23,8 @@ environment:
 
 init:
   # Uncomment the following two lines to enable RDP access to the virtual machine for debugging.
-  - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
-  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+  # - reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+  # - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - ps: $env:date_string = Get-Date -Format "yyMMdd"
   # vcvarsall.bat overwrites the PLATFORM variable, so back it up:
   - ps: $env:orig_platform = $($env:PLATFORM)
@@ -45,12 +45,13 @@ install:
   - cinst -y --limit-output 7zip.commandline nsis.portable
   - dir "c:\Program Files"
   - dir "c:\Program Files (x86)"
-  # We don't need strawberryperl on AppVeyor because there is already a Perl in c:\Perl.
+  # We don't need to install strawberryperl on AppVeyor because it's already in C:\Strawberry\perl.
   # If you are doing this on a fresh box for development, you would probably want to
   # install Chocolatey and then run:
   # cinst -y cmake.portable strawberryperl git vim visualstudio2012wdx
   # We install cmake.portable instead of cmake, to get it on the path again
   # <http://disq.us/p/xdknrt>.
+  - set PATH=C:\Strawberry\perl\bin;%PATH%
 
   - '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" %sane_platform%'
   - if not exist %CMAKE_UNIBUILD_DIR% md %CMAKE_UNIBUILD_DIR%
