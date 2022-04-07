@@ -12,7 +12,7 @@ set(install_dir ${CMAKE_BINARY_DIR}/install)
 # Version of zlib to download, build, and compile Box Backup against:
 set(ZLIB_VERSION    1.2.12)
 # Hash of zlib-${ZLIB_VERSION}.tar.gz, to be verified after download:
-set(ZLIB_HASH SHA256=789e49eaa1fae9e186444db3ec0526ad87254406be27e76c687a0761524b7127)
+set(ZLIB_HASH SHA256=91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9)
 
 # Version of OpenSSL to download, build, and compile Box Backup against:
 set(OPENSSL_VERSION 1.1.0g)

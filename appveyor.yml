@@ -16,7 +16,7 @@ configuration:
   - Release
 
 environment:
-  Generator_Base: Visual Studio 16 2019
+  Generator_Name: Visual Studio 16 2019
   OPENSSL_VERSION: 1.1.0f
   CMAKE_UNIBUILD_DIR: '%APPVEYOR_BUILD_FOLDER%\..\cmake'
   BOXBACKUP_VERSION_BASE: 0.12
@@ -35,7 +35,6 @@ init:
   - ps: $env:compiled_version="$($env:boxbackup_version_full)_Win_$($env:sane_platform)_$($env:CONFIGURATION)"
   # The only way to switch between 32-bit and 64-bit compilers appears to be to append " Win64"
   # to the generator name if you want a 64-bit build (x64 platform):
-  - ps: $env:generator_name="$($env:Generator_Base)$(if ($env:PLATFORM.equals('x64')) {' Win64'})"
 
 # scripts that run after cloning repository (before the build step, not after!)
 install:
@@ -57,16 +56,21 @@ install:
   # We need to specify the generator here, in case the user has more than one installed.
   # CMake always seems to default to the latest version of Visual Studio, not the one on
   # the current PATH.
-  - echo cmake -G "%generator_name%"
+  - echo cmake -G "%Generator_Name%" -A %Platform%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
-  - cmake -G "%generator_name%"
+  - cmake -G "%Generator_Name%" -A %Platform%
     -DBOXBACKUP_VERSION=%compiled_version%
     -DSUB_CMAKE_EXTRA_ARGS="-- /verbosity:minimal"
     %APPVEYOR_BUILD_FOLDER%\infrastructure\cmake\windows
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
+
+  # CMake assumes that the Platform is Win32, and generates Configurations called Debug|Win32 etc, but vcvarsall sets it
+  # to x86, which makes MSBuild infer Debug|x86 which it can't find. Hackily override the Platform set by vcvarsall:
+  # https://www.mail-archive.com/wireshark-bugs@wireshark.org/msg107170.html
+  - set Platform=
 
 build:
   parallel: true
