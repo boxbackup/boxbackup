@@ -1,6 +1,6 @@
 # Box Backup
 
-[![Travis Build Status](https://travis-ci.org/boxbackup/boxbackup.svg?branch=master)](https://travis-ci.org/boxbackup/boxbackup)
+[![Cirrus Build Status](https://api.cirrus-ci.com/github/boxbackup/boxbackup.svg)](https://cirrus-ci.com/github/boxbackup/boxbackup)
 [![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/ussek6c8mvgxqj2k/branch/master?svg=true)](https://ci.appveyor.com/project/qris/boxbackup/branch/master)
 
 Box Backup is an open source, completely automatic, secure, encrypted on-line backup system.
