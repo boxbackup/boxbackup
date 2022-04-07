@@ -51,7 +51,7 @@ install:
   # We install cmake.portable instead of cmake, to get it on the path again
   # <http://disq.us/p/xdknrt>.
 
-  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+  - "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" %sane_platform%
   - if not exist %CMAKE_UNIBUILD_DIR% md %CMAKE_UNIBUILD_DIR%
   - cd %CMAKE_UNIBUILD_DIR%
   # We need to specify the generator here, in case the user has more than one installed.
