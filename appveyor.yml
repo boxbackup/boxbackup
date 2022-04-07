@@ -72,7 +72,7 @@ install:
   # CMake assumes that the Platform is Win32, and generates Configurations called Debug|Win32 etc, but vcvarsall sets it
   # to x86, which makes MSBuild infer Debug|x86 which it can't find. Hackily override the Platform set by vcvarsall:
   # https://www.mail-archive.com/wireshark-bugs@wireshark.org/msg107170.html
-  - set Platform=
+  - set Platform=%orig_platform%
 
 build:
   parallel: true
