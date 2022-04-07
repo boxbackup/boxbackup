@@ -68,11 +68,6 @@ install:
 
   # Leave the current directory in the correct place to find the solution file using its relative path above.
 
-# Remove Xamarin to remove 500 lines of junk from build logs
-# http://help.appveyor.com/discussions/problems/4569-the-target-_convertpdbfiles-listed-in-a-beforetargets-attribute-at-c-does-not-exist-in-the-project-and-will-be-ignored
-before_build:
-  - del "C:\Program Files (x86)\MSBuild\4.0\Microsoft.Common.Targets\ImportAfter\Xamarin.Common.targets"
-
 build:
   parallel: true
   project: ..\cmake\BoxBackup_Windows.sln
