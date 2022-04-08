@@ -9,3 +9,6 @@
 # Denote all files that are truly binary and should not be modified.
 *.png binary
 *.jpg binary
+
+# This file is a reference plaintext for a reference ciphertext, and should not be modified at all:
+test/crypto/testfiles/bfdlink.h binary
