@@ -2283,13 +2283,7 @@ bool test_read_only_dirs_can_be_restored()
 	// TODO FIXME dedent
 	{
 		{
-			#ifdef WIN32
-				TEST_THAT(::system("attrib +r testfiles\\TestDir1\\x1")
-					== 0);
-			#else
-				TEST_THAT(chmod("testfiles/TestDir1/x1",
-					0555) == 0);
-			#endif
+			TEST_THAT(chmod("testfiles/TestDir1/x1", 0555) == 0);
 
 			bbackupd.RunSyncNow();
 			TEST_COMPARE_EXTRA(Compare_Same, "", "-cEQ Test1 testfiles/TestDir1");
@@ -2308,21 +2302,9 @@ bool test_read_only_dirs_can_be_restored()
 				"testfiles/restore-test/Test1");
 
 			// put the permissions back to sensible values
-			#ifdef WIN32
-				TEST_THAT(::system("attrib -r testfiles\\TestDir1\\x1")
-					== 0);
-				TEST_THAT(::system("attrib -r testfiles\\restore1\\x1")
-					== 0);
-				TEST_THAT(::system("attrib -r testfiles\\restore-test\\"
-					"Test1\\x1") == 0);
-			#else
-				TEST_THAT(chmod("testfiles/TestDir1/x1",
-					0755) == 0);
-				TEST_THAT(chmod("testfiles/restore1/x1",
-					0755) == 0);
-				TEST_THAT(chmod("testfiles/restore-test/Test1/x1",
-					0755) == 0);
-			#endif
+			TEST_THAT(chmod("testfiles/TestDir1/x1", 0755) == 0);
+			TEST_THAT(chmod("testfiles/restore1/x1", 0755) == 0);
+			TEST_THAT(chmod("testfiles/restore-test/Test1/x1", 0755) == 0);
 		}
 	}
 
@@ -3148,23 +3130,12 @@ bool test_upload_very_old_files()
 		// Then modify an existing file
 		{
 			// in the archive, it's read only
-			#ifdef WIN32
-				TEST_THAT(::system("attrib -r "
-					"testfiles\\TestDir\\sub23\\rand.h") == 0);
-			#else
-				TEST_THAT(chmod("testfiles/TestDir1/sub23/rand.h",
-					0777) == 0);
-			#endif
+			TEST_THAT(chmod("testfiles/TestDir1/sub23/rand.h", 0777) == 0);
 
 			FILE *f = fopen("testfiles/TestDir1/sub23/rand.h", 
 				"w+");
 
-			if (f == 0)
-			{
-				perror("Failed to open");
-			}
-
-			TEST_THAT(f != 0);
+			TEST_THAT(f != 0); // failed to open file
 
 			if (f != 0)
 			{
@@ -3395,11 +3366,7 @@ bool test_delete_dir_change_attribute()
 		TEST_THAT(::system("rm -r testfiles/TestDir1/x1") == 0);
 #endif
 		// Change attributes on an existing file.
-#ifdef WIN32
-		TEST_EQUAL(0, system("attrib +r testfiles\\TestDir1\\df9834.dsf"));
-#else
 		TEST_THAT(::chmod("testfiles/TestDir1/df9834.dsf", 0423) == 0);
-#endif
 
 		TEST_COMPARE(Compare_Different);
 		
@@ -3583,9 +3550,7 @@ bool test_sync_new_files()
 		// current time, which doesn't help us. So reset the timestamp
 		// on a file by touching it, so it won't be backed up.
 		{
-#ifndef WIN32
 			TEST_THAT(chmod("testfiles/TestDir1/chsh", 0755) == 0);
-#endif
 			FileStream fs("testfiles/TestDir1/chsh", O_WRONLY);
 			fs.Write("a", 1);
 		}
