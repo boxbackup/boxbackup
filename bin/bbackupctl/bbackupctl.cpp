@@ -373,21 +373,26 @@ int main(int argc, const char *argv[])
 
             case GetStats:
             {
+				if(line[0] == '{')
+				{
+					// We've got some stats
+					std::cout << line << std::endl;
+				}
                  // Decode line
-                static int statsCount=0;
-                int statsState;
-                box_time_t statsStartTime, statsEndTime;
-                uint64_t statsFileCount, statsSizeUploaded;
-                if(::sscanf(line.c_str(), "%d %lu %lu %lu %lu", &statsState, &statsStartTime,
-                            &statsEndTime, &statsFileCount, &statsSizeUploaded) == 5)
-                {
-                    BOX_NOTICE("#" << ++statsCount
-                               <<" "<<statsState
-                               <<" "<<statsStartTime
-                               <<" "<<statsEndTime
-                               <<" "<<statsFileCount
-                               <<" "<<statsSizeUploaded);
-                }
+                // static int statsCount=0;
+                // int statsState;
+                // box_time_t statsStartTime, statsEndTime;
+                // uint64_t statsFileCount, statsSizeUploaded;
+                // if(::sscanf(line.c_str(), "%d %lu %lu %lu %lu", &statsState, &statsStartTime,
+                //             &statsEndTime, &statsFileCount, &statsSizeUploaded) == 5)
+                // {
+                //     BOX_NOTICE("#" << ++statsCount
+                //                <<" "<<statsState
+                //                <<" "<<statsStartTime
+                //                <<" "<<statsEndTime
+                //                <<" "<<statsFileCount
+                //                <<" "<<statsSizeUploaded);
+                // }
 
             }
             break;

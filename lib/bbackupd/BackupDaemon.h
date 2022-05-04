@@ -13,10 +13,12 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <fstream>
 
 #include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
 #include "BoxTime.h"
+#include "Utils.h"
 #include "Daemon.h"
 #include "Logging.h"
 #include "Socket.h"
@@ -48,7 +50,6 @@ class BackupClientInodeToIDMap;
 class ExcludeList;
 class IOStreamGetLine;
 class Archive;
-
 // --------------------------------------------------------------------------
 //
 // Class
@@ -74,28 +75,84 @@ private:
 	bool DeleteStoreObjectInfo() const;
 	BackupDaemon(const BackupDaemon &);
 
-    typedef struct  {
-        int state;
-        box_time_t startTime;
-        box_time_t endTime;
-        uint64_t TotalSizeUploaded;
-        uint64_t NumFilesUploaded;
-        uint64_t NumDirsCreated;
-    } SyncStats;
+    class SyncStats  {
+		public:
+			int state;
+			box_time_t startTime;
+			box_time_t endTime;
+			uint64_t TotalSizeUploaded;
+			uint64_t NumFilesUploaded;
+			uint64_t NumDirsCreated;
+
+			std::string ToJson() const {
+				std::stringstream ss;
+				ss << "{ \"backup\": { \"status\": "<< this->state 
+					<< ", \"start\": " << this->startTime 
+					<< ", \"end\": " << this->endTime 
+					<< ", \"size\": " << this->TotalSizeUploaded 
+					<< ", \"files\": " << this->NumFilesUploaded 
+					<< ", \"dirs_created\": " << this->NumDirsCreated 
+					<< "}}";
+				return ss.str();
+			}
+
+			void reset() {
+				this->state = 0;
+				this->startTime = 0;
+				this->endTime = 0;
+				this->TotalSizeUploaded = 0;
+				this->NumFilesUploaded = 0;
+				this->NumDirsCreated = 0;
+			}
+			
+
+			bool isRunning() {
+				return this->startTime!=0 && this->endTime==0;
+			}
+
+			void setStart(SysadminNotifier::EventCode state) {
+				this->reset();
+        		this->startTime=GetCurrentBoxTime();
+        		this->state=(int)state;
+			}
+
+
+			void setEnd(SysadminNotifier::EventCode state) {
+				this->endTime=GetCurrentBoxTime();
+				this->state=(int)state;
+			}
+
+
+    };
 
     void setStartSync(SysadminNotifier::EventCode state) {
-        SyncStats stats;
-        memset(&stats, 0, sizeof(SyncStats));
-        stats.startTime=GetCurrentBoxTime();
-        stats.state=(int)state;
-        if ( mStats.size()>=mStatsHistoryLength)
-            mStats.resize(mStatsHistoryLength-1);
-        mStats.push_front(stats);
+        mCurrentOperationStats.setStart(state);
     }
 
     void setEndSync(SysadminNotifier::EventCode state) {
-        mStats.front().state=(int)state;
-        mStats.front().endTime=GetCurrentBoxTime();
+        mCurrentOperationStats.setEnd(state);
+
+		if(GetConfiguration().KeyExists("StatsFile")) {
+	
+			std::string statsFile = GetConfiguration().GetKeyValue("StatsFile");
+
+			// create the directory tree for the stats file
+			std::string statsDir = statsFile.substr(0, statsFile.find_last_of("/"));
+			CreatePath(statsDir);
+
+			std::ofstream statsStream(statsFile.c_str(), std::ios_base::out | std::ios_base::app);
+
+			if (statsStream.is_open())
+			{
+				statsStream << mCurrentOperationStats.ToJson()<< std::endl;
+				
+			}
+			statsStream.close();
+		}
+
+		// reset
+		mCurrentOperationStats.reset();
+
     }
 
 
@@ -224,7 +281,8 @@ public:
 		const std::string& output);
 	typedef std::list<Location *> Locations;
 	Locations GetLocations() { return mLocations; }
-	
+	SyncStats GetCurrentOperationStats() { return mCurrentOperationStats; }
+
 private:
 	int mState;		// what the daemon is currently doing
 
@@ -275,8 +333,7 @@ private:
 	TLSContext mTlsContext;
 	bool mDeleteStoreObjectInfoFile;
 	bool mDoSyncForcedByPreviousSyncError;
-    std::list<SyncStats> mStats;
-    //int64_t mNumFilesUploaded, mNumDirsCreated;
+	SyncStats mCurrentOperationStats;
 	int mMaxBandwidthFromSyncAllowScript;
 
 public:
@@ -482,8 +539,8 @@ public:
 				"): total size = " << FileSize << ", "
 				"uploaded size = " << UploadedSize);
 		}
-        mStats.front().TotalSizeUploaded+=FileSize;
-        mStats.front().NumFilesUploaded++;
+        mCurrentOperationStats.TotalSizeUploaded+=FileSize;
+        mCurrentOperationStats.NumFilesUploaded++;
 	}
 	virtual void NotifyFileSynchronised(
 		const BackupClientDirectoryRecord* pDirRecord,
@@ -506,7 +563,7 @@ public:
 				" (ID " << BOX_FORMAT_OBJECTID(ObjectID) <<
 				")");
 		}
-        mStats.front().NumDirsCreated++;
+        mCurrentOperationStats.NumDirsCreated++;
 	}
 	virtual void NotifyDirectoryDeleted(
 		int64_t ObjectID,

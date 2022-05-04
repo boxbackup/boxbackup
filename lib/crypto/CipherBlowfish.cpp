@@ -10,6 +10,9 @@
 #include "Box.h"
 
 #include <openssl/evp.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/provider.h>
+#endif
 
 #ifdef HAVE_OLD_SSL
 	#include <string.h>
@@ -155,8 +158,60 @@ CipherBlowfish &CipherBlowfish::operator=(const CipherBlowfish &rToCopy)
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
+
 const EVP_CIPHER *CipherBlowfish::GetCipher() const
 {
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	static OSSL_PROVIDER *legacy_provider = NULL;
+	static OSSL_PROVIDER *default_provider = NULL;
+	static OSSL_LIB_CTX *ossl_ctx = NULL;
+
+	if (!ossl_ctx) {
+		ossl_ctx = OSSL_LIB_CTX_new();
+	}
+	if (!ossl_ctx) {
+		THROW_EXCEPTION(CipherException, UnknownCipherMode)
+	}
+
+	if (!legacy_provider) {
+		legacy_provider = OSSL_PROVIDER_load(ossl_ctx, "legacy");
+	}
+	if (!legacy_provider) {
+		THROW_EXCEPTION(CipherException, UnknownCipherMode)
+	}
+
+	if (!default_provider) {
+		default_provider = OSSL_PROVIDER_load(ossl_ctx, "default");
+	}
+	if (!default_provider) {
+			THROW_EXCEPTION(CipherException, UnknownCipherMode)
+
+	}
+
+	switch(mMode)
+	{
+	case CipherDescription::Mode_ECB:
+		return EVP_CIPHER_fetch(ossl_ctx, "BF-EBC", NULL);
+		break;
+	
+	case CipherDescription::Mode_CBC:
+	    return EVP_CIPHER_fetch(ossl_ctx, "BF-CBC", NULL);
+		break;
+	
+	case CipherDescription::Mode_CFB:
+		return EVP_CIPHER_fetch(ossl_ctx, "BF-CFB", NULL);
+		break;
+	
+	case CipherDescription::Mode_OFB:
+		return EVP_CIPHER_fetch(ossl_ctx, "BF-OFB", NULL);
+		break;
+	
+	default:
+		break;
+	}
+
+#else
 	switch(mMode)
 	{
 	case CipherDescription::Mode_ECB:
@@ -165,6 +220,34 @@ const EVP_CIPHER *CipherBlowfish::GetCipher() const
 	
 	case CipherDescription::Mode_CBC:
 		return EVP_bf_cbc();
+		break;
+	
+	case CipherDescription::Mode_CFB:
+		return EVP_bf_cfb();
+		break;
+	
+	case CipherDescription::Mode_OFB:
+		return EVP_bf_ofb();
+		break;
+	
+	default:
+		break;
+	}
+#endif
+
+
+	switch(mMode)
+	{
+	case CipherDescription::Mode_ECB:
+		return EVP_bf_ecb();
+		break;
+	
+	case CipherDescription::Mode_CBC:
+	
+
+	      return EVP_CIPHER_fetch(ossl_ctx, "BF-CBC", NULL);
+		return EVP_bf_cbc();
+
 		break;
 	
 	case CipherDescription::Mode_CFB:

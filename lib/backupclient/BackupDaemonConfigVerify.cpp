@@ -121,6 +121,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("LogFileOverwrite", ConfigTest_IsBool, false),
     // set the number of sync stats to keep in memory
     ConfigurationVerifyKey("StatsHistoryLength", ConfigTest_IsUint32, 1),
+	ConfigurationVerifyKey("StatsFile", ConfigTest_Exists),
 	// overwrite the log file on each backup
 	ConfigurationVerifyKey("CommandSocket", 0),
 	// not compulsory to have this
@@ -154,6 +155,7 @@ static const ConfigurationVerifyKey verifyrootkeys[] =
 	ConfigurationVerifyKey("TrustedCAsFile", 0),
 	ConfigurationVerifyKey("SSLSecurityLevel", ConfigTest_IsInt | ConfigTest_LastEntry,
 		BOX_DEFAULT_SSL_SECURITY_LEVEL),
+
 };
 
 const ConfigurationVerify BackupDaemonConfigVerify =

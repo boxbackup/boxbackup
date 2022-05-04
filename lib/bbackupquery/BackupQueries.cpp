@@ -19,6 +19,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fstream>
 
 #ifdef HAVE_DIRENT_H
 	#include <dirent.h>
@@ -2153,6 +2154,37 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		BOX_ERROR("Unknown restore result " << result << ".");
 		SetReturnCode(ReturnCode::Command_Error);
 		break;
+	}
+
+
+
+	// write some stats
+	if(mrConfiguration.KeyExists("StatsFile")) {
+		// write mStats to file
+
+		std::string statsFile = mrConfiguration.GetKeyValue("StatsFile");
+
+		// create the directory tree for the stats file
+		std::string statsDir = statsFile.substr(0, statsFile.find_last_of("/"));
+		CreatePath(statsDir);
+		
+
+		std::ofstream statsStream(statsFile.c_str(), std::ios_base::out | std::ios_base::app);
+
+		if (statsStream.is_open())
+		{
+				statsStream << "{ \"restore\": { \"status\": "<< result 
+					<< ", \"start\": " << infos.startTime 
+					<< ", \"end\": " << infos.endTime 
+					<< ", \"dirs\": " << infos.totalDirsRestored 
+					<< ", \"files\": " << infos.totalFilesRestored
+					<< ", \"size\": " << infos.totalBytesRestored
+					<< ", \"warnings\": "<< infos.totalWarnings
+					<< ", \"skipped\": " << infos.totalFilesSkipped 
+					<< "}}"<< std::endl;
+			
+		}
+		statsStream.close();
 	}
 
 	// print some stats from infos

@@ -381,3 +381,133 @@ std::string FormatUsageLineStart(const std::string& rName,
 	return result.str();
 }
 
+
+#include <iostream>
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    CreatePath(const std::string& rPath)
+//		Purpose: Create a path and its parents if necessary
+//		Created: 04/05/22
+//
+// --------------------------------------------------------------------------
+void CreatePath(const std::string& rPath) {
+	std::string::size_type pos = 0;
+	EMU_STRUCT_STAT st;
+	std::cout << "Creating path " << rPath << std::endl;
+
+	// loop through the path, creating directories as we go
+	while(pos != std::string::npos)
+	{
+		pos = rPath.find('/', pos + 1);
+		if(pos == std::string::npos)
+		{
+			pos = rPath.find('\\', pos + 1);
+		}
+		if(pos == std::string::npos)
+		{
+			// Last component
+			if(EMU_STAT(rPath.c_str(), &st) != 0)
+			{
+				std::cout << "Creating directory " << rPath << std::endl;
+				if(errno == ENOENT)
+				{
+#ifdef WIN32
+				if(_mkdir(rPath.c_str()) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+#else
+
+				if(mkdir(rPath.c_str(), 0777) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+#endif
+				}
+				else
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+			}
+		}
+		else
+		{
+			std::string dir = rPath.substr(0, pos);
+			if(EMU_STAT(dir.c_str(), &st) != 0)
+			{
+				std::cout << "Creating directory " << dir << std::endl;
+				if(errno == ENOENT)
+				{
+					#ifdef WIN32
+				if(_mkdir(dir.c_str()) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+#else
+
+				if(mkdir(dir.c_str(), 0777) != 0)
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+#endif
+				}
+				else
+				{
+					THROW_EXCEPTION(CommonException, OSFileError);
+				}
+			}
+		}
+	}
+
+
+
+
+
+
+
+// 	while( (pos = rPath.find('/', pos)) != std::string::npos)
+// 	{
+// 		if(pos == 0)
+// 		{
+// 			pos++;
+// 			continue;
+// 		}
+// 		std::string path = rPath.substr(0, pos);
+
+// 	std::cout << "Creating " << path << std::endl;
+// 		if(EMU_LSTAT(path.c_str(), &st) != 0)
+// 		{
+// 			if(errno == ENOENT)
+// 			{
+// #ifdef WIN32
+// 				if(_mkdir(path.c_str()) != 0)
+// 				{
+// 					THROW_EXCEPTION(CommonException, OSFileError);
+// 				}
+// #else
+
+// 				if(mkdir(path.c_str(), 0777) != 0)
+// 				{
+// 					THROW_EXCEPTION(CommonException, OSFileError);
+// 				}
+// #endif
+// 			}
+// 			else
+// 			{
+// 				THROW_EXCEPTION(CommonException, OSFileError);
+// 			}
+// 		}
+
+// 		// is it a file?	
+// 		if((st.st_mode & S_IFDIR) == 0)
+// 		{
+// 			THROW_EXCEPTION(CommonException, OSFileError);
+// 		}
+		
+
+
+// 		pos++;
+
+// 	}
+}

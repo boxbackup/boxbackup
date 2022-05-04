@@ -42,6 +42,7 @@ std::string FormatUsageLineStart(const std::string& rName,
 	bool MachineReadable);
 
 std::string BoxGetTemporaryDirectoryName();
+void CreatePath(const std::string& rPath);
 
 #include "MemLeakFindOff.h"
 

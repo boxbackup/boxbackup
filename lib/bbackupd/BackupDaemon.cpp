@@ -1835,16 +1835,16 @@ void BackupDaemon::OnBackupFinish(SysadminNotifier::EventCode status)
 			<< BackupStoreFile::msStats.mBytesAlreadyOnServer
 			<< ", encoded size "
 			<< BackupStoreFile::msStats.mTotalFileStreamSize
-            << ", " << mStats.front().NumFilesUploaded << " files uploaded, "
-            << mStats.front().NumDirsCreated << " dirs created");
+            << ", " << mCurrentOperationStats.NumFilesUploaded << " files uploaded, "
+            << mCurrentOperationStats.NumDirsCreated << " dirs created");
 
 		BOX_NOTICE("Backup finished: "
 			<< "status: " << status << ", "
-			<< "start: " << mStats.front().startTime << ", "
-			<< "end: " << mStats.front().endTime << ", "
-			<< "files: " << mStats.front().NumFilesUploaded << ", "
-			<< "size: " << mStats.front().TotalSizeUploaded << " B, "
-			<< "dirs: " << mStats.front().NumDirsCreated << ", "
+			<< "start: " << mCurrentOperationStats.startTime << ", "
+			<< "end: " << mCurrentOperationStats.endTime << ", "
+			<< "files: " << mCurrentOperationStats.NumFilesUploaded << ", "
+			<< "size: " << mCurrentOperationStats.TotalSizeUploaded << " B, "
+			<< "dirs: " << mCurrentOperationStats.NumDirsCreated << ", "
 			<< "uploaded: " << BackupStoreFile::msStats.mBytesInEncodedFiles << " B, "
 			<< "on_server: " << BackupStoreFile::msStats.mBytesAlreadyOnServer << " B, "
 			<< "encoded: " << BackupStoreFile::msStats.mTotalFileStreamSize << " B"
@@ -2250,27 +2250,31 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
             else if ( command == "get-stats")
             {
                 sendResponse = false;
-                if ( mStats.empty() )
-                {
-                    mapCommandSocketInfo->mpConnectedSocket->Write("-no stats-", timeout);
-                }
-                else
-                {
-                    for (std::list<SyncStats>::iterator it=mStats.begin(); it != mStats.end(); ++it)
-                    {
-                        std::ostringstream msg;
-                        const SyncStats& stats=(*it);
-                        msg << stats.state << " "<<
-                            stats.startTime << " " <<
-                            stats.endTime << " " <<
-                            stats.NumFilesUploaded << " " <<
-                            stats.TotalSizeUploaded<<"\n";
 
-                        mapCommandSocketInfo->mpConnectedSocket->Write(
-                            msg.str(), timeout);
+				if(GetConfiguration().KeyExists("StatsFile")) {
+					
+					// Add the content of the stats file
+					std::string statsFile = GetConfiguration().GetKeyValue("StatsFile");
 
-                    }
-                }
+					std::ifstream statsFileStream(statsFile.c_str());
+					std::string line;
+					while (std::getline(statsFileStream, line)) {
+						mapCommandSocketInfo->mpConnectedSocket->Write(line.append("\n"), timeout);
+						
+					}
+
+
+					// Then the current operation if not finished (not written in the stats file)
+					if(mCurrentOperationStats.isRunning()) {
+						mapCommandSocketInfo->mpConnectedSocket->Write(mCurrentOperationStats.ToJson().append("\n"), timeout);
+					}
+
+
+				} else {
+
+					// just output our current operation stats
+					mapCommandSocketInfo->mpConnectedSocket->Write(mCurrentOperationStats.ToJson().append("\n"), timeout);
+				}
 
 
             }
