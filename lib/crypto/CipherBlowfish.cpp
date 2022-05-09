@@ -236,32 +236,6 @@ const EVP_CIPHER *CipherBlowfish::GetCipher() const
 #endif
 
 
-	switch(mMode)
-	{
-	case CipherDescription::Mode_ECB:
-		return EVP_bf_ecb();
-		break;
-	
-	case CipherDescription::Mode_CBC:
-	
-
-	      return EVP_CIPHER_fetch(ossl_ctx, "BF-CBC", NULL);
-		return EVP_bf_cbc();
-
-		break;
-	
-	case CipherDescription::Mode_CFB:
-		return EVP_bf_cfb();
-		break;
-	
-	case CipherDescription::Mode_OFB:
-		return EVP_bf_ofb();
-		break;
-	
-	default:
-		break;
-	}
-
 	// Unknown!
 	THROW_EXCEPTION(CipherException, UnknownCipherMode)
 }
