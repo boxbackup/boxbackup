@@ -2159,16 +2159,15 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 
 
 	// write some stats
-	if(mrConfiguration.KeyExists("StatsFile")) {
+	if(mrConfiguration.KeyExists("OperationHistoryFile")) {
 		// write mStats to file
 
-		std::string statsFile = mrConfiguration.GetKeyValue("StatsFile");
+		std::string statsFile = mrConfiguration.GetKeyValue("OperationHistoryFile");
 
 		// create the directory tree for the stats file
 		std::string statsDir = statsFile.substr(0, statsFile.find_last_of("/"));
 		CreatePath(statsDir);
 		
-
 		std::ofstream statsStream(statsFile.c_str(), std::ios_base::out | std::ios_base::app);
 
 		if (statsStream.is_open())

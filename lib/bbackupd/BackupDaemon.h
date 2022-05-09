@@ -14,6 +14,7 @@
 #include <string>
 #include <memory>
 #include <fstream>
+#include <iostream>
 
 #include "BackupClientContext.h"
 #include "BackupClientDirectoryRecord.h"
@@ -76,6 +77,9 @@ private:
 	BackupDaemon(const BackupDaemon &);
 
     class SyncStats  {
+
+		
+
 		public:
 			int state;
 			box_time_t startTime;
@@ -132,9 +136,9 @@ private:
     void setEndSync(SysadminNotifier::EventCode state) {
         mCurrentOperationStats.setEnd(state);
 
-		if(GetConfiguration().KeyExists("StatsFile")) {
+		if(GetConfiguration().KeyExists("OperationHistoryFile")) {
 	
-			std::string statsFile = GetConfiguration().GetKeyValue("StatsFile");
+			std::string statsFile = GetConfiguration().GetKeyValue("OperationHistoryFile");
 
 			// create the directory tree for the stats file
 			std::string statsDir = statsFile.substr(0, statsFile.find_last_of("/"));
@@ -148,6 +152,8 @@ private:
 				
 			}
 			statsStream.close();
+
+	
 		}
 
 		// reset

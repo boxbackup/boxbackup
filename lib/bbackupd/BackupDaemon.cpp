@@ -2251,10 +2251,10 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
             {
                 sendResponse = false;
 
-				if(GetConfiguration().KeyExists("StatsFile")) {
+				if(GetConfiguration().KeyExists("OperationHistoryFile")) {
 					
 					// Add the content of the stats file
-					std::string statsFile = GetConfiguration().GetKeyValue("StatsFile");
+					std::string statsFile = GetConfiguration().GetKeyValue("OperationHistoryFile");
 
 					std::ifstream statsFileStream(statsFile.c_str());
 					std::string line;
@@ -2262,7 +2262,6 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						mapCommandSocketInfo->mpConnectedSocket->Write(line.append("\n"), timeout);
 						
 					}
-
 
 					// Then the current operation if not finished (not written in the stats file)
 					if(mCurrentOperationStats.isRunning()) {
