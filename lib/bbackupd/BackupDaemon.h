@@ -90,13 +90,14 @@ private:
 
 			std::string ToJson() const {
 				std::stringstream ss;
-				ss << "{ \"backup\": { \"status\": "<< this->state 
+				ss << "{ \"operation\": \"backup\""
+					<< ", \"status\": "<< this->state 
 					<< ", \"start\": " << this->startTime 
 					<< ", \"end\": " << this->endTime 
 					<< ", \"size\": " << this->TotalSizeUploaded 
 					<< ", \"files\": " << this->NumFilesUploaded 
 					<< ", \"dirs_created\": " << this->NumDirsCreated 
-					<< "}}";
+					<< "}";
 				return ss.str();
 			}
 

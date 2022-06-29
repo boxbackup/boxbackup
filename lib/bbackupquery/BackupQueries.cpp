@@ -2172,7 +2172,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 
 		if (statsStream.is_open())
 		{
-				statsStream << "{ \"restore\": { \"status\": "<< result 
+				statsStream << "{ \"operation\": \"restore\""
+					<< ", \"status\": "<< result 
 					<< ", \"start\": " << infos.startTime 
 					<< ", \"end\": " << infos.endTime 
 					<< ", \"dirs\": " << infos.totalDirsRestored 
@@ -2180,7 +2181,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 					<< ", \"size\": " << infos.totalBytesRestored
 					<< ", \"warnings\": "<< infos.totalWarnings
 					<< ", \"skipped\": " << infos.totalFilesSkipped 
-					<< "}}"<< std::endl;
+					<< "}"<< std::endl;
 			
 		}
 		statsStream.close();
