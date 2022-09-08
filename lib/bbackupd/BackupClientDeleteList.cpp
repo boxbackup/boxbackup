@@ -138,7 +138,7 @@ void BackupClientDeleteList::PerformDeletions(BackupClientContext &rContext)
 	for(std::vector<DirToDelete>::iterator i(mDirectoryList.begin());
 		i != mDirectoryList.end(); ++i)
 	{
-		connection.QueryDeleteDirectory(i->mObjectID, false);
+		connection.QueryDeleteDirectory(i->mObjectID);
 		rContext.GetProgressNotifier().NotifyDirectoryDeleted(
 			i->mObjectID, i->mLocalPath);
 	}
@@ -150,7 +150,7 @@ void BackupClientDeleteList::PerformDeletions(BackupClientContext &rContext)
 	for(std::vector<FileToDelete>::iterator i(mFileList.begin());
 		i != mFileList.end(); ++i)
 	{
-		connection.QueryDeleteFile(i->mDirectoryID, i->mFilename, false);
+		connection.QueryDeleteFile(i->mDirectoryID, i->mFilename);
 		rContext.GetProgressNotifier().NotifyFileDeleted(
 			i->mDirectoryID, i->mLocalPath);
 	}

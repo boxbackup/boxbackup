@@ -2447,14 +2447,27 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	try
 	{
 		// Delete object
-		if(flagsOut & BackupProtocolListDirectory::Flags_File)
-		{
-			mrConnection.QueryDeleteFile(parentId, fn, removeASAP);
+		if ( removeASAP ) {
+			if(flagsOut & BackupProtocolListDirectory::Flags_File)
+			{
+				mrConnection.QueryDeleteFileASAP(parentId, fn);
+			}
+			else
+			{
+				mrConnection.QueryDeleteDirectoryASAP(fileId);
+			}
+		} else {
+			if(flagsOut & BackupProtocolListDirectory::Flags_File)
+			{
+				mrConnection.QueryDeleteFile(parentId, fn);
+			}
+			else
+			{
+				mrConnection.QueryDeleteDirectory(fileId);
+			}
 		}
-		else
-		{
-			mrConnection.QueryDeleteDirectory(fileId, removeASAP);
-		}
+		
+		
 	}
 	catch (BoxException &e)
 	{

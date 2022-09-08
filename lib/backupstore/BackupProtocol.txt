@@ -159,12 +159,15 @@ ChangeDirAttributes	22	Command(Success)	StreamWithCommand
 
 DeleteDirectory	23	Command(Success)
 	int64		ObjectID
-	bool        RemoveASAP
 
 
 UndeleteDirectory	24	Command(Success)
 	int64		ObjectID
 	# may not have exactly the desired effect if files within in have been deleted before the directory was deleted.
+
+
+DeleteDirectoryASAP	25	Command(Success)
+	int64		ObjectID
 
 
 # -------------------------------------------------------------------------------------
@@ -198,7 +201,6 @@ SetReplacementFileAttributes	32	Command(Success)	StreamWithCommand
 DeleteFile	33	Command(Success)
 	int64		InDirectory
 	Filename	Filename
-	bool        RemoveASAP
 	# will return 0 if the object couldn't be found in the specified directory
 
 
@@ -220,6 +222,12 @@ GetBlockIndexByName	35	Command(Success)
 UndeleteFile	36	Command(Success)
 	int64		InDirectory
 	int64		ObjectID
+	# will return 0 if the object couldn't be found in the specified directory
+
+
+DeleteFileASAP	37	Command(Success)
+	int64		InDirectory
+	Filename	Filename
 	# will return 0 if the object couldn't be found in the specified directory
 
 

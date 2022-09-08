@@ -3309,7 +3309,7 @@ void BackupDaemon::DeleteUnusedRootDirEntries(BackupClientContext &rContext)
 		i(mUnusedRootDirEntries.begin());
 		i != mUnusedRootDirEntries.end(); ++i)
 	{
-		connection.QueryDeleteDirectory(i->first, false);
+		connection.QueryDeleteDirectory(i->first);
 		rContext.GetProgressNotifier().NotifyFileDeleted(
 			i->first, i->second);
 	}

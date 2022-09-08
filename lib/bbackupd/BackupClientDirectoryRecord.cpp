@@ -1305,7 +1305,7 @@ bool BackupClientDirectoryRecord::UpdateItems(
 			// Entry exists, but is not a directory. Bad.
 			// Get rid of it.
 			BackupProtocolCallable &connection(rContext.GetConnection());
-			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename, false);
+			connection.QueryDeleteFile(mObjectID /* in directory */, storeFilename);
 
 			std::string filenameClear = DecryptFilename(en,
 				rRemotePath);
@@ -1758,7 +1758,7 @@ void BackupClientDirectoryRecord::RemoveDirectoryInPlaceOfFile(
 {
 	// First, delete the directory
 	BackupProtocolCallable &connection(rParams.mrContext.GetConnection());
-	connection.QueryDeleteDirectory(pEntry->GetObjectID(), false);
+	connection.QueryDeleteDirectory(pEntry->GetObjectID());
 
 	BackupStoreFilenameClear clear(pEntry->GetName());
 	rParams.mrContext.GetProgressNotifier().NotifyDirectoryDeleted(
