@@ -2256,18 +2256,42 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 					// Add the content of the stats file
 					std::string statsFile = GetConfiguration().GetKeyValue("OperationHistoryFile");
 
-					std::ifstream statsFileStream(statsFile.c_str());
-					std::string line;
-					while (std::getline(statsFileStream, line)) {
-						mapCommandSocketInfo->mpConnectedSocket->Write(line.append("\n"), timeout);
-						
-					}
-
 					// Then the current operation if not finished (not written in the stats file)
 					if(mCurrentOperationStats.isRunning()) {
 						mapCommandSocketInfo->mpConnectedSocket->Write(mCurrentOperationStats.ToJson().append("\n"), timeout);
 					}
 
+					// read the file line by line in reverse order
+					std::ifstream infile(statsFile);
+ 					std::string strLine;
+					char buf;
+					infile.seekg(0, std::ios::beg);
+					std::ifstream::pos_type posBeg = infile.tellg();
+					infile.seekg(-1, std::ios::end);
+					while (infile.tellg() != posBeg)
+					{
+						buf = static_cast <char>(infile.peek());
+						if (buf != '\n')
+						{
+							strLine += buf;
+						}
+						else
+						{
+							std::reverse(strLine.begin(), strLine.end());
+							mapCommandSocketInfo->mpConnectedSocket->Write(strLine.append("\n"), timeout);
+							strLine.clear();
+						}
+						infile.seekg(-1, std::ios::cur);
+					}
+					
+					strLine += static_cast <char>(infile.peek());
+					std::reverse(strLine.begin(), strLine.end());
+					mapCommandSocketInfo->mpConnectedSocket->Write(strLine.append("\n"), timeout);
+					
+					infile.close();
+					
+
+				
 
 				} else {
 
