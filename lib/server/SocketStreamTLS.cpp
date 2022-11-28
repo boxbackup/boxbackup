@@ -302,6 +302,12 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 	CheckForMissingTimeout(Timeout);
 	if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
 
+	// Make sure we always have a timeout set
+	// Deadlock may occur if we don't
+	if Timeout == IOStream::TimeOutInfinite {
+		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
+	}
+
 	// Make sure zero byte reads work as expected
 	if(NBytes == 0)
 	{
@@ -358,6 +364,13 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 {
     if(!mpSSL) {THROW_EXCEPTION(ServerException, TLSNoSSLObject)}
+
+
+	// Make sure we always have a timeout set
+	// Deadlock may occur if we don't
+	if Timeout == IOStream::TimeOutInfinite {
+		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
+	}
 
     // Make sure zero byte writes work as expected
     if(NBytes == 0)
