@@ -24,6 +24,7 @@
 
 #include "autogen_ConnectionException.h"
 #include "autogen_ServerException.h"
+#include "Protocol.h"
 #include "BoxTime.h"
 #include "CryptoUtils.h"
 #include "SocketStreamTLS.h"
