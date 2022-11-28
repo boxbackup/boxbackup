@@ -16,7 +16,7 @@ standard_build: &standard_build
 standard_gce_instance: &standard_gce_instance
   zone: europe-west2-c
   type: n1-standard-1  # 1 vCPU, 3.75GB mem
-  disk: 10
+  disk: 30  # FreeBSD image is 29GB, VM can't be smaller
   use_ssd: true
   #preemptible: $CIRRUS_BRANCH != "master"
 
@@ -63,7 +63,6 @@ freebsd_gce_instance: &freebsd_gce_instance
   platform: FreeBSD
   image_project: freebsd-org-cloud-dev
   # Need to use image_name for now: https://github.com/cirruslabs/cirrus-ci-docs/issues/422
-  disk: 30  # Image is 29GB, VM can't be smaller
 
 task:
   matrix:
