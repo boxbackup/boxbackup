@@ -770,7 +770,7 @@ void Protocol::SendStream(IOStream &rStream)
 		}
 	}
 	// Make sure everything is written
-	mapConn->WriteAllBuffered();
+	mapConn->WriteAllBuffered(GetTimeout());
 	
 }
 
