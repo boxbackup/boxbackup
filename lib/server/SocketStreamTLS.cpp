@@ -304,12 +304,6 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 		return 0;
 	}
 
-	// Make sure we always have a timeout set
-	// Deadlock may occur if we don't
-	if(Timeout == IOStream::TimeOutInfinite) {
-		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
-	}
-
 	while(true)
 	{
 		int r = ::SSL_read(mpSSL, pBuffer, NBytes);
@@ -366,12 +360,6 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 		return;
 	}
 
-	// Make sure we always have a timeout set
-	// Deadlock may occur if we don't
-	if(Timeout == IOStream::TimeOutInfinite) {
-		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
-	}
-
 	// from man SSL_write
 	//
 	// SSL_write() will only return with success, when the
@@ -396,24 +384,21 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 		case SSL_ERROR_ZERO_RETURN:
 			// Connection closed
 			MarkAsWriteClosed();
-			THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting)
+			THROW_EXCEPTION(ConnectionException, TLSClosedWhenWriting);
 			break;
 
 		case SSL_ERROR_WANT_READ:
 		case SSL_ERROR_WANT_WRITE:
-			// wait for the required data
+			// Wait until we can read or write the socket again, or timeout:
+			if(!WaitWhenRetryRequired(se, Timeout))
 			{
-			#ifndef BOX_RELEASE_BUILD
-				bool conditionmet =
-			#endif
-				WaitWhenRetryRequired(se, Timeout);
-				ASSERT(conditionmet);
+				THROW_EXCEPTION(ConnectionException, Protocol_Timeout);
 			}
 			break;
 		
 		default:
 			CryptoUtils::LogError("writing");
-			THROW_EXCEPTION(ConnectionException, TLSWriteFailed)
+			THROW_EXCEPTION(ConnectionException, TLSWriteFailed);
 			break;
 		}
 	}
