@@ -2339,7 +2339,7 @@ void BackupDaemon::SendSyncStartOrFinish(bool SendStart)
 	// by code, rather than the OS.
 	typedef struct
 	{
-		bool operator()(const std::string &s1, const std::string &s2)
+		bool operator()(const std::string &s1, const std::string &s2) const
 		{
 			if(s1.size() == s2.size())
 			{
