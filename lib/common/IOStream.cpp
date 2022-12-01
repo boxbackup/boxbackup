@@ -218,7 +218,7 @@ bool IOStream::CopyStreamTo(IOStream &rCopyTo, int Timeout, int BufferSize)
 		// Write some data
 		if(bytes != 0)
 		{
-			rCopyTo.Write(buffer, bytes);
+			rCopyTo.Write(buffer, bytes, Timeout);
 		}
 	}
 	
