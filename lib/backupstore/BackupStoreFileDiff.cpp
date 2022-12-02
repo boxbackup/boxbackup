@@ -422,8 +422,6 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 				foundSizes[pIndex[b].mSize] = 1;
 			}
 		}
-		
-		
 	}
 	
 	// Make the block sizes
@@ -465,7 +463,6 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 		}
 	}
 #endif
-
 }
 
 
@@ -572,7 +569,6 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			int64_t fileBlockNumber = 0;
 			int64_t fileOffset = 0;
 			int rollOverInitialBytes = 0;
-
 			while(true)
 			{
 				if(maximumDiffingTime.HasExpired())
