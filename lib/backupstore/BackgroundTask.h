@@ -29,7 +29,7 @@ class BackgroundTask
 		Scanning_Dirs,
 		Searching_Blocks,
 		Uploading_Full,
-		Uploading_Patch
+		Uploading_Patch,
 	};
 	virtual ~BackgroundTask() { }
 	virtual bool RunBackgroundTask(State state, uint64_t progress,
