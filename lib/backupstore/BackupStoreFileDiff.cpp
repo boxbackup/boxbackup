@@ -27,6 +27,7 @@
 #include "BackupStoreFileEncodeStream.h"
 #include "BackupStoreFileWire.h"
 #include "BackupStoreObjectMagic.h"
+#include "BackgroundTask.h"
 #include "CommonException.h"
 #include "FileStream.h"
 #include "MD5Digest.h"
@@ -51,7 +52,8 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 static void SearchForMatchingBlocks(IOStream &rFile, 
 	std::map<int64_t, int64_t> &rFoundBlocks, BlocksAvailableEntry *pIndex, 
 	int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES],
-	DiffTimer *pDiffTimer);
+	DiffTimer *pDiffTimer, 
+	BackgroundTask* pBackgroundTask);
 static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t BlockSize, BlocksAvailableEntry **pHashTable);
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
 BlocksAvailableEntry *pIndex, std::map<int64_t, int64_t> &rFoundBlocks);
@@ -197,7 +199,7 @@ std::auto_ptr<BackupStoreFileEncodeStream> BackupStoreFile::EncodeFileDiff
 				sizeOfInputFile = file.BytesLeftToRead();
 				// Find all those lovely matching blocks
 				SearchForMatchingBlocks(file, foundBlocks, pindex, 
-					blocksInIndex, sizesToScan, pDiffTimer);
+					blocksInIndex, sizesToScan, pDiffTimer, pBackgroundTask);
 				
 				// Is it completely different?
 				completelyDifferent = (foundBlocks.size() == 0);
@@ -391,7 +393,6 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 {
 	// Array for lengths
 	int64_t sizeCounts[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES];
-
 	// Set arrays to lots of zeros (= unused entries)
 	for(int l = 0; l < BACKUP_FILE_DIFF_MAX_BLOCK_SIZES; ++l)
 	{
@@ -421,6 +422,8 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 				foundSizes[pIndex[b].mSize] = 1;
 			}
 		}
+		
+		
 	}
 	
 	// Make the block sizes
@@ -462,6 +465,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 		}
 	}
 #endif
+
 }
 
 
@@ -476,7 +480,8 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 // --------------------------------------------------------------------------
 static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> &rFoundBlocks,
 	BlocksAvailableEntry *pIndex, int64_t NumBlocks, 
-	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer)
+	int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES], DiffTimer *pDiffTimer,
+	BackgroundTask* pBackgroundTask)
 {
 	Timer maximumDiffingTime(0, "MaximumDiffingTime");
 
@@ -567,6 +572,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 			int64_t fileBlockNumber = 0;
 			int64_t fileOffset = 0;
 			int rollOverInitialBytes = 0;
+
 			while(true)
 			{
 				if(maximumDiffingTime.HasExpired())
@@ -578,6 +584,11 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					break;
 				}
 				
+				pBackgroundTask->RunBackgroundTask(
+					BackgroundTask::Searching_Blocks,
+					fileBlockNumber, 0);
+	
+
 				if(pDiffTimer)
 				{
 					pDiffTimer->DoKeepAlive();
@@ -726,7 +737,7 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 
 			if(abortSearch) break;
 		}
-		
+
 		// Free buffers and hash table
 		::free(pbuffer1);
 		pbuffer1 = 0;

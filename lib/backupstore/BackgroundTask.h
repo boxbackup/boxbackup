@@ -30,6 +30,7 @@ class BackgroundTask
 		Searching_Blocks,
 		Uploading_Full,
 		Uploading_Patch,
+		Preparing_Patch,
 	};
 	virtual ~BackgroundTask() { }
 	virtual bool RunBackgroundTask(State state, uint64_t progress,
