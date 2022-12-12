@@ -439,7 +439,7 @@ QueryCommandSpecification commands[] =
 		{CompleteGetFileOrId, CompleteLocalDir} },
 	{ "compare",	"alcqAEQ",	Command_Compare,
 		{CompleteCompareLocationOrRemoteDir, CompleteCompareNoneOrLocalDir} },
-	{ "restore",	"drif",		Command_Restore,
+	{ "restore",	"darif",		Command_Restore,
 		{CompleteRestoreRemoteDirOrId, CompleteLocalDir} },
 	{ "help",	"",		Command_Help,	{} },
 	{ "usage",	"m",		Command_Usage,	{} },

@@ -193,6 +193,7 @@ typedef struct
 {
 	bool PrintDots;
 	bool RestoreDeleted;
+	bool RestoreAny;	// restore deleted and non-deleted
 	bool ContinueAfterErrors;
 	bool ContinuedAfterError;
 	std::string mRestoreResumeInfoFilename;
@@ -200,7 +201,7 @@ typedef struct
 } RestoreParams;
 
 
-
+#include <iostream>
 // --------------------------------------------------------------------------
 //
 // Function
@@ -447,7 +448,7 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 	rConnection.QueryListDirectory(
 		DirectoryID,
 		Params.RestoreDeleted?(BackupProtocolListDirectory::Flags_Deleted):(BackupProtocolListDirectory::Flags_INCLUDE_EVERYTHING),
-		BackupProtocolListDirectory::Flags_OldVersion | (Params.RestoreDeleted?(0):(BackupProtocolListDirectory::Flags_Deleted)),
+		BackupProtocolListDirectory::Flags_OldVersion  | (Params.RestoreAny || Params.RestoreDeleted?(0):(BackupProtocolListDirectory::Flags_Deleted)),
 		true /* want attributes */);
 
 	// Retrieve the directory from the stream following
@@ -514,11 +515,11 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					DIRECTORY_SEPARATOR_ASCHAR +
 					nm.GetClearFilename());
 				
+				std::cout << "Restoring file '" << localFilename << "'..." << std::endl;
 				// Unlink anything which already exists:
 				// For resuming restores, we can't overwrite
 				// files already there.
-				if(ObjectExists(localFilename)
-					!= ObjectExists_NoObject &&
+				if(	ObjectExists(localFilename) != ObjectExists_NoObject &&
 					EMU_UNLINK(localFilename.c_str()) != 0)
 				{
 					BOX_LOG_SYS_ERROR("Failed to delete "
@@ -869,14 +870,15 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 int BackupClientRestore(BackupProtocolCallable &rConnection,
 	int64_t DirectoryID, const std::string& RemoteDirectoryName,
 	const std::string& LocalDirectoryName, bool PrintDots, bool RestoreDeleted,
-	bool UndeleteAfterRestoreDeleted, bool Resume,
-	bool ContinueAfterErrors,
+	bool RestoreAny, bool UndeleteAfterRestoreDeleted, 
+	bool Resume, bool ContinueAfterErrors,
 	RestoreInfos &infos)
 {
 	// Parameter block
 	RestoreParams params;
 	params.PrintDots = PrintDots;
 	params.RestoreDeleted = RestoreDeleted;
+	params.RestoreAny = RestoreAny;
 	params.ContinueAfterErrors = ContinueAfterErrors;
 	params.ContinuedAfterError = false;
 	params.mRestoreResumeInfoFilename = LocalDirectoryName;

@@ -123,7 +123,7 @@ compare <store-dir-name> <local-dir-name>
 	This can be used for automated tests.
 <
 
-> restore [-drif] <directory-name> [<local-directory-name>]
+> restore [-darif] <directory-name> [<local-directory-name>]
 
 	Restores a directory to the local disc. The local directory specified
 	must not exist (unless a previous restore is being restarted). If the
@@ -134,6 +134,7 @@ compare <store-dir-name> <local-dir-name>
 	The root cannot be restored -- restore locations individually.
 
 	-d -- restore a deleted directory or deleted files inside
+	-a -- restore both deleted and not-deleted files or directory
 	-r -- resume an interrupted restoration
 	-i -- directory name is actually an ID
 	-f -- force restore to continue if errors are encountered

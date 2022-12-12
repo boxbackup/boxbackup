@@ -2013,7 +2013,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	// Check arguments
 	if(args.size() < 1 || args.size() > 2)
 	{
-		BOX_ERROR("Incorrect usage. restore [-drif] <remote-name> "
+		BOX_ERROR("Incorrect usage. restore [-darif] <remote-name> "
 			"[<local-name>]");
 		return;
 	}
@@ -2096,6 +2096,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		result = BackupClientRestore(mrConnection, dirID, 
 			storeDirEncoded.c_str(), localName.c_str(), 
 			true /* print progress dots */, restoreDeleted, 
+			opts['a'] /* restore any deleted or not-deleted */,
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
 			opts['f'] /* force continue after errors */,
