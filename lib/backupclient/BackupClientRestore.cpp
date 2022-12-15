@@ -515,7 +515,6 @@ static int BackupClientRestoreDir(BackupProtocolCallable &rConnection,
 					DIRECTORY_SEPARATOR_ASCHAR +
 					nm.GetClearFilename());
 				
-				std::cout << "Restoring file '" << localFilename << "'..." << std::endl;
 				// Unlink anything which already exists:
 				// For resuming restores, we can't overwrite
 				// files already there.
