@@ -326,8 +326,12 @@ bool SocketStream::Poll(short Events, int Timeout)
 		return false;
 
 	default:
-		// good to go!
-		return true;
+		if(p.revents & POLLIN || p.revents & POLLOUT) {
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 }
 
