@@ -81,6 +81,8 @@ private:
 		
 
 		public:
+			SyncStats(): state(0), startTime(0), endTime(0), TotalSizeUploaded(0), NumFilesUploaded(0), NumDirsCreated(0) {}
+
 			int state;
 			box_time_t startTime;
 			box_time_t endTime;
@@ -90,14 +92,16 @@ private:
 
 			std::string ToJson() const {
 				std::stringstream ss;
-				ss << "{ \"operation\": \"backup\""
-					<< ", \"status\": "<< this->state 
-					<< ", \"start\": " << this->startTime 
-					<< ", \"end\": " << this->endTime 
-					<< ", \"size\": " << this->TotalSizeUploaded 
-					<< ", \"files\": " << this->NumFilesUploaded 
-					<< ", \"dirs_created\": " << this->NumDirsCreated 
-					<< "}";
+				if( startTime!=0 ) {
+					ss << "{ \"operation\": \"backup\""
+						<< ", \"status\": "<< this->state 
+						<< ", \"start\": " << this->startTime 
+						<< ", \"end\": " << this->endTime 
+						<< ", \"size\": " << this->TotalSizeUploaded 
+						<< ", \"files\": " << this->NumFilesUploaded 
+						<< ", \"dirs_created\": " << this->NumDirsCreated 
+						<< "}";
+				}
 				return ss.str();
 			}
 
