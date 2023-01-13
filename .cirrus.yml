@@ -79,10 +79,6 @@ task:
       gce_instance:
         <<: *freebsd_gce_instance
         image_family: freebsd-12-3
-    - name: FreeBSD 11.4 amd64
-      gce_instance:
-        <<: *freebsd_gce_instance
-        image_family: freebsd-11-4
 
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
