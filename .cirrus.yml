@@ -94,7 +94,7 @@ task:
     CPPFLAGS: -I/usr/local/opt/openssl/include
     LDFLAGS: -L/usr/local/opt/openssl/lib
   setup_script:
-    - brew install autoconf automake openssl readline
+    - brew install autoconf automake openssl@1.1 readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
     - export CPPFLAGS LDFLAGS
