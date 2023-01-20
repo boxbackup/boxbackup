@@ -579,11 +579,13 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					abortSearch = true;
 					break;
 				}
-				
-				pBackgroundTask->RunBackgroundTask(
-					BackgroundTask::Searching_Blocks,
-					fileBlockNumber, 0);
-	
+
+				if(pBackgroundTask)
+				{
+					pBackgroundTask->RunBackgroundTask(
+						BackgroundTask::Searching_Blocks,
+						fileBlockNumber, 0);
+				}
 
 				if(pDiffTimer)
 				{
