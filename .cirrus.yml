@@ -87,14 +87,14 @@ task:
   <<: *standard_build
 
 task:
-  name: MacOS Mojave
-  osx_instance:
-    image: mojave-xcode-10.2
+  name: MacOS Ventura
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
   env:
     CPPFLAGS: -I/usr/local/opt/openssl/include
     LDFLAGS: -L/usr/local/opt/openssl/lib
   setup_script:
-    - brew install autoconf automake openssl@1.1 readline
+    - brew install autoconf automake openssl readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
     - export CPPFLAGS LDFLAGS
