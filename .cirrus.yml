@@ -79,10 +79,6 @@ task:
       gce_instance:
         <<: *freebsd_gce_instance
         image_family: freebsd-12-3
-    - name: FreeBSD 11.4 amd64
-      gce_instance:
-        <<: *freebsd_gce_instance
-        image_family: freebsd-11-4
 
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
@@ -91,9 +87,9 @@ task:
   <<: *standard_build
 
 task:
-  name: MacOS Mojave
-  osx_instance:
-    image: mojave-xcode-10.2
+  name: MacOS Ventura
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
   env:
     CPPFLAGS: -I/usr/local/opt/openssl/include
     LDFLAGS: -L/usr/local/opt/openssl/lib
@@ -101,7 +97,8 @@ task:
     - brew install autoconf automake openssl readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
-    - export CPPFLAGS LDFLAGS
+    - export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
+    - export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
     - ./bootstrap
     - ./configure
   build_client_script:
