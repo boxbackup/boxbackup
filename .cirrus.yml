@@ -122,6 +122,11 @@ task:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1804-bionic-v20190617
+    - name: Ubuntu 22.10 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_name: ubuntu-2210-kinetic-amd64-v20230113
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
