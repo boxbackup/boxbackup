@@ -52,7 +52,7 @@ static void FindMostUsedSizes(BlocksAvailableEntry *pIndex, int64_t NumBlocks, i
 static void SearchForMatchingBlocks(IOStream &rFile, 
 	std::map<int64_t, int64_t> &rFoundBlocks, BlocksAvailableEntry *pIndex, 
 	int64_t NumBlocks, int32_t Sizes[BACKUP_FILE_DIFF_MAX_BLOCK_SIZES],
-	DiffTimer *pDiffTimer, 
+	DiffTimer *pDiffTimer,
 	BackgroundTask* pBackgroundTask);
 static void SetupHashTable(BlocksAvailableEntry *pIndex, int64_t NumBlocks, int32_t BlockSize, BlocksAvailableEntry **pHashTable);
 static bool SecondStageMatch(BlocksAvailableEntry *pFirstInHashList, RollingChecksum &fastSum, uint8_t *pBeginnings, uint8_t *pEndings, int Offset, int32_t BlockSize, int64_t FileBlockNumber,
@@ -579,11 +579,13 @@ static void SearchForMatchingBlocks(IOStream &rFile, std::map<int64_t, int64_t> 
 					abortSearch = true;
 					break;
 				}
-				
-				pBackgroundTask->RunBackgroundTask(
-					BackgroundTask::Searching_Blocks,
-					fileBlockNumber, 0);
-	
+
+				if(pBackgroundTask)
+				{
+					pBackgroundTask->RunBackgroundTask(
+						BackgroundTask::Searching_Blocks,
+						fileBlockNumber, 0);
+				}
 
 				if(pDiffTimer)
 				{
