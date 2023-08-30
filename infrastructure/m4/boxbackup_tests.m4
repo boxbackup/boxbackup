@@ -119,6 +119,8 @@ AX_PATH_BDB([1.x or 4.1], [
   )
   AX_SPLIT_VERSION([BDB_VERSION], [$BDB_VERSION])
 ])
+AX_CHECK_SYSTEMD(, [AC_MSG_ERROR([[Systemd is not installed but is required]])])
+AX_CHECK_PTHREAD(, [AC_MSG_ERROR([[Pthread is not installed but is required]])])
 
 # need to find libdl before trying to link openssl, apparently
 AC_SEARCH_LIBS([dlsym], [dl])

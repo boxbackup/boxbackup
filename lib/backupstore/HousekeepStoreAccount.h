@@ -14,6 +14,8 @@
 #include <set>
 #include <vector>
 
+#include "BackupStoreInfo.h"
+
 #include "BackupStoreRefCountDatabase.h"
 
 class BackupStoreDirectory;
@@ -36,18 +38,26 @@ class HousekeepingCallback
 class HousekeepStoreAccount
 {
 public:
+
+	typedef enum {
+		DefaultAction=0x0,
+		RemoveDeleted=0x1,
+		RemoveOldVersions=0x2,
+		DisableAutoClean=0x4,
+	}ActionFlags;
+
 	HousekeepStoreAccount(int AccountID, const std::string &rStoreRoot,
 		int StoreDiscSet, HousekeepingCallback* pHousekeepingCallback);
 	~HousekeepStoreAccount();
 	
-	bool DoHousekeeping(bool KeepTryingForever = false);
+	bool DoHousekeeping(int32_t flags=DefaultAction, bool KeepTryingForever = false);
 	int GetErrorCount() { return mErrorCount; }
 	
 private:
 	// utility functions
 	void MakeObjectFilename(int64_t ObjectID, std::string &rFilenameOut);
 
-	bool ScanDirectory(int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
+	bool ScanDirectory(int32_t flags, int64_t ObjectID, BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteFiles(BackupStoreInfo& rBackupStoreInfo);
 	bool DeleteEmptyDirectories(BackupStoreInfo& rBackupStoreInfo);
 	void DeleteEmptyDirectory(int64_t dirId, std::vector<int64_t>& rToExamine,

@@ -103,10 +103,20 @@ HousekeepStoreAccount::~HousekeepStoreAccount()
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
+bool HousekeepStoreAccount::DoHousekeeping(int32_t flags, bool KeepTryingForever)
 {
-	BOX_TRACE("Starting housekeeping on account " <<
+    BOX_INFO("Starting housekeeping on account " <<
 		BOX_FORMAT_ACCOUNT(mAccountID));
+
+	if ( (flags & HousekeepStoreAccount::RemoveDeleted) !=0 ) {
+		BOX_INFO("RemoveDeleted option activated.")
+	}
+	if ( (flags & HousekeepStoreAccount::RemoveOldVersions) !=0 ) {
+		BOX_INFO("RemoveOldVersions option activated.")
+	}
+	if ( (flags & HousekeepStoreAccount::DisableAutoClean) !=0 ) {
+		BOX_INFO("AutoClean option deactivated.")
+	}
 
 	// Attempt to lock the account
 	std::string writeLockFilename;
@@ -161,7 +171,7 @@ bool HousekeepStoreAccount::DoHousekeeping(bool KeepTryingForever)
 
 	// Scan the directory for potential things to delete
 	// This will also remove eligible items marked with RemoveASAP
-	bool continueHousekeeping = ScanDirectory(BACKUPSTORE_ROOT_DIRECTORY_ID,
+	bool continueHousekeeping = ScanDirectory(flags, BACKUPSTORE_ROOT_DIRECTORY_ID,
 		*info);
 
 	if(!continueHousekeeping)
@@ -325,7 +335,7 @@ void HousekeepStoreAccount::MakeObjectFilename(int64_t ObjectID, std::string &rF
 //		Created: 11/12/03
 //
 // --------------------------------------------------------------------------
-bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
+bool HousekeepStoreAccount::ScanDirectory(int32_t flags, int64_t ObjectID,
 	BackupStoreInfo& rBackupStoreInfo)
 {
 #ifndef WIN32
@@ -399,9 +409,20 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 			while((en = i.Next(BackupStoreDirectory::Entry::Flags_File)) != 0)
 			{
 				int16_t enFlags = en->GetFlags();
-				if((enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
-					&& (en->IsDeleted() || en->IsOld()))
+				if( ( (enFlags & BackupStoreDirectory::Entry::Flags_RemoveASAP) != 0
+						&& (en->IsDeleted() || en->IsOld())
+					)
+					|| ( (flags & HousekeepStoreAccount::RemoveDeleted) != 0 && en->IsDeleted() )
+					|| ( (flags & HousekeepStoreAccount::RemoveOldVersions) != 0 && en->IsOld() )
+					)
 				{
+
+					BOX_INFO("Going to remove Object " << BOX_FORMAT_OBJECTID(en->GetObjectID())
+							 << (en->IsDeleted() ? " (Deleted)" : "")
+							 << (en->IsOld() ? " (Old)" :"")
+							 );
+
+
 					// Delete this immediately.
 					DeleteFile(ObjectID, en->GetObjectID(), dir,
 						objectFilename, rBackupStoreInfo);
@@ -417,8 +438,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		} while(deletedSomething);
 	}
 
-	// BLOCK
-	{
+	if ( flags == HousekeepStoreAccount::DefaultAction ){
 		// Add files to the list of potential deletions
 
 		// map to count the distance from the mark
@@ -445,6 +465,7 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 				markVersionAges.find(
 					version_t(en->GetName().GetEncodedFilename(),
 						en->GetMarkNumber())));
+
 			if(enVersionAgeI != markVersionAges.end())
 			{
 				enVersionAge = enVersionAgeI->second + 1;
@@ -539,8 +560,8 @@ bool HousekeepStoreAccount::ScanDirectory(int64_t ObjectID,
 		while((en = i.Next(BackupStoreDirectory::Entry::Flags_Dir)) != 0)
 		{
 			ASSERT(en->IsDir());
-
-			if(!ScanDirectory(en->GetObjectID(), rBackupStoreInfo))
+			
+			if(!ScanDirectory(flags, en->GetObjectID(), rBackupStoreInfo))
 			{
 				// Halting operation
 				return false;

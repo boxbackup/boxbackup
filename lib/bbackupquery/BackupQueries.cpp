@@ -19,6 +19,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fstream>
 
 #ifdef HAVE_DIRENT_H
 	#include <dirent.h>
@@ -48,6 +49,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "PathUtils.h"
+#include "BoxTime.h"
 #include "SelfFlushingStream.h"
 #include "Utils.h"
 #include "autogen_BackupProtocol.h"
@@ -983,7 +985,7 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 	
 	// Open file
 	FileStream out(args[1].c_str(), O_WRONLY | O_CREAT | O_EXCL);
-	
+
 	// Request that object
 	try
 	{
@@ -992,11 +994,12 @@ void BackupQueries::CommandGetObject(const std::vector<std::string> &args, const
 
 		// Stream that object out to the file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
+        int64_t bytes=objectStream->BytesLeftToRead();
 		objectStream->CopyStreamTo(out);
 			
 		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(id) <<
-			" fetched successfully.");
-	}
+            " fetched successfully. ("<<bytes<<" B)");
+    }
 	catch(ConnectionException &e)
 	{
 		if(mrConnection.GetLastErrorType() == BackupProtocolError::Err_DoesNotExist)
@@ -1230,13 +1233,16 @@ void BackupQueries::CommandGet(std::vector<std::string> args, const bool *opts)
 
 		// Stream containing encoded file
 		std::auto_ptr<IOStream> objectStream(mrConnection.ReceiveStream());
-		
+
 		// Decode it
 		BackupStoreFile::DecodeFile(*objectStream, localName.c_str(), mrConnection.GetTimeout());
 
+        int64_t fileSize=0;
+        FileExists(localName.c_str(), &fileSize, true );
+
 		// Done.
-		BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(fileId) <<
-			" fetched successfully.");
+        BOX_INFO("Object ID " << BOX_FORMAT_OBJECTID(fileId) <<
+            " fetched successfully. ("<<fileSize<<" B)");
 	}
 	catch (BoxException &e)
 	{
@@ -2007,7 +2013,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	// Check arguments
 	if(args.size() < 1 || args.size() > 2)
 	{
-		BOX_ERROR("Incorrect usage. restore [-drif] <remote-name> "
+		BOX_ERROR("Incorrect usage. restore [-darif] <remote-name> "
 			"[<local-name>]");
 		return;
 	}
@@ -2080,8 +2086,8 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	}
 
 	// Go and restore...
+	RestoreInfos infos;
 	int result;
-
 	try
 	{
 		// At TRACE level, we print a line for each file and
@@ -2090,9 +2096,12 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		result = BackupClientRestore(mrConnection, dirID, 
 			storeDirEncoded.c_str(), localName.c_str(), 
 			true /* print progress dots */, restoreDeleted, 
+			opts['a'] /* restore any deleted or not-deleted */,
 			false /* don't undelete after restore! */, 
 			opts['r'] /* resume? */,
-			opts['f'] /* force continue after errors */);
+			opts['f'] /* force continue after errors */,
+			infos /* gather some infos */);
+		infos.endTime = GetCurrentBoxTime();
 	}
 	catch(std::exception &e)
 	{
@@ -2110,7 +2119,7 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 	switch(result)
 	{
 	case Restore_Complete:
-		BOX_INFO("Restore complete.");
+		BOX_INFO("Restore complete. ");
 		break;
 	
 	case Restore_CompleteWithErrors:
@@ -2147,6 +2156,52 @@ void BackupQueries::CommandRestore(const std::vector<std::string> &args, const b
 		SetReturnCode(ReturnCode::Command_Error);
 		break;
 	}
+
+
+
+	// write some stats
+	if(mrConfiguration.KeyExists("OperationHistoryFile")) {
+		// write mStats to file
+
+		std::string statsFile = mrConfiguration.GetKeyValue("OperationHistoryFile");
+
+		// create the directory tree for the stats file
+		std::string statsDir = statsFile.substr(0, statsFile.find_last_of("/"));
+		CreatePath(statsDir);
+		
+		std::ofstream statsStream(statsFile.c_str(), std::ios_base::out | std::ios_base::app);
+
+		if (statsStream.is_open())
+		{
+				statsStream << "{ \"operation\": \"restore\""
+					<< ", \"status\": "<< result 
+					<< ", \"start\": " << infos.startTime 
+					<< ", \"end\": " << infos.endTime 
+					<< ", \"dirs\": " << infos.totalDirsRestored 
+					<< ", \"files\": " << infos.totalFilesRestored
+					<< ", \"size\": " << infos.totalBytesRestored
+					<< ", \"warnings\": "<< infos.totalWarnings
+					<< ", \"skipped\": " << infos.totalFilesSkipped 
+					<< "}"<< std::endl;
+			
+		}
+		statsStream.close();
+	}
+
+	// print some stats from infos
+	BOX_INFO("Restore finished: "
+		<< "status: " << result << ", "
+		<< "start: " << infos.startTime << ", "
+		<< "end: " << infos.endTime << ", "
+		<< "dirs: " << infos.totalDirsRestored << ", "
+		<< "files: " << infos.totalFilesRestored << ", "
+		<< "size: " << infos.totalBytesRestored << " B, "
+		<< "warnings: "<< infos.totalWarnings << ", "
+		<< "skipped: " << infos.totalFilesSkipped 
+		);
+
+
+
 }
 
 
@@ -2346,9 +2401,9 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	}
 
 	// Check arguments
-	if(args.size() != 1)
+	if(args.size() < 1)
 	{
-		BOX_ERROR("Incorrect usage. delete <name>");
+		BOX_ERROR("Incorrect usage. delete <name> [now]");
 		return;
 	}
 
@@ -2359,6 +2414,17 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	const std::string& storeDirEncoded(args[0]);
 #endif
 
+	int16_t listFlags = BackupProtocolListDirectory::Flags_OldVersion |
+		BackupProtocolListDirectory::Flags_Deleted;
+	
+	bool removeASAP = false;
+	if(args.size() == 2) {
+		if(args[1] == "now" ) { // going to tag the Flags_RemoveASAP
+			removeASAP = true;
+			listFlags = BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING;
+		}
+	}
+
 	// Find object ID somehow
 	int64_t fileId, parentId;
 	std::string fileName;
@@ -2367,9 +2433,7 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	fileId = FindFileID(storeDirEncoded, opts, &parentId, &fileName,
 		/* include files and directories */
 		BackupProtocolListDirectory::Flags_EXCLUDE_NOTHING,
-		/* exclude old and deleted files */
-		BackupProtocolListDirectory::Flags_OldVersion |
-		BackupProtocolListDirectory::Flags_Deleted,
+		listFlags,
 		&flagsOut);
 
 	if (fileId == 0)
@@ -2384,14 +2448,27 @@ void BackupQueries::CommandDelete(const std::vector<std::string> &args,
 	try
 	{
 		// Delete object
-		if(flagsOut & BackupProtocolListDirectory::Flags_File)
-		{
-			mrConnection.QueryDeleteFile(parentId, fn);
+		if ( removeASAP ) {
+			if(flagsOut & BackupProtocolListDirectory::Flags_File)
+			{
+				mrConnection.QueryDeleteFileASAP(parentId, fn);
+			}
+			else
+			{
+				mrConnection.QueryDeleteDirectoryASAP(fileId);
+			}
+		} else {
+			if(flagsOut & BackupProtocolListDirectory::Flags_File)
+			{
+				mrConnection.QueryDeleteFile(parentId, fn);
+			}
+			else
+			{
+				mrConnection.QueryDeleteDirectory(fileId);
+			}
 		}
-		else
-		{
-			mrConnection.QueryDeleteDirectory(fileId);
-		}
+		
+		
 	}
 	catch (BoxException &e)
 	{

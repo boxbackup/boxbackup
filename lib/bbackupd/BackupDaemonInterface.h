@@ -35,10 +35,12 @@ class SysadminNotifier
 	{
 		StoreFull = 0,
 		ReadError,
-		BackupError,
+        BackupError,
 		BackupStart,
 		BackupFinish,
 		BackupOK,
+		BackupCanceled,
+		SyncAllowScriptError,
 		MAX
 		// When adding notifications, remember to add
 		// strings to NotifySysadmin()

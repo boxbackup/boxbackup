@@ -19,7 +19,6 @@
 #include "BoxTime.h"
 #include "IOStream.h"
 #include "Socket.h"
-
 #ifdef WIN32
 	typedef SOCKET tOSSocketHandle;
 	#define INVALID_SOCKET_VALUE (tOSSocketHandle)(-1)

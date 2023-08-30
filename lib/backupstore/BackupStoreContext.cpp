@@ -10,7 +10,7 @@
 #include "Box.h"
 
 #include <stdio.h>
-
+#include <iostream>
 #include "BackupConstants.h"
 #include "BackupStoreContext.h"
 #include "BackupStoreDirectory.h"
@@ -64,8 +64,7 @@ BackupStoreContext::BackupStoreContext(int32_t ClientID,
   mStoreDiscSet(-1),
   mReadOnly(true),
   mSaveStoreInfoDelay(STORE_INFO_SAVE_DELAY),
-  mpTestHook(NULL)
-// If you change the initialisers, be sure to update
+  mpTestHook(NULL)// If you change the initialisers, be sure to update
 // BackupStoreContext::ReceivedFinishCommand as well!
 {
 }
@@ -642,6 +641,9 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		adjustment.mBlocksInCurrentFiles += newObjectBlocksUsed;
 		adjustment.mNumCurrentFiles++;
 
+		mStatistics.mAddedFilesSize += newObjectBlocksUsed;
+		mStatistics.mAddedFilesCount++;
+
 		// Exceeds the hard limit?
 		int64_t newTotalBlocksUsed = mapStoreInfo->GetBlocksUsed() +
 			adjustment.mBlocksUsed;
@@ -706,27 +708,74 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 		{
 			BackupStoreDirectory::Iterator i(dir);
 			BackupStoreDirectory::Entry *e = 0;
+            std::list<BackupStoreDirectory::Entry*> oldEntries;
+
 			while((e = i.Next()) != 0)
 			{
 				// First, check it's not an old version (cheaper comparison)
-				if(! e->IsOld())
-				{
+                if(mapStoreInfo->GetVersionCountLimit()>0 || !e->IsOld())
+                {
 					// Compare name
+
 					if(e->GetName() == rFilename)
 					{
-						// Check that it's definately not an old version
-						ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0);
-						// Set old version flag
-						e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
-						// Can safely do this, because we know we won't be here if it's already 
-						// an old version
-						adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
-						adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
-						adjustment.mNumOldFiles++;
-						adjustment.mNumCurrentFiles--;
+                        if(! e->IsOld()) {
+                            // Check that it's definately not an old version
+                            ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_OldVersion) == 0);
+
+                            // Set old version flag
+                            e->AddFlags(BackupStoreDirectory::Entry::Flags_OldVersion);
+                            // Can safely do this, because we know we won't be here if it's already
+                            // an old version
+                            adjustment.mBlocksInOldFiles += e->GetSizeInBlocks();
+                            adjustment.mBlocksInCurrentFiles -= e->GetSizeInBlocks();
+                            adjustment.mNumOldFiles++;
+                            adjustment.mNumCurrentFiles--;
+						
+                        }
+
+                        oldEntries.push_back(e);
+
 					}
-				}
+                }
 			}
+
+            int versionsCount=0;
+            if ( mapStoreInfo->GetVersionCountLimit()>0 && !oldEntries.empty() ) {
+                //  we have a version limit, let's do some cleanup
+                BackupStoreDirectory::Entry *latestVersion=0;
+                for (std::list<BackupStoreDirectory::Entry*>::reverse_iterator it=oldEntries.rbegin(); it != oldEntries.rend(); ++it) {
+
+                    if ( ++versionsCount>mapStoreInfo->GetVersionCountLimit()-1 ) {
+                        int64_t objectID=(*it)->GetObjectID();
+                        dir.DeleteEntry(objectID);
+                        adjustment.mBlocksUsed -= (*it)->GetSizeInBlocks();
+                        adjustment.mBlocksInOldFiles -= (*it)->GetSizeInBlocks();
+                        adjustment.mNumOldFiles--;
+
+                        std::string objFilename;
+                        MakeObjectFilename(objectID, objFilename);
+
+
+                        mapRefCount->RemoveReference(objectID);
+
+                        BackupStoreRefCountDatabase::refcount_t refs=mapRefCount->GetRefCount(objectID);
+                        if ( refs==0 )
+                        {
+                            RaidFileWrite del(mStoreDiscSet, objFilename, refs);
+                            del.Delete();
+                        }
+
+                        if ( latestVersion ) {
+                            latestVersion->SetDependsOlder(0);
+                            latestVersion=0;
+                        }
+                    } else {
+                        latestVersion=(*it);
+                    }
+                }
+            }
+
 		}
 
 		// Then the new entry
@@ -812,7 +861,7 @@ int64_t BackupStoreContext::AddFile(IOStream &rFile, int64_t InDirectory,
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut)
+bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut, bool RemoveASAP)
 {
 	// Essential checks!
 	if(mapStoreInfo.get() == 0)
@@ -848,12 +897,20 @@ bool BackupStoreContext::DeleteFile(const BackupStoreFilename &rFilename, int64_
 				ASSERT(!e->IsDeleted());
 				// Set deleted flag
 				e->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				
+				if ( RemoveASAP ) {
+					e->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
+				} 
+				
 				// Mark as made a change
 				madeChanges = true;
 
 				int64_t blocks = e->GetSizeInBlocks();
 				mapStoreInfo->AdjustNumDeletedFiles(1);
 				mapStoreInfo->ChangeBlocksInDeletedFiles(blocks);
+
+				mStatistics.mDeletedFilesCount++;
+				mStatistics.mDeletedFilesSize += blocks;
 
 				// We're marking all old versions as deleted.
 				// This is how a file can be old and deleted
@@ -941,7 +998,7 @@ bool BackupStoreContext::UndeleteFile(int64_t ObjectID, int64_t InDirectory)
 				// Check that it's definitely already deleted
 				ASSERT((e->GetFlags() & BackupStoreDirectory::Entry::Flags_Deleted) != 0);
 				// Clear deleted flag
-				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+				e->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_RemoveASAP );
 				// Mark as made a change
 				madeChanges = true;
 				blocksDel -= e->GetSizeInBlocks();
@@ -1212,6 +1269,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 
 	// Save the store info (may not be postponed)
 	mapStoreInfo->AdjustNumDirectories(1);
+	mStatistics.mAddedDirectoriesCount ++;
 	SaveStoreInfo(false);
 
 	// tell caller what the ID was
@@ -1227,7 +1285,7 @@ int64_t BackupStoreContext::AddDirectory(int64_t InDirectory,
 //		Created: 2003/10/21
 //
 // --------------------------------------------------------------------------
-void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
+void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete, bool RemoveASAP)
 {
 	// Essential checks!
 	if(mapStoreInfo.get() == 0)
@@ -1271,11 +1329,15 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 				// This is the one to delete
 				if(Undelete)
 				{
-					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					en->RemoveFlags(BackupStoreDirectory::Entry::Flags_Deleted | BackupStoreDirectory::Entry::Flags_RemoveASAP);
 				}
 				else
 				{
 					en->AddFlags(BackupStoreDirectory::Entry::Flags_Deleted);
+					if ( RemoveASAP ) {
+						en->AddFlags(BackupStoreDirectory::Entry::Flags_RemoveASAP);
+					}
+
 				}
 
 				// Save it
@@ -1288,6 +1350,8 @@ void BackupStoreContext::DeleteDirectory(int64_t ObjectID, bool Undelete)
 
 		// Update blocks deleted count
 		SaveStoreInfo(false);
+			mStatistics.mDeletedDirectoriesCount ++;
+
 	}
 	catch(...)
 	{

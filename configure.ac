@@ -137,6 +137,7 @@ to the documentation for more information on each feature.
 Regular expressions: $have_regex_support
 Large files:         $box_cv_have_large_file_support
 Berkeley DB:         $ax_path_bdb_ok
+Systemd:             $ax_check_systemd_found
 Readline:            $have_libreadline
 Extended attributes: $ac_cv_header_sys_xattr_h
 Debugger:            ${with_debugger:-neither GDB nor LLDB detected!}

@@ -25,7 +25,7 @@
 #include "Socket.h"
 #include "SocketStream.h"
 #include "IOStreamGetLine.h"
-
+#include <signal.h>
 #ifdef WIN32
 	#include "WinNamedPipeStream.h"
 #endif
@@ -37,7 +37,8 @@ enum Command
 	Default,
 	WaitForSyncStart,
 	WaitForSyncEnd,
-	SyncAndWaitForEnd,
+    SyncAndWaitForEnd,
+    GetStats,
 	NoCommand,
 };
 
@@ -50,12 +51,14 @@ void PrintUsageAndExit(int ret)
 	Logging::OptionParser::GetUsageString() <<
 	"\n"
 	"Commands are:\n"
-	"  status -- report daemon status without changing anything\n"
-	"  sync -- start a synchronisation (backup) run now\n"
+    "  status -- report daemon status without changing anything\n"
+    "  get-stats -- get some statistics about daemon activity\n"
+    "  sync -- start a synchronisation (backup) run now\n"
 	"  force-sync -- force the start of a synchronisation run, "
 	"even if SyncAllowScript says no\n"
 	"  reload -- reload daemon configuration\n"
 	"  terminate -- terminate daemon now\n"
+    "  stop-sync -- cancel the sync now\n"
 	"  wait-for-sync -- wait until the next sync starts, then exit\n"
 	"  wait-for-end  -- wait until the next sync finishes, then exit\n"
 	"  sync-and-wait -- start sync, wait until it finishes, then exit\n"
@@ -70,9 +73,12 @@ int main(int argc, const char *argv[])
 	MAINHELPER_SETUP_MEMORY_LEAK_EXIT_REPORT("bbackupctl.memleaks", 
 		"bbackupctl")
 
-	MAINHELPER_START
+    MAINHELPER_START
 
 	Logging::SetProgramName("bbackupctl");
+    Logging::ToConsole(true);
+	//Logging::ToSyslog (false);
+
 
 	// Filename for configuration file?
 	std::string configFilename = BOX_GET_DEFAULT_BBACKUPD_CONFIG_FILE;
@@ -205,6 +211,8 @@ int main(int argc, const char *argv[])
 		"  MinimumFileAge = " << minimumFileAge << " seconds\n"
 		"  MaxUploadWait = " << maxUploadWait << " seconds");
 
+
+
 	std::string stateLine;
 	if(!getLine.GetLine(stateLine, false, PROTOCOL_DEFAULT_TIMEOUT) || getLine.IsEOF())
 	{
@@ -214,7 +222,7 @@ int main(int argc, const char *argv[])
 
 	// Decode it
 	int currentState;
-	if(::sscanf(stateLine.c_str(), "state %d", &currentState) != 1)
+    if(::sscanf(stateLine.c_str(), "state: %d", &currentState) != 1)
 	{
 		BOX_ERROR("Received invalid state line from daemon");
 		return 1;
@@ -222,6 +230,7 @@ int main(int argc, const char *argv[])
 
 	BOX_TRACE("Current state: " <<
 		BackupDaemon::GetStateName(currentState));
+
 
 	Command command = Default;
 	std::string commandName(argv[0]);
@@ -241,9 +250,11 @@ int main(int argc, const char *argv[])
 	else if(commandName == "status")
 	{
 		BOX_NOTICE("state " <<
-			BackupDaemon::GetStateName(currentState));
-		command = NoCommand;
-	}
+            BackupDaemon::GetStateName(currentState));
+        command = NoCommand;
+	} else if(commandName == "get-stats") {
+		command=GetStats;
+    }
 
 	switch(command)
 	{
@@ -276,7 +287,9 @@ int main(int argc, const char *argv[])
 					"to finish...");
 			}
 		}
-		break;
+        break;
+
+
 
 		default:
 		{
@@ -304,7 +317,6 @@ int main(int argc, const char *argv[])
 	while(command != NoCommand && !finished && !getLine.IsEOF() &&
 		getLine.GetLine(line, false, PROTOCOL_DEFAULT_TIMEOUT))
 	{
-		BOX_TRACE("Received line: " << line);
 
 		if(line.substr(0, 6) == "state ")
 		{
@@ -357,7 +369,35 @@ int main(int argc, const char *argv[])
 					// daemon must still be busy
 				}
 			}
-			break;
+            break;
+
+            case GetStats:
+            {
+				if(line[0] == '{')
+				{
+					// We've got some stats
+					std::cout << line << std::endl;
+				}
+                 // Decode line
+                // static int statsCount=0;
+                // int statsState;
+                // box_time_t statsStartTime, statsEndTime;
+                // uint64_t statsFileCount, statsSizeUploaded;
+                // if(::sscanf(line.c_str(), "%d %lu %lu %lu %lu", &statsState, &statsStartTime,
+                //             &statsEndTime, &statsFileCount, &statsSizeUploaded) == 5)
+                // {
+                //     BOX_NOTICE("#" << ++statsCount
+                //                <<" "<<statsState
+                //                <<" "<<statsStartTime
+                //                <<" "<<statsEndTime
+                //                <<" "<<statsFileCount
+                //                <<" "<<statsSizeUploaded);
+                // }
+
+            }
+            break;
+
+
 
 			default:
 			{
@@ -381,14 +421,14 @@ int main(int argc, const char *argv[])
 		}
 	}
 
-	// Send a quit command to finish nicely
-	connection.Write("quit\n", 5, PROTOCOL_DEFAULT_TIMEOUT);
 
+    // Send a quit command to finish nicely
+    //connection.Write("quit\n", 5, PROTOCOL_DEFAULT_TIMEOUT);
 	MAINHELPER_END
 
-#if defined WIN32 && ! defined BOX_RELEASE_BUILD
+
+        #if defined WIN32 && ! defined BOX_RELEASE_BUILD
 	closelog();
 #endif
-	
 	return returnCode;
 }

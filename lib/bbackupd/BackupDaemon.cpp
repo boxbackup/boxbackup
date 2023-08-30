@@ -230,9 +230,8 @@ BackupDaemon::BackupDaemon()
 	  mUpdateStoreInterval(0),
 	  mDeleteStoreObjectInfoFile(false),
 	  mDoSyncForcedByPreviousSyncError(false),
-	  mNumFilesUploaded(-1),
-	  mNumDirsCreated(-1),
 	  mMaxBandwidthFromSyncAllowScript(0),
+      mStatsHistoryLength(1),
 	  mLogAllFileAccess(false),
 	  mpProgressNotifier(this),
 	  mpLocationResolver(this),
@@ -509,7 +508,7 @@ void BackupDaemon::Run()
 {
 	// initialise global timer mechanism
 	Timers::Init();
-	
+
 	mapCommandSocketPollTimer.reset(new Timer(COMMAND_SOCKET_POLL_INTERVAL,
 		"CommandSocketPollTimer"));
 
@@ -598,6 +597,8 @@ void BackupDaemon::InitCrypto()
 void BackupDaemon::Run2()
 {
 	InitCrypto();
+
+
 
 	const Configuration &conf(GetConfiguration());
 
@@ -737,6 +738,7 @@ void BackupDaemon::Run2()
 		// logged something at INFO level or higher to explain why.
 
 		// Use a script to see if sync is allowed now?
+		bool do_backup = true;
 		if(mDoSyncForcedByCommand)
 		{
 			BOX_INFO("Skipping SyncAllowScript due to bbackupctl "
@@ -755,6 +757,22 @@ void BackupDaemon::Run2()
 					"scheduled for " <<
 					FormatTime(mNextSyncTime, false));
 				continue;
+			} else if (d==-1) {
+				// script asks the backup to not be started
+				BOX_INFO("SyncAllowScript returned an error "
+				"skipping backup");
+
+				// notify, record and reset stats...
+				SysadminNotifier::EventCode status = SysadminNotifier::SyncAllowScriptError;
+				    
+				setStartSync(SysadminNotifier::BackupStart);
+				setEndSync(status);
+				NotifySysadmin(status);
+				SendSyncStartOrFinish(false);
+				TouchFileInWorkingDir("last_sync_finish");
+				SetState(State_Idle);
+
+				break;
 			}
 		}
 
@@ -808,7 +826,7 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 
 	// Is it a berkely db failure?
 	bool isBerkelyDbFailure = false;
-
+    SysadminNotifier::EventCode status=SysadminNotifier::BackupOK;
 	// Notify system administrator about the final state of the backup
 	if(errorOccurred)
 	{
@@ -825,17 +843,20 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 		}
 
 		ResetCachedState();
+        status=SysadminNotifier::BackupError;
 
 		// Handle restart?
 		if(StopRun())
 		{
 			BOX_NOTICE("Exception (" << errorCode << "/" <<
 				errorSubCode << ") due to signal");
-			OnBackupFinish();
+			if ( IsCancelSyncWanted() ) {
+				status=SysadminNotifier::BackupCanceled;
+			}
+            OnBackupFinish(status);
 			return mapClientContext; // releases mapClientContext
 		}
-
-		NotifySysadmin(SysadminNotifier::BackupError);
+        NotifySysadmin(status);
 
 		// If the Berkely db files get corrupted,
 		// delete them and try again immediately.
@@ -851,7 +872,8 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 		{
 			// Not restart/terminate, pause and retry
 			// Notify administrator
-			SetState(State_Error);
+
+
 			BOX_ERROR("Exception caught (" << errorString <<
 				" " << errorCode << "/" << errorSubCode <<
 				"), reset state and waiting to retry...");
@@ -865,25 +887,28 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNowWithExceptionHandling
 
 	if(mReadErrorsOnFilesystemObjects)
 	{
-		NotifySysadmin(SysadminNotifier::ReadError);
+        status=SysadminNotifier::ReadError;
+        NotifySysadmin(status);
 	}
 
 	if(mStorageLimitExceeded)
 	{
-		NotifySysadmin(SysadminNotifier::StoreFull);
+        status=SysadminNotifier::StoreFull;
+        NotifySysadmin(status);
 	}
 
 	if (!errorOccurred && !mReadErrorsOnFilesystemObjects &&
 		!mStorageLimitExceeded)
 	{
-		NotifySysadmin(SysadminNotifier::BackupOK);
+        status=SysadminNotifier::BackupOK;
+        NotifySysadmin(status);
 	}
 	
 	// If we were retrying after an error, and this backup succeeded,
 	// then now would be a good time to stop :-)
 	mDoSyncForcedByPreviousSyncError = errorOccurred && !isBerkelyDbFailure;
 
-	OnBackupFinish();
+    OnBackupFinish(status);
 	return mapClientContext; // releases mapClientContext
 }
 
@@ -968,10 +993,17 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		extendedLogFile = conf.GetKeyValue("ExtendedLogFile");
 	}
 
-	if (conf.KeyExists("LogAllFileAccess"))
+    if (conf.KeyExists("LogAllFileAccess"))
 	{
 		mLogAllFileAccess = conf.GetKeyValueBool("LogAllFileAccess");
 	}
+
+    if (conf.KeyExists("StatsHistoryLength"))
+    {
+        mStatsHistoryLength = conf.GetKeyValueUint32("StatsHistoryLength");
+    }
+    if ( mStatsHistoryLength<1)
+        mStatsHistoryLength=1;  // should at least contains the current sync
 
 	// Then create a client context object (don't
 	// just connect, as this may be unnecessary)
@@ -1068,9 +1100,8 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		conf.GetKeyValueInt("DiffingUploadSizeThreshold");
 	params.mMaxFileTimeInFuture =
 		SecondsToBoxTime(conf.GetKeyValueInt("MaxFileTimeInFuture"));
-	mNumFilesUploaded = 0;
-	mNumDirsCreated = 0;
 
+    // A new sync is starting, create a new stats record
 	if(conf.KeyExists("MaxUploadRate"))
 	{
 		params.mMaxUploadRate = conf.GetKeyValueInt("MaxUploadRate");
@@ -1184,8 +1215,8 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 		// run. This is only done if the storage limit wasn't
 		// exceeded (as things won't have been done properly if
 		// it was)
-		mLastSyncTime = syncPeriodEnd;
-	}
+        mLastSyncTime = syncPeriodEnd;
+    }
 
 	// Commit the ID Maps
 	CommitIDMapsAfterSync();
@@ -1209,6 +1240,10 @@ std::auto_ptr<BackupClientContext> BackupDaemon::RunSyncNow()
 
 	return mapClientContext; // releases mapClientContext
 }
+
+
+
+
 
 #ifdef ENABLE_VSS
 bool BackupDaemon::WaitForAsync(IVssAsync *pAsync,
@@ -1758,6 +1793,9 @@ void BackupDaemon::CleanupVssBackupComponents()
 
 void BackupDaemon::OnBackupStart()
 {
+
+    setStartSync(SysadminNotifier::BackupStart);
+
 	ResetLogFile();
 
 	// Touch a file to record times in filesystem
@@ -1781,10 +1819,12 @@ void BackupDaemon::OnBackupStart()
 	BOX_NOTICE("Beginning scan of local files");
 }
 
-void BackupDaemon::OnBackupFinish()
+void BackupDaemon::OnBackupFinish(SysadminNotifier::EventCode status)
 {
 	try
 	{
+        setEndSync(status);
+
 		// Log
 		BOX_NOTICE("Finished scan of local files");
 
@@ -1795,8 +1835,21 @@ void BackupDaemon::OnBackupFinish()
 			<< BackupStoreFile::msStats.mBytesAlreadyOnServer
 			<< ", encoded size "
 			<< BackupStoreFile::msStats.mTotalFileStreamSize
-			<< ", " << mNumFilesUploaded << " files uploaded, "
-			<< mNumDirsCreated << " dirs created");
+            << ", " << mCurrentOperationStats.NumFilesUploaded << " files uploaded, "
+            << mCurrentOperationStats.NumDirsCreated << " dirs created");
+
+		BOX_NOTICE("Backup finished: "
+			<< "status: " << status << ", "
+			<< "start: " << mCurrentOperationStats.startTime << ", "
+			<< "end: " << mCurrentOperationStats.endTime << ", "
+			<< "files: " << mCurrentOperationStats.NumFilesUploaded << ", "
+			<< "size: " << mCurrentOperationStats.TotalSizeUploaded << " B, "
+			<< "dirs: " << mCurrentOperationStats.NumDirsCreated << ", "
+			<< "uploaded: " << BackupStoreFile::msStats.mBytesInEncodedFiles << " B, "
+			<< "on_server: " << BackupStoreFile::msStats.mBytesAlreadyOnServer << " B, "
+			<< "encoded: " << BackupStoreFile::msStats.mTotalFileStreamSize << " B"
+		);
+
 
 		// Reset statistics again
 		BackupStoreFile::ResetStats();
@@ -1825,8 +1878,9 @@ void BackupDaemon::OnBackupFinish()
 // Function
 //		Name:    BackupDaemon::UseScriptToSeeIfSyncAllowed()
 //		Purpose: Private. Use a script to see if the sync should be
-//			 allowed now (if configured). Returns -1 if it's
-//			 allowed, time in seconds to wait otherwise.
+//			 allowed now (if configured). Returns 0 if it's
+//			 allowed, time in seconds to wait or -1 if the script would 
+//           prevent the backup to be ran.
 //		Created: 21/6/04
 //
 // --------------------------------------------------------------------------
@@ -1838,7 +1892,7 @@ int BackupDaemon::UseScriptToSeeIfSyncAllowed()
 	if(!conf.KeyExists("SyncAllowScript"))
 	{
 		// No. Do sync.
-		return -1;
+		return 0;
 	}
 
 	// If there's no result, try again in five minutes
@@ -1911,7 +1965,7 @@ int BackupDaemon::ParseSyncAllowScriptOutput(const std::string& script,
 	if(delay == "now")
 	{
 		// Script says do it now. Obey.
-		waitInSeconds = -1;
+		waitInSeconds = 0;
 
 		BOX_NOTICE("SyncAllowScript requested a backup now "
 			"(" << script << ")");
@@ -2120,7 +2174,7 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 						conf.GetKeyValueInt("MinimumFileAge") 
 						<< " " <<
 						conf.GetKeyValueInt("MaxUploadWait") 
-						<< "\nstate " << mState << "\n";
+                        << "\nstate: " << mState <<"\n";
 					mapCommandSocketInfo->mpConnectedSocket->Write(
 						hello.str(), timeout);
 					
@@ -2187,7 +2241,66 @@ void BackupDaemon::WaitOnCommandSocket(box_time_t RequiredDelay, bool &DoSyncFla
 				// Terminate the daemon cleanly
 				SetTerminateWanted();
 				sendOK = true;
-			}
+            }
+            else if(command == "stop-sync")
+            {
+                SetCancelSyncWanted();
+                sendOK = true;
+            }
+            else if ( command == "get-stats")
+            {
+                sendResponse = false;
+
+				if(GetConfiguration().KeyExists("OperationHistoryFile")) {
+					
+					// Add the content of the stats file
+					std::string statsFile = GetConfiguration().GetKeyValue("OperationHistoryFile");
+
+					// Then the current operation if not finished (not written in the stats file)
+					if(mCurrentOperationStats.isRunning()) {
+						mapCommandSocketInfo->mpConnectedSocket->Write(mCurrentOperationStats.ToJson().append("\n"), timeout);
+					}
+
+					// read the file line by line in reverse order
+					std::ifstream infile(statsFile);
+ 					std::string strLine;
+					char buf;
+					infile.seekg(0, std::ios::beg);
+					std::ifstream::pos_type posBeg = infile.tellg();
+					infile.seekg(-1, std::ios::end);
+					while (infile.tellg() != posBeg)
+					{
+						buf = static_cast <char>(infile.peek());
+						if (buf != '\n')
+						{
+							strLine += buf;
+						}
+						else
+						{
+							std::reverse(strLine.begin(), strLine.end());
+							mapCommandSocketInfo->mpConnectedSocket->Write(strLine.append("\n"), timeout);
+							strLine.clear();
+						}
+						infile.seekg(-1, std::ios::cur);
+					}
+					
+					strLine += static_cast <char>(infile.peek());
+					std::reverse(strLine.begin(), strLine.end());
+					mapCommandSocketInfo->mpConnectedSocket->Write(strLine.append("\n"), timeout);
+					
+					infile.close();
+					
+
+				
+
+				} else {
+
+					// just output our current operation stats
+					mapCommandSocketInfo->mpConnectedSocket->Write(mCurrentOperationStats.ToJson().append("\n"), timeout);
+				}
+
+
+            }
 			
 			// Send a response back?
 			if(sendResponse)
@@ -3098,6 +3211,8 @@ void BackupDaemon::NotifySysadmin(SysadminNotifier::EventCode Event)
 		"backup-start",
 		"backup-finish",
 		"backup-ok",
+		"backup-canceled",
+		"syncallowscript-error",
 		0
 	};
 

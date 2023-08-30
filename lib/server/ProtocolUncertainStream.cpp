@@ -188,7 +188,7 @@ void ProtocolUncertainStream::Write(const void *pBuffer, int NBytes, int Timeout
 // --------------------------------------------------------------------------
 bool ProtocolUncertainStream::StreamDataLeft()
 {
-	return !mFinished;
+	return mrSource.StreamDataLeft() && !mFinished;
 }
 
 // --------------------------------------------------------------------------

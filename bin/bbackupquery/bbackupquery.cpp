@@ -402,6 +402,7 @@ int main(int argc, const char *argv[])
 			THROW_EXCEPTION(BackupStoreException, WrongServerVersion)
 		}
 	}
+	
 	// Login -- if this fails, the Protocol will exception
 	connection.QueryLogin(conf.GetKeyValueUint32("AccountNumber"),
 		(readWrite)?0:(BackupProtocolLogin::Flags_ReadOnly));

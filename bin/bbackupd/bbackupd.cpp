@@ -31,7 +31,7 @@ int main(int argc, const char *argv[])
 
 	Logging::SetProgramName("bbackupd");
 	Logging::ToConsole(true);
-	Logging::ToSyslog (true);
+    Logging::ToSyslog (true);
 	
 #ifdef WIN32
 

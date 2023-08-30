@@ -221,9 +221,21 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolFinished::DoCommand(BackupPro
 {
 	// can be called in any phase
 
+	const BackupStoreInfo &rinfo(rContext.GetBackupStoreInfo());
+
+	Statistics& stats = rContext.GetStatistics();
+
 	BOX_NOTICE("Session finished for Client ID " <<
 		BOX_FORMAT_ACCOUNT(rContext.GetClientID()) << " "
-		"(name=" << rContext.GetAccountName() << ")");
+		"(name=" << rContext.GetAccountName() << "), "
+		"infos " << rContext.GetConnectionDetails() << ","
+		"added files : "<<stats.mAddedFilesCount  << " (" << stats.mAddedFilesSize << " blocks), " 
+		"deleted files : "<<stats.mDeletedFilesCount  << " (" << stats.mDeletedFilesSize << " blocks), "
+		"added dirs : "<<stats.mAddedDirectoriesCount  << ", " 
+		"deleted dirs : "<<stats.mDeletedDirectoriesCount  << ", "
+		"time :" << stats.ElapsedTime() << "s"
+
+		);
 
 	// Let the context know about it
 	rContext.ReceivedFinishCommand();
@@ -624,7 +636,29 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFile::DoCommand(BackupP
 
 	// Context handles this
 	int64_t objectID = 0;
-	rContext.DeleteFile(mFilename, mInDirectory, objectID);
+	rContext.DeleteFile(mFilename, mInDirectory, objectID, false);
+
+	// return the object ID or zero for not found
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
+}
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolDeleteFileASAP::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Delete a file. mark it for deletion ASAP
+//		Created: 2022/09/08
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteFileASAP::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+	CHECK_WRITEABLE_SESSION
+
+	// Context handles this
+	int64_t objectID = 0;
+	rContext.DeleteFile(mFilename, mInDirectory, objectID, true);
 
 	// return the object ID or zero for not found
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(objectID));
@@ -659,6 +693,34 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolUndeleteFile::DoCommand(
 //
 // Function
 //		Name:    BackupProtocolDeleteDirectory::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
+//		Purpose: Delete a directory, mark it for deletion ASAP
+//		Created: 2022/09/08
+//
+// --------------------------------------------------------------------------
+std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectoryASAP::DoCommand(BackupProtocolReplyable &rProtocol, BackupStoreContext &rContext) const
+{
+	CHECK_PHASE(Phase_Commands)
+	CHECK_WRITEABLE_SESSION
+
+	// Check it's not asking for the root directory to be deleted
+	if(mObjectID == BACKUPSTORE_ROOT_DIRECTORY_ID)
+	{
+		return PROTOCOL_ERROR(Err_CannotDeleteRoot);
+	}
+
+	// Context handles this
+	rContext.DeleteDirectory(mObjectID, false, true);
+
+	// return the object ID
+	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
+}
+
+
+
+// --------------------------------------------------------------------------
+//
+// Function
+//		Name:    BackupProtocolDeleteDirectory::DoCommand(BackupProtocolReplyable &, BackupStoreContext &)
 //		Purpose: Delete a directory
 //		Created: 2003/10/21
 //
@@ -675,12 +737,11 @@ std::auto_ptr<BackupProtocolMessage> BackupProtocolDeleteDirectory::DoCommand(Ba
 	}
 
 	// Context handles this
-	rContext.DeleteDirectory(mObjectID);
+	rContext.DeleteDirectory(mObjectID, false, false);
 
 	// return the object ID
 	return std::auto_ptr<BackupProtocolMessage>(new BackupProtocolSuccess(mObjectID));
 }
-
 
 // --------------------------------------------------------------------------
 //

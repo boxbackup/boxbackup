@@ -17,7 +17,7 @@
 #endif
 
 #include <sys/types.h>
-
+#include <iostream>
 #include "box_getopt.h"
 #include "BackupStoreAccounts.h"
 #include "BackupStoreAccountDatabase.h"
@@ -43,7 +43,7 @@ void PrintUsageAndExit()
 "Account ID is integer specified in hex\n"
 "\n"
 "Commands (and arguments):\n"
-"  create <account> <discnum> <softlimit> <hardlimit>\n"
+"  create <account> <discnum> <softlimit> <hardlimit> <versionslimit>\n"
 "        Creates the specified account number (in hex with no 0x) on the\n"
 "        specified raidfile disc set number (see raidfile.conf for valid\n"
 "        set numbers) with the specified soft and hard limits (in blocks\n"
@@ -53,7 +53,7 @@ void PrintUsageAndExit()
 "        of blocks used. The -m option enable machine-readable output.\n"
 "  enabled <accounts> <yes|no>\n"
 "        Sets the account as enabled or disabled for new logins.\n"
-"  setlimit <accounts> <softlimit> <hardlimit>\n"
+"  setlimit <accounts> <softlimit> <hardlimit> <versionslimit>\n"
 "        Changes the limits of the account as specified. Numbers are\n"
 "        interpreted as for the 'create' command (suffixed with B, M or G)\n"
 "  delete <account> [yes]\n"
@@ -68,7 +68,7 @@ void PrintUsageAndExit()
 "        Changes the \"name\" of the account to the specified string.\n"
 "        The name is purely cosmetic and intended to make it easier to\n"
 "        identify your accounts.\n"
-"  housekeep <account>\n"
+"  housekeep <account> [remove-deleted] [remove-old] [disable-auto-clean]\n"
 "        Runs housekeeping immediately on the account. If it cannot be locked,\n"
 "        bbstoreaccounts returns an error status code (1), otherwise success\n"
 "        (0) even if any errors were fixed by housekeeping.\n"
@@ -92,7 +92,7 @@ int main(int argc, const char *argv[])
 	
 	// See if there's another entry on the command line
 	int c;
-	while((c = getopt(argc, (char * const *)argv, "c:W:m")) != -1)
+	while((c = getopt(argc, (char * const *)argv, "c:W:mS")) != -1)
 	{
 		switch(c)
 		{
@@ -100,7 +100,9 @@ int main(int argc, const char *argv[])
 			// store argument
 			configFilename = optarg;
 			break;
-		
+		case 'S':
+			Logging::ToSyslog (false);
+			break;
 		case 'W':
 			logLevel = Logging::GetNamedLevel(optarg);
 			if(logLevel == Log::INVALID)
@@ -122,7 +124,7 @@ int main(int argc, const char *argv[])
 	}
 
 	Logging::FilterConsole((Log::Level) logLevel);
-	Logging::FilterSyslog (Log::NOTHING);
+	Logging::FilterSyslog((Log::Level) logLevel);
 
 	// Adjust arguments
 	argc -= optind;
@@ -181,8 +183,9 @@ int main(int argc, const char *argv[])
 	{
 		// which disc?
 		int32_t discnum;
-		int32_t softlimit;
-		int32_t hardlimit;
+        int64_t softlimit;
+        int64_t hardlimit;
+        int32_t versionslimit;
 		if(argc < 5
 			|| ::sscanf(argv[2], "%d", &discnum) != 1)
 		{
@@ -195,10 +198,11 @@ int main(int argc, const char *argv[])
 		int blocksize = control.BlockSizeOfDiscSet(discnum);
 		softlimit = control.SizeStringToBlocks(argv[3], blocksize);
 		hardlimit = control.SizeStringToBlocks(argv[4], blocksize);
+        versionslimit= argc>5 ? atoi(argv[5]) : 0;
 		control.CheckSoftHardLimits(softlimit, hardlimit);
 	
 		// Create the account...
-		return control.CreateAccount(id, discnum, softlimit, hardlimit);
+        return control.CreateAccount(id, discnum, softlimit, hardlimit, versionslimit);
 	}
 	else if(command == "info")
 	{
@@ -239,11 +243,11 @@ int main(int argc, const char *argv[])
 			return 1;
 		}
 		
-		return control.SetLimit(id, argv[2], argv[3]);
+        return control.SetLimit(id, argv[2], argv[3],argv[4]);
 	}
 	else if(command == "name")
 	{
-		// Change the limits on this account
+        // Change the name on this account
 		if(argc != 3)
 		{
 			BOX_ERROR("name command requires a new name.");
@@ -290,7 +294,34 @@ int main(int argc, const char *argv[])
 	}
 	else if(command == "housekeep")
 	{
-		return control.HousekeepAccountNow(id);
+		int32_t flags=HousekeepStoreAccount::DefaultAction;
+
+		// Look at other options
+		for(int o = 2; o < argc; ++o)
+		{
+			if(::strcmp(argv[o], "remove-deleted") == 0)
+			{
+				flags|=HousekeepStoreAccount::RemoveDeleted;
+			}
+			else if(::strcmp(argv[o], "remove-old") == 0)
+			{
+				flags|=HousekeepStoreAccount::RemoveOldVersions;
+			}
+			else if(::strcmp(argv[o], "disable-auto-clean") == 0)
+			{
+				// no default action here, this should remove only the deleted or old version marked with Flags_RemoveASAP
+				flags |= HousekeepStoreAccount::DisableAutoClean; 
+			}
+			else
+			{
+				BOX_ERROR("Unknown option " << argv[o] << ".");
+				return 2;
+			}
+		}
+
+
+
+		return control.HousekeepAccountNow(id, flags);
 	}
 	else
 	{

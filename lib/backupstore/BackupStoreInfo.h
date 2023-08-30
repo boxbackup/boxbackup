@@ -49,6 +49,7 @@ typedef struct
 
 #define INFO_MAGIC_VALUE_1	0x34832476
 #define INFO_MAGIC_VALUE_2	0x494e4632 /* INF2 */
+#define INFO_MAGIC_VALUE_3	0x95684f23 /* cjean INF3 */
 
 // Use default packing
 #ifdef STRUCTURE_PACKING_FOR_WIRE_USE_HEADERS
@@ -81,9 +82,9 @@ private:
 public:
 	// Create a New account, saving a blank info object to the disc
 	static void CreateNew(int32_t AccountID, const std::string &rRootDir, int DiscSet,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+        int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionsCountLimit=0);
 	BackupStoreInfo(int32_t AccountID, const std::string &FileName,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit);
+        int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionCountLimit=0);
 
 	// Load it from the store
 	static std::auto_ptr<BackupStoreInfo> Load(int32_t AccountID, const std::string &rRootDir, int DiscSet, bool ReadOnly, int64_t *pRevisionID = 0);
@@ -114,6 +115,7 @@ public:
 	int64_t GetNumOldFiles() const {return mNumOldFiles;}
 	int64_t GetNumDeletedFiles() const {return mNumDeletedFiles;}
 	int64_t GetNumDirectories() const {return mNumDirectories;}
+    int32_t GetVersionCountLimit() const { return mVersionCountLimit; }
 	bool IsAccountEnabled() const {return mAccountEnabled;}
 	bool IsReadOnly() const {return mReadOnly;}
 	int GetDiscSetNumber() const {return mDiscSet;}
@@ -129,7 +131,7 @@ public:
 	void CorrectAllUsedValues(int64_t Used, int64_t InOldFiles, int64_t InDeletedFiles, int64_t InDirectories);
 	void AddDeletedDirectory(int64_t DirID);
 	void RemovedDeletedDirectory(int64_t DirID);
-	void ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit);
+    void ChangeLimits(int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionsLimit);
 	void AdjustNumCurrentFiles(int64_t increase);
 	void AdjustNumOldFiles(int64_t increase);
 	void AdjustNumDeletedFiles(int64_t increase);
@@ -157,7 +159,7 @@ public:
 		int64_t LastObjectID, int64_t BlocksUsed,
 		int64_t BlocksInCurrentFiles, int64_t BlocksInOldFiles,
 		int64_t BlocksInDeletedFiles, int64_t BlocksInDirectories,
-		int64_t BlockSoftLimit, int64_t BlockHardLimit,
+        int64_t BlockSoftLimit, int64_t BlockHardLimit, int32_t VersionCountLimit,
 		bool AccountEnabled, IOStream& ExtraData);
 
 	typedef struct
@@ -201,6 +203,7 @@ private:
 	int64_t mNumOldFiles;
 	int64_t mNumDeletedFiles;
 	int64_t mNumDirectories;
+    int32_t mVersionCountLimit;
 	std::vector<int64_t> mDeletedDirectories;
 	bool mAccountEnabled;
 	CollectInBufferStream mExtraData;

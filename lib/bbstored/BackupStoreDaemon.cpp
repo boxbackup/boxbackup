@@ -171,13 +171,17 @@ void BackupStoreDaemon::Run()
 	mExtendedLogging = false;
 	const Configuration &config(GetConfiguration());
 	mExtendedLogging = config.GetKeyValueBool("ExtendedLogging");
-	
+	bool disabledHouseKeeping=false;
+	//if (config.KeyExists("DisableHouseKeeping")) {
+		disabledHouseKeeping=config.GetKeyValueBool("DisableHouseKeeping");
+	//}
+
 	// Fork off housekeeping daemon -- must only do this the first
 	// time Run() is called.  Housekeeping runs synchronously on Win32
 	// because IsSingleProcess() is always true
-	
+
 #ifndef WIN32
-	if(!IsSingleProcess() && !mHaveForkedHousekeeping)
+	if(!disabledHouseKeeping && !IsSingleProcess() && !mHaveForkedHousekeeping)
 	{
 		// Open a socket pair for communication
 		int sv[2] = {-1,-1};
@@ -262,7 +266,7 @@ void BackupStoreDaemon::Run()
 		}
 	}
 }
-
+#include <iostream>
 // --------------------------------------------------------------------------
 //
 // Function

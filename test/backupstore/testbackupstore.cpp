@@ -1124,7 +1124,8 @@ bool test_server_housekeeping()
 	// Check that deleting files is accounted for as well
 	protocol.QueryDeleteFile(
 		BACKUPSTORE_ROOT_DIRECTORY_ID, // InDirectory
-		store1name); // Filename
+		store1name,
+		false); // Filename
 
 	// The old version file is deleted as well!
 	TEST_THAT(check_num_files(0, 1, 2, 1));
@@ -1371,7 +1372,8 @@ bool test_multiple_uploads()
 		{
 			std::auto_ptr<BackupProtocolSuccess> del(apProtocol->QueryDeleteFile(
 				BACKUPSTORE_ROOT_DIRECTORY_ID,
-				uploads[UPLOAD_DELETE_EN].name));
+				uploads[UPLOAD_DELETE_EN].name,
+				false));
 			TEST_THAT(del->GetObjectID() == uploads[UPLOAD_DELETE_EN].allocated_objid);
 			TEST_THAT(check_num_files(UPLOAD_NUM - 4, 3, 2, 1));
 		}
@@ -1984,7 +1986,7 @@ bool test_server_commands()
 
 		{
 			std::auto_ptr<BackupProtocolSuccess> dirdel(apProtocol->QueryDeleteDirectory(
-					dirtodelete));
+					dirtodelete, false));
 			TEST_THAT(dirdel->GetObjectID() == dirtodelete);
 		}
 
@@ -2111,7 +2113,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 
 	// Now delete an entry, and check that the size is reduced
 	protocol.QueryDeleteFile(subdirid,
-		BackupStoreFilenameClear(last_added_filename));
+		BackupStoreFilenameClear(last_added_filename), false);
 	ExpectedRefCounts[last_added_file_id] = 0;
 
 	// Reduce the limits, to remove it permanently from the store
@@ -2171,7 +2173,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 	}
 	TEST_THAT_OR(en, return false);
 	protocol.Reopen();
-	protocol.QueryDeleteDirectory(en->GetObjectID());
+	protocol.QueryDeleteDirectory(en->GetObjectID(), false);
 	set_refcount(en->GetObjectID(), 0);
 
 	// This should have fixed the error, so we should be able to add the
@@ -2182,7 +2184,7 @@ bool test_directory_parent_entry_tracks_directory_size()
 		BACKUPSTORE_ROOT_DIRECTORY_ID));
 
 	// Delete it again, which should reduce the object size again
-	protocol.QueryDeleteDirectory(dir2id);
+	protocol.QueryDeleteDirectory(dir2id, false);
 	set_refcount(dir2id, 0);
 
 	// Reduce the limits, to remove it permanently from the store
@@ -2724,7 +2726,7 @@ bool test_housekeeping_deletes_files()
 		NULL /* pRefCount */);
 
 	TEST_EQUAL(dirtodelete,
-		protocolLocal.QueryDeleteDirectory(dirtodelete)->GetObjectID());
+		protocolLocal.QueryDeleteDirectory(dirtodelete, false)->GetObjectID());
 	assert_everything_deleted(protocolLocal, dirtodelete);
 	protocolLocal.QueryFinished();
 

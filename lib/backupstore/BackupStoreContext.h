@@ -34,6 +34,39 @@ class HousekeepingInterface
 	virtual void SendMessageToHousekeepingProcess(const void *Msg, int MsgLen) = 0;
 };
 
+class Statistics {
+	public:
+		Statistics() {
+			mAddedFilesCount = 0;
+			mAddedFilesSize = 0;
+			mDeletedFilesCount = 0;
+			mDeletedFilesSize = 0;
+			mAddedDirectoriesCount = 0;
+			mDeletedDirectoriesCount = 0;
+			mDeletedDirectoriesSize = 0;
+			mCreationTime=time(NULL);
+		}
+
+		time_t ElapsedTime() {
+			return time(NULL) - mCreationTime;
+		}
+		
+		int64_t mAddedFilesCount;
+		int64_t mAddedFilesSize;
+		int64_t mDeletedFilesCount;
+		int64_t mDeletedFilesSize;
+		int64_t mAddedDirectoriesCount;
+		int64_t mDeletedDirectoriesCount;
+		int64_t mDeletedDirectoriesSize;
+
+
+
+	private:
+		time_t mCreationTime;
+
+};
+
+
 // --------------------------------------------------------------------------
 //
 // Class
@@ -155,9 +188,9 @@ public:
 		bool &rAlreadyExists);
 	void ChangeDirAttributes(int64_t Directory, const StreamableMemBlock &Attributes, int64_t AttributesModTime);
 	bool ChangeFileAttributes(const BackupStoreFilename &rFilename, int64_t InDirectory, const StreamableMemBlock &Attributes, int64_t AttributesHash, int64_t &rObjectIDOut);
-	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut);
+	bool DeleteFile(const BackupStoreFilename &rFilename, int64_t InDirectory, int64_t &rObjectIDOut, bool RemoveASAP);
 	bool UndeleteFile(int64_t ObjectID, int64_t InDirectory);
-	void DeleteDirectory(int64_t ObjectID, bool Undelete = false);
+	void DeleteDirectory(int64_t ObjectID, bool Undelete = false, bool RemoveASAP = false);
 	void MoveObject(int64_t ObjectID, int64_t MoveFromDirectory, int64_t MoveToDirectory, const BackupStoreFilename &rNewFilename, bool MoveAllWithSameName, bool AllowMoveOverDeletedObject);
 
 	// Manipulating objects
@@ -173,6 +206,8 @@ public:
 	// Info
 	int32_t GetClientID() const {return mClientID;}
 	const std::string& GetConnectionDetails() { return mConnectionDetails; }
+
+	Statistics &GetStatistics() { return mStatistics; }
 
 private:
 	void MakeObjectFilename(int64_t ObjectID, std::string &rOutput, bool EnsureDirectoryExists = false);
@@ -196,6 +231,7 @@ private:
 	NamedLock mWriteLock;
 	int mSaveStoreInfoDelay; // how many times to delay saving the store info
 
+	
 	// Store info
 	std::auto_ptr<BackupStoreInfo> mapStoreInfo;
 
@@ -205,6 +241,8 @@ private:
 	// Directory cache
 	std::map<int64_t, BackupStoreDirectory*> mDirectoryCache;
 
+	// Statistics
+	Statistics mStatistics;
 public:
 	class TestHook
 	{

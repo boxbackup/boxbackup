@@ -304,6 +304,12 @@ int SocketStreamTLS::Read(void *pBuffer, int NBytes, int Timeout)
 		return 0;
 	}
 
+	// Make sure we always have a timeout set
+	// Deadlock may occur if we don't
+	if(Timeout == IOStream::TimeOutInfinite) {
+		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
+	}
+
 	while(true)
 	{
 		int r = ::SSL_read(mpSSL, pBuffer, NBytes);
@@ -358,6 +364,12 @@ void SocketStreamTLS::Write(const void *pBuffer, int NBytes, int Timeout)
 	if(NBytes == 0)
 	{
 		return;
+	}
+
+	// Make sure we always have a timeout set
+	// Deadlock may occur if we don't
+	if(Timeout == IOStream::TimeOutInfinite) {
+		Timeout = PROTOCOL_DEFAULT_TIMEOUT;
 	}
 
 	// from man SSL_write

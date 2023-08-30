@@ -143,6 +143,7 @@ ListDirectory	21	Command(Success)
 	CONSTANT	Flags_File			1
 	CONSTANT	Flags_Dir			2
 	CONSTANT	Flags_Deleted			4
+	CONSTANT	Flags_RemoveASAP			16
 	CONSTANT	Flags_OldVersion		8
 	# make sure this is the same as in BackupStoreConstants.h
 	CONSTANT	RootDirectory			1
@@ -163,6 +164,10 @@ DeleteDirectory	23	Command(Success)
 UndeleteDirectory	24	Command(Success)
 	int64		ObjectID
 	# may not have exactly the desired effect if files within in have been deleted before the directory was deleted.
+
+
+DeleteDirectoryASAP	25	Command(Success)
+	int64		ObjectID
 
 
 # -------------------------------------------------------------------------------------
@@ -217,6 +222,12 @@ GetBlockIndexByName	35	Command(Success)
 UndeleteFile	36	Command(Success)
 	int64		InDirectory
 	int64		ObjectID
+	# will return 0 if the object couldn't be found in the specified directory
+
+
+DeleteFileASAP	37	Command(Success)
+	int64		InDirectory
+	Filename	Filename
 	# will return 0 if the object couldn't be found in the specified directory
 
 
