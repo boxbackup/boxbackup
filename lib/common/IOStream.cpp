@@ -241,7 +241,10 @@ void IOStream::Flush(int Timeout)
 
 	while(StreamDataLeft())
 	{
-		Read(buffer, sizeof(buffer), Timeout);
+		if(Read(buffer, sizeof(buffer), Timeout) == 0) {
+			// Timeout or something went wrong
+			return;
+		}
 	}
 }
 
