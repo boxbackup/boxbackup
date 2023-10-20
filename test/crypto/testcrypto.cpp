@@ -62,10 +62,12 @@ void test_cipher()
 		encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
 		TEST_CHECK_THROWS(encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY))),
 			CipherException, AlreadyInitialised);
-		// Encrpt something
+
+		// Encrypt something
 		char buf1[256];
 		unsigned int buf1_used = encrypt1.TransformBlock(buf1, sizeof(buf1), STRING1, sizeof(STRING1));
 		TEST_THAT(buf1_used >= sizeof(STRING1));
+
 		// Decrypt it
 		CipherContext decrypt1;
 		decrypt1.Init(CipherContext::Decrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
