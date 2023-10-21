@@ -41,7 +41,7 @@ StreamableMemBlock::StreamableMemBlock()
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-StreamableMemBlock::StreamableMemBlock(void *pBuffer, int Size)
+StreamableMemBlock::StreamableMemBlock(const void *pBuffer, int Size)
 	: mpBuffer(0),
 	  mSize(0)
 {
@@ -90,7 +90,7 @@ StreamableMemBlock::StreamableMemBlock(const StreamableMemBlock &rToCopy)
 //		Created: 2003/09/05
 //
 // --------------------------------------------------------------------------
-void StreamableMemBlock::Set(void *pBuffer, int Size)
+void StreamableMemBlock::Set(const void *pBuffer, int Size)
 {
 	FreeBlock();
 	AllocateBlock(Size);
