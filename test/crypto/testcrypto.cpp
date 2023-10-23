@@ -208,8 +208,11 @@ void test_cipher()
 			if (messages.size() == 1)
 			{
 				Capture::Message message = messages[0];
-				TEST_EQUAL("SSL or crypto error: encrypt: error:1C80006B:"
-					"Provider routines::wrong final block length", message.message);
+				TEST_STARTSWITH("SSL or crypto error: encrypt: error:", message.message);
+				TEST_LINE(EndsWith("Provider routines::wrong final block length", message.message) ||
+					EndsWith("EVP_EncryptFinal_ex:data not multiple of block length", message.message) ||
+					EndsWith("lib(6):func(127):reason(138)", message.message),
+					message.message);
 			}
 		}
 

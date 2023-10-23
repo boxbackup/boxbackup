@@ -76,14 +76,18 @@ void set_refcount(int64_t ObjectID, uint32_t RefCount)
 	}
 }
 
+//! Initialises a TLSContext object using the standard certficate filenames.
 void init_context(TLSContext& rContext)
 {
 	rContext.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
+		"testfiles/clientCerts.pem",
+		"testfiles/clientPrivKey.pem",
+		"testfiles/clientTrustedCAs.pem",
+		0 // SSLSecurityLevel, allow use of our old hard-coded certificates in tests for now
+	);
 }
 
+//! Opens a connection to the server (bbstored).
 std::auto_ptr<SocketStream> open_conn(const char *hostname,
 	TLSContext& rContext)
 {
