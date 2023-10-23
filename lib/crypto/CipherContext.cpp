@@ -448,6 +448,9 @@ int CipherContext::MaxOutSizeForInBufferSize(int InLength)
 // Function
 //		Name:    CipherContext::TransformBlock(void *, int, const void *, int)
 //		Purpose: Transform one block to another all in one go, no Final required.
+//		         Note: you should ALWAYS call SetIV() before TransformBlock(), otherwise the
+//		         previous IV may be reused (in OpenSSL 3.0+), which will probably generate
+//		         undecryptable ciphertext.
 //		Created: 1/12/03
 //
 // --------------------------------------------------------------------------
