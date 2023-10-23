@@ -191,8 +191,28 @@ void test_cipher()
 		encrypt3.Begin();
 		ZERO_BUFFER(buf4);
 		int buf4_used = encrypt3.Transform(buf4, sizeof(buf4), STRING2, 6);
-		TEST_CHECK_THROWS(encrypt3.Final(buf4, sizeof(buf4)), CipherException, EVPFinalFailure);
-		
+
+		{
+			Capture capture;
+			capture.Filter(Log::WARNING);
+
+			// We only want this log message to go to the Capture logger, not the console,
+			// because it makes it look like the test is failing when actually it's fine.
+			Logging::TempLoggerGuard guard(&capture);
+			Logger::LevelGuard suppress_console_log(Logging::GetConsole(), Log::FATAL);
+
+			TEST_CHECK_THROWS(encrypt3.Final(buf4, sizeof(buf4)), CipherException, EVPFinalFailure);
+
+			std::vector<Capture::Message> messages = capture.GetMessages();
+			TEST_EQUAL(1, messages.size());
+			if (messages.size() == 1)
+			{
+				Capture::Message message = messages[0];
+				TEST_EQUAL("SSL or crypto error: encrypt: error:1C80006B:"
+					"Provider routines::wrong final block length", message.message);
+			}
+		}
+
 		// Check a nice encryption with the correct block size
 		CipherContext encrypt4;
 		encrypt4.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
