@@ -116,14 +116,17 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
 				"Failed to load certificates from " << CertificatesFile << ": "
-				"key too short for current security level");
+				"key too short for current security level, see "
+				"http://bit.ly/sslseclevel");
 		}
 		else if(err_reason == SSL_R_CA_MD_TOO_WEAK)
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
 				"Failed to load certificates from " << CertificatesFile << ": "
-				"hash too weak for current security level");
+				"hash too weak for current security level, see "
+				"http://bit.ly/sslseclevel");
 		}
+		// TODO: handle SSL_R_CA_KEY_TOO_SMALL as well?
 		else
 #endif // HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
 		{

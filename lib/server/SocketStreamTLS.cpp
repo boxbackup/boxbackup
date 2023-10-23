@@ -223,14 +223,16 @@ void SocketStreamTLS::Handshake(const TLSContext &rContext, bool IsServer)
 				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSPeerWeakCertificate,
 					(IsServer ? "Failed to accept connection from" :
 						"Failed to connect to") << " " << mPeerSocketDesc <<
-					": key too short for current security level");
+					": key too short for current security level, see "
+					"http://bit.ly/sslseclevel");
 			}
 			else if(se == SSL_ERROR_SSL && verify_result == X509_V_ERR_CA_MD_TOO_WEAK)
 			{
 				THROW_EXCEPTION_MESSAGE(ConnectionException, TLSPeerWeakCertificate,
 					(IsServer ? "Failed to accept connection from" :
 						"Failed to connect to") << " " << mPeerSocketDesc <<
-					": hash too weak for current security level");
+					": hash too weak for current security level, see "
+					"http://bit.ly/sslseclevel");
 			}
 			else
 #endif // HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
