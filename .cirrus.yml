@@ -131,11 +131,11 @@ task:
 
 task:
   matrix:
-    - name: Ubuntu 22.10 amd64
+    - name: Ubuntu 23.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_name: ubuntu-2210-kinetic-amd64-v20230113
+        image_name: ubuntu-2304-lunar-amd64-v20231020
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libeditreadline-dev make xsltproc libwww-perl libboost-dev
