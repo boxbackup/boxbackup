@@ -32,13 +32,14 @@ task:
     - chown -R build: .
   <<: *standard_build
 
+# gcloud compute images list --project=debian-cloud
 task:
   matrix:
     - name: Debian 9 i386
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190618
+        image_name: debian-9-stretch-v20220621
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name stretch-build --chroot stretch
@@ -49,7 +50,7 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20190618
+        image_name: debian-9-stretch-v20220621
 
   setup_script:
     - ${CHROOT} apt-get update
@@ -66,10 +67,12 @@ freebsd_gce_instance: &freebsd_gce_instance
 
 task:
   matrix:
-    - name: FreeBSD 14.0 (pre) amd64
-      gce_instance:
-        <<: *freebsd_gce_instance
-        image_family: freebsd-14-0-snap
+    # FreeBSD 14 has a newer GCC that's removed support for std::auto_ptr, so we can't enable it
+    # until we have worked around that:
+    # - name: FreeBSD 14.0 (pre) amd64
+    #   gce_instance:
+    #     <<: *freebsd_gce_instance
+    #     image_family: freebsd-14-0-snap
     - name: FreeBSD 13.0 amd64
       gce_instance:
         <<: *freebsd_gce_instance
@@ -97,8 +100,8 @@ task:
     - brew install autoconf automake openssl readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
-    - export CPPFLAGS="-I/opt/homebrew/opt/openssl@1.1/include"
-    - export LDFLAGS="-L/opt/homebrew/opt/openssl@1.1/lib"
+    - export CPPFLAGS="-I/opt/homebrew/opt/openssl@3.1/include"
+    - export LDFLAGS="-L/opt/homebrew/opt/openssl@3.1/lib"
     - ./bootstrap
     - ./configure
   build_client_script:
@@ -110,6 +113,7 @@ task:
   release_tests_script:
     - make release_tests
 
+# gcloud compute images list --filter ubuntu-os-cloud
 task:
   matrix:
     - name: Ubuntu 16.04 amd64
