@@ -458,7 +458,7 @@ int Syslog::GetNamedFacility(const std::string& rFacility)
 	return LOG_LOCAL6;
 }
 
-bool FileLogger::Log(Log::Level Level, const std::string& file, int line,
+bool FileLogger::Log(Log::Level level, const std::string& file, int line,
 	const std::string& function, const Log::Category& category,
 	const std::string& message)
 {
@@ -469,40 +469,40 @@ bool FileLogger::Log(Log::Level Level, const std::string& file, int line,
 		return true;
 	}
 
-	if (Level > GetLevel())
+	if (level > GetLevel())
 	{
 		return true;
 	}
 	
 	/* avoid infinite loop if this throws an exception */
-	Log::Level oldLevel = GetLevel();
+	Log::Level old_level = GetLevel();
 	Filter(Log::NOTHING);
 
 	std::ostringstream buf;
 	buf << FormatTime(GetCurrentBoxTime(), true, false);
 	buf << " ";
 
-	if (Level <= Log::FATAL)
+	if (level <= Log::FATAL)
 	{
 		buf << "[FATAL]   ";
 	}
-	else if (Level <= Log::ERROR)
+	else if (level <= Log::ERROR)
 	{
 		buf << "[ERROR]   ";
 	}
-	else if (Level <= Log::WARNING)
+	else if (level <= Log::WARNING)
 	{
 		buf << "[WARNING] ";
 	}
-	else if (Level <= Log::NOTICE)
+	else if (level <= Log::NOTICE)
 	{
 		buf << "[NOTICE]  ";
 	}
-	else if (Level <= Log::INFO)
+	else if (level <= Log::INFO)
 	{
 		buf << "[INFO]    ";
 	}
-	else if (Level <= Log::TRACE)
+	else if (level <= Log::TRACE)
 	{
 		buf << "[TRACE]   ";
 	}
@@ -517,7 +517,7 @@ bool FileLogger::Log(Log::Level Level, const std::string& file, int line,
 	mLogFile.Write(output.c_str(), output.length());
 
 	// no infinite loop, reset to saved logging level
-	Filter(oldLevel);
+	Filter(old_level);
 	return true;
 }
 

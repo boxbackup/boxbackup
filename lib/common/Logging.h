@@ -386,6 +386,11 @@ class Capture : public Logger
 		const std::string& function, const Log::Category& category,
 		const std::string& message)
 	{
+		if (level > GetLevel())
+		{
+			return true;
+		}
+
 		Message msg(category);
 		msg.level = level;
 		msg.file = file;
