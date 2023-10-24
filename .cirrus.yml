@@ -21,11 +21,17 @@ standard_gce_instance: &standard_gce_instance
   #preemptible: $CIRRUS_BRANCH != "master"
 
 task:
-  name: CentOS 7 amd64
-  gce_instance:
-    <<: *standard_gce_instance
-    image_project: centos-cloud
-    image_name: centos-7-v20190619
+  matrix:
+    - name: CentOS 7 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: centos-cloud
+        image_name: centos-7-v20190619
+    - name: CentOS 8 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: centos-cloud
+        image_family: centos-stream-8
   setup_script:
     - yum install -y --disablerepo=google-cloud-sdk --disablerepo=google-compute-engine git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
     - useradd -m build
@@ -33,13 +39,14 @@ task:
   <<: *standard_build
 
 # gcloud compute images list --project=debian-cloud
+# gcloud compute images list --filter debian --show-deprecated
 task:
   matrix:
     - name: Debian 9 i386
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20220621
+        image: debian-9-stretch-v20220621
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name stretch-build --chroot stretch
@@ -50,7 +57,7 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image_name: debian-9-stretch-v20220621
+        image: debian-9-stretch-v20220621
 
   setup_script:
     - ${CHROOT} apt-get update
@@ -76,7 +83,6 @@ task:
     - name: FreeBSD 13.0 amd64
       gce_instance:
         <<: *freebsd_gce_instance
-        image_name: freebsd-13-0-current-amd64-v20190829
         image_family: freebsd-13-0
     - name: FreeBSD 12.3 amd64
       gce_instance:
@@ -126,6 +132,11 @@ task:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_name: ubuntu-1804-bionic-v20190617
+    - name: Ubuntu 20.04 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-2004-lts
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
