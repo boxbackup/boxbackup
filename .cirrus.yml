@@ -49,9 +49,9 @@ task:
         image_family: debian-10
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
-        - schroot --begin-session --session-name stretch-build --chroot stretch
+        - schroot --begin-session --session-name debian-i386 --chroot buster
       env:
-        CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
+        CHROOT: schroot --run-session --chroot debian-i386 --directory /tmp/cirrus-ci-build --
 
     - name: Debian 10 amd64
       gce_instance:
