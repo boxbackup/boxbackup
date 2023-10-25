@@ -42,22 +42,22 @@ task:
 # gcloud compute images list --filter debian --show-deprecated
 task:
   matrix:
-    - name: Debian 9 i386
+    - name: Debian 10 i386
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image: debian-9-stretch-v20220621
+        image_family: debian-10
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
         - schroot --begin-session --session-name stretch-build --chroot stretch
       env:
         CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
 
-    - name: Debian 9 amd64
+    - name: Debian 10 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
-        image: debian-9-stretch-v20220621
+        image_family: debian-10
 
   setup_script:
     - ${CHROOT} apt-get update
