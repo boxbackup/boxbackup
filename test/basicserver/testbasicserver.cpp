@@ -502,6 +502,29 @@ bool test_security_level(int cert_level, int test_level, bool expect_failure_on_
 		// so we don't know whether we will fail to connect to the running daemon
 		// (despite expect_failure_on_connect), so we can't do this part of the test.
 	}
+#if defined HAVE_SSL_CTX_SET_SECURITY_LEVEL && !defined OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+	// versions <= 1.1.1, but this appears system-dependent and unreliable.
+	//
+	// For example:
+	//     ./_test --test-daemon-args= srv3 testfiles/srv3-insecure-daemon.conf
+	//     openssl s_client -connect localhost:2003
+	//         -CAfile testfiles/seclevel2-sha256/ca/roots/serverCA.pem
+	//         -cipher DEFAULT:@SECLEVEL=2 2>&1 | grep "Verify return code"
+	//
+	// prints "Verify return code: 0 (ok)" on CentOS 8 and
+	// "Verify return code: 68 (CA signature digest algorithm too weak)" on Ubuntu 20.04,
+	// both running OpenSSL 1.1.1.
+	//
+	// So we skip the connection test on 1.1.1 when cert_level is 2, test_level is 2 (or -1,
+	// which might be equal to 2 depending on system configuration) and
+	// expect_failure_on_connect is true (connecting to a daemon running
+	// testfiles/srv3-insecure-daemon.conf, with SHA1 certificates).
+	if(cert_level == 2 && (test_level == 2 || test_level == -1) && expect_failure_on_connect)
+	{
+		// Do nothing (don't do the connection test)
+	}
+#endif
 	else if(expect_failure_on_connect)
 	{
 		TEST_CHECK_THROWS(
@@ -548,7 +571,7 @@ bool test_ancient_certificates()
 #else // !HAVE_SSL_CTX_SET_SECURITY_LEVEL
 	// We have no way to increase the security level, so this OpenSSL is too old to implement
 	// security levels, and should still accept old certificates without question:
-	test_security_level(0, 2); // cert_level, test_level
+	TEST_THAT(test_security_level(0, 2)); // cert_level, test_level
 #endif
 
 	return (num_failures == old_num_failures); // no new failures -> good
@@ -564,7 +587,9 @@ bool test_new_certificates(bool expect_failure_level_2)
 	// again, as it did when Debian increased the default level.
 	// Newly generated certificates may need to be strengthened.
 	// And we may need to update the documentation.
-	TEST_THAT(test_security_level(2, -1)); // cert_level, test_level
+	// The arguments that we pass to test_security_level (specifically
+	// expect_failure_on_connect) will depend on the OpenSSL version,
+	// so it's called conditionally below.
 
 #ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
 	// Level 0 (allow all) should pass with any certificates:
@@ -574,21 +599,28 @@ bool test_new_certificates(bool expect_failure_level_2)
 	// Level 1 (allow >80 bit security) should pass with new certificates,
 	// but should refuse to connect to a peer with weak (insecure) certificates:
 	TEST_THAT(test_security_level(2, 1, expect_failure_level_2));
-	// cert_level, test_level, expect_failure
+	// cert_level, test_level, expect_failure_on_connect
 # else // !OPENSSL_SHA1_DOWNGRADED
-	// Level 1 (allow >80 bit security) allows certs with SHA1 MD in OpenSSL versions <= 1.1.1:
+	// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+	// versions <= 1.1.1:
 	TEST_THAT(test_security_level(2, 1, false));
-	// cert_level, test_level, expect_failure
+	// cert_level, test_level, expect_failure_on_connect
 # endif // OPENSSL_SHA1_DOWNGRADED
 
-	// Level 2 (allow >112 bit security) should pass with new certificates,
-	// but should refuse to connect to a peer with weak (insecure) certificates:
+	// Level 2 (allow >112 bit security) should pass with new certificates, but should refuse
+	// to connect to a peer with weak (insecure) certificates. But this appears to be
+	// system-dependent and unreliable, so test_security_level skips the connection test for
+	// OpenSSL 1.1.1 when/ cert_level is 2, test_level is 2 and expect_failure_on_connect is true:
 	TEST_THAT(test_security_level(2, 2, expect_failure_level_2));
 	// cert_level, test_level, expect_failure
+
+	// The same goes for level -1 (system-wide default), because that might be equal to level 2.
+	TEST_THAT(test_security_level(2, -1, expect_failure_level_2));
 #else // !HAVE_SSL_CTX_SET_SECURITY_LEVEL
 	// We have no way to increase the security level, so this OpenSSL is too old to implement
 	// security levels, and should still accept old certificates without question:
-	test_security_level(2, 2); // cert_level, test_level
+	TEST_THAT(test_security_level(2, 2)); // cert_level, test_level
+	TEST_THAT(test_security_level(2, -1)); // cert_level, test_level
 #endif
 
 	return (num_failures == old_num_failures); // no new failures -> good
@@ -863,11 +895,13 @@ int test(int argc, const char *argv[])
 		pid = LaunchServer(cmd, "testfiles/srv3.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
-#ifdef OPENSSL_SHA1_DOWNGRADED
+
+		// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+		// versions <= 1.1.1, but this appears system-dependent and unreliable, so
+		// test_new_certificates skips the connection test on 1.1.1 with cert_level 2
+		// and test_level 2 when expect_failure_level_2 is true:
 		TEST_THAT(test_new_certificates(true)); // expect_failure_level_2
-#else // !OPENSSL_SHA1_DOWNGRADED
-		TEST_THAT(test_new_certificates(false)); // expect_failure_level_2
-#endif
+
 		TEST_THAT(KillServer(pid));
 	}
 	
