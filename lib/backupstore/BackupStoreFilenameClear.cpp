@@ -25,6 +25,9 @@ namespace
 	CipherContext sBlowfishDecrypt;
 }
 
+bool BackupStoreFilenameClear::sBlowfishKeySet = false;
+char BackupStoreFilenameClear::sBlowfishIV[8];
+
 // --------------------------------------------------------------------------
 //
 // Function
@@ -239,6 +242,9 @@ static void EnsureEncDecBufferSize(int BufSize)
 // --------------------------------------------------------------------------
 void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, CipherContext &rCipherContext, int StoreAsEncoding)
 {
+	ASSERT(sBlowfishKeySet);
+	ASSERT(rCipherContext.IsInitialised());
+
 	// Work out max size
 	int maxOutSize = rCipherContext.MaxOutSizeForInBufferSize(rToEncode.size()) + 4;
 	
@@ -249,6 +255,7 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 	uint8_t *buffer = *spEncDecBuffer;
 	
 	// Encode -- do entire block in one go
+	rCipherContext.SetIV(sBlowfishIV);
 	int encSize = rCipherContext.TransformBlock(buffer + 2, sEncDecBufferSize - 2, rToEncode.c_str(), rToEncode.size());
 	// and add in header size
 	encSize += 2;
@@ -271,6 +278,9 @@ void BackupStoreFilenameClear::EncryptClear(const std::string &rToEncode, Cipher
 // --------------------------------------------------------------------------
 void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) const
 {
+	ASSERT(sBlowfishKeySet);
+	ASSERT(rCipherContext.IsInitialised());
+
 	const std::string& rEncoded = GetEncodedFilename();
 
 	// Work out max size
@@ -284,6 +294,7 @@ void BackupStoreFilenameClear::DecryptEncoded(CipherContext &rCipherContext) con
 	
 	// Decrypt
 	const char *str = rEncoded.c_str() + 2;
+	rCipherContext.SetIV(sBlowfishIV);
 	int sizeOut = rCipherContext.TransformBlock(buffer, sEncDecBufferSize, str, rEncoded.size() - 2);
 	
 	// Assign to this
@@ -319,15 +330,19 @@ void BackupStoreFilenameClear::EncodedFilenameChanged()
 void BackupStoreFilenameClear::SetBlowfishKey(const void *pKey, int KeyLength, const void *pIV, int IVLength)
 {
 	// Initialisation vector not used. Can't use a different vector for each filename as
-	// that would stop comparisions on the server working.
+	// that would stop comparisons on the server working.
 	sBlowfishEncrypt.Reset();
 	sBlowfishEncrypt.Init(CipherContext::Encrypt, CipherBlowfish(CipherDescription::Mode_CBC, pKey, KeyLength));
 	ASSERT(sBlowfishEncrypt.GetIVLength() == IVLength);
-	sBlowfishEncrypt.SetIV(pIV);
+
 	sBlowfishDecrypt.Reset();
 	sBlowfishDecrypt.Init(CipherContext::Decrypt, CipherBlowfish(CipherDescription::Mode_CBC, pKey, KeyLength));
 	ASSERT(sBlowfishDecrypt.GetIVLength() == IVLength);
-	sBlowfishDecrypt.SetIV(pIV);
+
+	// Don't set the IV now, set it before each call to TransformBlock:
+	ASSERT(IVLength == sizeof(sBlowfishIV));
+	memcpy(sBlowfishIV, pIV, IVLength);
+	sBlowfishKeySet = true;
 }
 
 // --------------------------------------------------------------------------

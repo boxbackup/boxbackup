@@ -311,9 +311,12 @@ int test(int argc, const char *argv[])
 	// Context
 	TLSContext context;
 	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
+		"testfiles/clientCerts.pem",
+		"testfiles/clientPrivKey.pem",
+		"testfiles/clientTrustedCAs.pem",
+		0 // SSLSecurityLevel, allow use of our old
+		  // hard-coded certificates in tests for now
+	);
 
 	// Create an account
 	TEST_THAT_ABORTONFAIL(::system(BBSTOREACCOUNTS

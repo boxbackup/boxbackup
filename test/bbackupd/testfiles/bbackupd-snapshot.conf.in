@@ -2,6 +2,8 @@
 CertificateFile = testfiles/clientCerts.pem
 PrivateKeyFile = testfiles/clientPrivKey.pem
 TrustedCAsFile = testfiles/clientTrustedCAs.pem
+# Allow use of our old hard-coded certificates in tests for now:
+SSLSecurityLevel = 0
 
 KeysFile = testfiles/bbackupd.keys
 

@@ -703,7 +703,7 @@ void *operator new(size_t size)
 }
 */
 
-void *operator new[](size_t size) throw (std::bad_alloc)
+void *operator new[](size_t size)
 {
 	return internal_new(size, "standard libraries", 0);
 }

@@ -72,7 +72,7 @@ private:
 	
 	struct DelEnCompare
 	{
-		bool operator()(const DelEn &x, const DelEn &y);
+		bool operator()(const DelEn &x, const DelEn &y) const;
 	};
 	
 	int mAccountID;

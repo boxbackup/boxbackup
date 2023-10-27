@@ -206,6 +206,10 @@ extern std::map<std::string, std::string> s_test_status;
 #define TEST_STARTSWITH(expected, actual) \
 	TEST_EQUAL_LINE(expected, actual.substr(0, std::string(expected).size()), actual);
 
+#define TEST_ENDSWITH(expected, actual) \
+	TEST_EQUAL_LINE(expected, actual.substr(std::string(actual().size() - std::string(expected).size(), \
+		std::string(actual).size()), actual);
+
 //! Sets up (cleans up) test environment at the start of every test.
 bool setUp(const char* function_name);
 

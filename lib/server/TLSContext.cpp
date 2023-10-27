@@ -88,16 +88,16 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 	}
 	
 #ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
-	if(SSLSecurityLevel == -1)
+	if(SSLSecurityLevel >= 0 && SSLSecurityLevel < 2)
 	{
-		BOX_WARNING("SSLSecurityLevel not set. Your connection may not be secure. "
-			"Please see https://github.com/boxbackup/boxbackup/wiki/WeakSSLCertificates "
-			"for details");
-		SSLSecurityLevel = 1; // Default for now. Unsafe, but we warned the user.
-		// TODO: upgrade to level 2 soon.
+		BOX_WARNING("SSLSecurityLevel set very low (0-1). Your connection may not be secure. "
+			"See https://bit.ly/sslseclevel");
 	}
 
-	SSL_CTX_set_security_level(mpContext, SSLSecurityLevel);
+	if(SSLSecurityLevel != BOX_DEFAULT_SSL_SECURITY_LEVEL)
+	{
+		SSL_CTX_set_security_level(mpContext, SSLSecurityLevel);
+	}
 #else
 	if(SSLSecurityLevel != BOX_DEFAULT_SSL_SECURITY_LEVEL)
 	{
@@ -116,14 +116,17 @@ void TLSContext::Initialise(bool AsServer, const char *CertificatesFile, const c
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
 				"Failed to load certificates from " << CertificatesFile << ": "
-				"key too short for current security level");
+				"key too short for current security level, see "
+				"http://bit.ly/sslseclevel");
 		}
 		else if(err_reason == SSL_R_CA_MD_TOO_WEAK)
 		{
 			THROW_EXCEPTION_MESSAGE(ServerException, TLSServerWeakCertificate,
 				"Failed to load certificates from " << CertificatesFile << ": "
-				"hash too weak for current security level");
+				"hash too weak for current security level, see "
+				"http://bit.ly/sslseclevel");
 		}
+		// TODO: handle SSL_R_CA_KEY_TOO_SMALL as well?
 		else
 #endif // HAVE_DECL_SSL_R_EE_KEY_TOO_SMALL
 		{

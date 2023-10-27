@@ -26,12 +26,12 @@ class StreamableMemBlock
 public:
 	StreamableMemBlock();
 	StreamableMemBlock(int Size);
-	StreamableMemBlock(void *pBuffer, int Size);
+	StreamableMemBlock(const void *pBuffer, int Size);
 	StreamableMemBlock(const StreamableMemBlock &rToCopy);
 	~StreamableMemBlock();
 	
 	void Set(const StreamableMemBlock &rBlock);
-	void Set(void *pBuffer, int Size);
+	void Set(const void *pBuffer, int Size);
 	void Set(IOStream &rStream, int Timeout);
 	StreamableMemBlock &operator=(const StreamableMemBlock &rBlock)
 	{
