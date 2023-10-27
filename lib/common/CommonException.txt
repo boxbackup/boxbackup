@@ -13,10 +13,10 @@ BadArguments		5
 ConfigNoKey			6
 ConfigNoSubConfig	7
 GetLineNoHandle		8
-OSFileError			9	Error accessing a file. Check permissions.
+OSFileError			9	Error accessing a file. Check permissions
 GetLineEOF			10
 ConfigBadIntValue	11
-GetLineTooLarge		12	Protects against very large lines using up lots of memory.
+GetLineTooLarge		12	Protects against very large lines using up lots of memory
 NotSupported		13
 OSFileReadError		14
 OSFileWriteError	15
@@ -34,7 +34,7 @@ ReadGatherStreamAddingBadBlock			26
 CouldNotLookUpUsername					27
 CouldNotRestoreProcessUser				28
 CouldNotChangeProcessUser				29
-RegexNotSupportedOnThisPlatform			30	Your platform does not have built in regular expression libraries.
+RegexNotSupportedOnThisPlatform			30	Your platform does not have built in regular expression libraries
 BadRegularExpression					31
 CouldNotCreateKQueue					32
 KEventErrorAdd							33
@@ -42,9 +42,9 @@ KEventErrorWait							34
 KEventErrorRemove						35
 KQueueNotSupportedOnThisPlatform		36
 IOStreamGetLineNotEnoughDataToIgnore	37	Bad value passed to IOStreamGetLine::IgnoreBufferedData()
-TempDirPathTooLong				38	Your temporary directory path is too long. Check the TMP and TEMP environment variables.
-ArchiveBlockIncompleteRead		39	The Store Object Info File is too short or corrupted, and will be rewritten automatically when the next backup completes.
-AccessDenied				40	Access to the file or directory was denied. Please check the permissions.
+TempDirPathTooLong				38	Your temporary directory path is too long. Check the TMP and TEMP environment variables
+ArchiveBlockIncompleteRead		39	The Store Object Info File is too short or corrupted, and will be rewritten automatically when the next backup completes
+AccessDenied				40	Access to the file or directory was denied. Please check the permissions
 DatabaseOpenFailed			41	Failed to open the database file
 DatabaseReadFailed			42	Failed to read a record from the database file
 DatabaseWriteFailed			43	Failed to write a record from the database file
@@ -56,4 +56,5 @@ DatabaseRecordBadSize			48	The database contains a record with an invalid size
 DatabaseIterateFailed			49	Failed to iterate over the database keys
 ReferenceNotFound			50	The database does not contain an expected reference
 TimersNotInitialised			51	The timer framework should have been ready at this point
-InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file.
+InvalidConfiguration			52	Some required values are missing or incorrect in the configuration file
+ReadTimedOut				53	A read operation timed out
