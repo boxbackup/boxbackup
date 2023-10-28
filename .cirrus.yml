@@ -151,6 +151,11 @@ task:
 # gcloud compute images list --filter ubuntu-os-cloud
 task:
   matrix:
+    - name: Ubuntu 16.04 LTS amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-pro-1604-lts
     - name: Ubuntu 18.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
