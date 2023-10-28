@@ -151,22 +151,17 @@ task:
 # gcloud compute images list --filter ubuntu-os-cloud
 task:
   matrix:
-    - name: Ubuntu 18.04 amd64
+    - name: Ubuntu 18.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_family: ubuntu-minimal-1804-lts
-    - name: Ubuntu 20.04 amd64
+        image_family: ubuntu-pro-1804-lts
+    - name: Ubuntu 20.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_family: ubuntu-minimal-2004-lts
-    - name: Ubuntu 21.04 amd64
-      gce_instance:
-        <<: *standard_gce_instance
-        image_project: ubuntu-os-cloud
-        image_family: ubuntu-minimal-2104
-    - name: Ubuntu 22.04 amd64
+    - name: Ubuntu 22.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
