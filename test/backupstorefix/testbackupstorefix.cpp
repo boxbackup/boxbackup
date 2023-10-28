@@ -665,16 +665,21 @@ int test(int argc, const char *argv[])
 	{
 		FILE *f = ::fopen("testfiles/initial-listing.txt", "r");
 		TEST_THAT_ABORTONFAIL(f != 0);
+
 		char line[512];
 		int32_t id;
 		char flags[32];
 		char name[256];
+
 		while(::fgets(line, sizeof(line), f) != 0)
 		{
-			if(StartsWith("WARNING: SSLSecurityLevel not set.", line))
+			if(StartsWith("WARNING: SSLSecurityLevel set very low (0-1)", line) ||
+				StartsWith("WARNING: SSLSecurityLevel is set, but this Box Backup "
+					"is not compiled with", line))
 			{
 				continue;
 			}
+
 			TEST_EQUAL_LINE(3, ::sscanf(line, "%x %s %s", &id, flags, name),
 				"Unexpected format in initial-listing.txt: <" << line << ">");
 			bool isDir = (::strcmp(flags, "-d---") == 0);
@@ -683,6 +688,7 @@ int test(int argc, const char *argv[])
 			nameToID[std::string(name)] = id;
 			objectIsDir[id] = isDir;
 		}
+
 		::fclose(f);
 	}
 

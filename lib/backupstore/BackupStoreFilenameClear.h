@@ -54,6 +54,8 @@ protected:
 
 private:
 	mutable BackupStoreFilename_base mClearFilename;
+	static char sBlowfishIV[];
+	static bool sBlowfishKeySet;
 };
 
 #endif // BACKUPSTOREFILENAMECLEAR__H

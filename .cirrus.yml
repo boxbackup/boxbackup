@@ -16,52 +16,42 @@ standard_build: &standard_build
 standard_gce_instance: &standard_gce_instance
   zone: europe-west2-c
   type: n1-standard-1  # 1 vCPU, 3.75GB mem
-  disk: 10
+  disk: 30  # FreeBSD image is 29GB, VM can't be smaller
   use_ssd: true
   #preemptible: $CIRRUS_BRANCH != "master"
 
 task:
-  name: CentOS 7 amd64
-  gce_instance:
-    <<: *standard_gce_instance
-    image_project: centos-cloud
-    image_name: centos-7-v20190619
+  matrix:
+    - name: CentOS 7 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: centos-cloud
+        image_name: centos-7-v20190619
+    - name: CentOS 8 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: centos-cloud
+        image_family: centos-stream-8
   setup_script:
-    - yum install -y git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
+    - yum install -y --disablerepo=google-cloud-sdk --disablerepo=google-compute-engine git autoconf automake gcc gcc-c++ zlib-devel openssl-devel libdb-devel readline-devel make libxslt perl-libwww-perl boost-devel
     - useradd -m build
     - chown -R build: .
   <<: *standard_build
 
+# gcloud compute images list --project=debian-cloud
+# gcloud compute images list --filter debian --show-deprecated
 task:
   matrix:
-    - name: Debian 9 i386
-      gce_instance:
-        <<: *standard_gce_instance
-        image_project: debian-cloud
-        image_family: debian-9
-      setup_chroot_script:
-        - ./infrastructure/setup-debian-chroot.sh
-        - schroot --begin-session --session-name stretch-build --chroot stretch
-      env:
-        CHROOT: schroot --run-session --chroot stretch-build --directory /tmp/cirrus-ci-build --
-
-    - name: Debian 9 amd64
-      gce_instance:
-        <<: *standard_gce_instance
-        image_project: debian-cloud
-        image_family: debian-9
-
     - name: Debian 10 i386
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
         image_family: debian-10
-
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
-        - schroot --begin-session --session-name buster-build --chroot buster
+        - schroot --begin-session --session-name debian-i386 --chroot buster
       env:
-        CHROOT: schroot --run-session --chroot buster-build --directory /tmp/cirrus-ci-build --
+        CHROOT: schroot --run-session --chroot debian-i386 --directory /tmp/cirrus-ci-build --
 
     - name: Debian 10 amd64
       gce_instance:
@@ -77,15 +67,21 @@ task:
 
       setup_chroot_script:
         - ./infrastructure/setup-debian-chroot.sh
-        - schroot --begin-session --session-name bullseye-build --chroot bullseye
+        - schroot --begin-session --session-name debian-i386 --chroot bullseye
       env:
-        CHROOT: schroot --run-session --chroot bullseye-build --directory /tmp/cirrus-ci-build --
+        CHROOT: schroot --run-session --chroot debian-i386 --directory /tmp/cirrus-ci-build --
 
     - name: Debian 11 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: debian-cloud
         image_family: debian-11
+
+    - name: Debian 12 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_family: debian-12
 
   setup_script:
     - ${CHROOT} apt-get update
@@ -103,14 +99,15 @@ freebsd_gce_instance: &freebsd_gce_instance
 
 task:
   matrix:
-    - name: FreeBSD 14.0 (pre) amd64
-      gce_instance:
-        <<: *freebsd_gce_instance
-        image_family: freebsd-14-0-snap
+    # FreeBSD 14 has a newer GCC that's removed support for std::auto_ptr, so we can't enable it
+    # until we have worked around that:
+    # - name: FreeBSD 14.0 (pre) amd64
+    #   gce_instance:
+    #     <<: *freebsd_gce_instance
+    #     image_family: freebsd-14-0-snap
     - name: FreeBSD 13.0 amd64
       gce_instance:
         <<: *freebsd_gce_instance
-        image_name: freebsd-13-0-current-amd64-v20190829
         image_family: freebsd-13-0
     - name: FreeBSD 12.3 amd64
       gce_instance:
@@ -128,9 +125,9 @@ task:
   <<: *standard_build
 
 task:
-  name: MacOS Mojave
-  osx_instance:
-    image: mojave-xcode-10.2
+  name: MacOS Ventura
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
   env:
     CPPFLAGS: -I/usr/local/opt/openssl/include
     LDFLAGS: -L/usr/local/opt/openssl/lib
@@ -138,7 +135,8 @@ task:
     - brew install autoconf automake openssl readline
   # Don't use standard_build for now - not sure if the build user is required, or how to add users on macOS
   configure_script:
-    - export CPPFLAGS LDFLAGS
+    - export CPPFLAGS="-I/opt/homebrew/opt/openssl@3.1/include"
+    - export LDFLAGS="-L/opt/homebrew/opt/openssl@3.1/lib"
     - ./bootstrap
     - ./configure
   build_client_script:
@@ -150,6 +148,7 @@ task:
   release_tests_script:
     - make release_tests
 
+# gcloud compute images list --filter ubuntu-os-cloud
 task:
   matrix:
     - name: Ubuntu 18.04 amd64
@@ -157,22 +156,48 @@ task:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_family: ubuntu-minimal-1804-lts
-
     - name: Ubuntu 20.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_family: ubuntu-2004-lts
-
+        image_family: ubuntu-minimal-2004-lts
     - name: Ubuntu 21.04 amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
         image_family: ubuntu-minimal-2104
-
+    - name: Ubuntu 22.04 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2204-lts
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev make xsltproc libwww-perl libboost-dev
+    - useradd -m build
+    - chown -R build .
+  <<: *standard_build
+
+task:
+  matrix:
+    - name: Ubuntu 23.04 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2304-amd64
+    - name: Ubuntu 23.10 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2310-amd64
+    - name: Ubuntu 23.10 arm64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2310-arm64
+  setup_script:
+    - apt-get update
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libeditreadline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
     - chown -R build .
   <<: *standard_build

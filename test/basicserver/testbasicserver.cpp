@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <openssl/opensslv.h>
 
 #include <typeinfo>
 
@@ -38,6 +39,16 @@
 // three child processes before starting to read it back again, without the children
 // timing out and aborting.
 #define SHORT_TIMEOUT 30000
+
+// Since OpenSSL 3.0.0, X509 certificates signed using SHA1 are no longer allowed at security
+// level 1 and above.
+// https://github.com/openssl/openssl/commit/b744f915ca8bb37631909728dd2529289bda8438
+
+#if HAVE_DECL_OPENSSL_VERSION_PREREQ
+# if OPENSSL_VERSION_PREREQ(3, 0)
+#  define OPENSSL_SHA1_DOWNGRADED
+# endif
+#endif
 
 class basicdaemon : public Daemon
 {
@@ -348,10 +359,12 @@ void Srv2TestConversations(const std::vector<IOStream *> &conns)
 			TEST_LINE(hadTimeout, "Line " << q)
 		}
 	}
+
 	for(unsigned int c = 0; c < conns.size(); ++c)
 	{
 		conns[c]->Write("LARGEDATA\n", 10, SHORT_TIMEOUT);
 	}
+
 	// This part of the test is timing-sensitive, because we read 20 MB from each of
 	// three daemon processes, then write 20 MB to each of them, then read back 
 	// another 20 MB from each of them. Each child could timeout waiting for us to
@@ -467,14 +480,6 @@ bool test_security_level(int cert_level, int test_level, bool expect_failure_on_
 			"testfiles/clientTrustedCAs.pem",
 			test_level); // SecurityLevel
 	}
-	else if(cert_level == 1)
-	{
-		context.Initialise(false /* client */,
-			"testfiles/seclevel2-sha1/ca/clients/1234567-cert.pem",
-			"testfiles/seclevel2-sha1/bbackupd/1234567-key.pem",
-			"testfiles/seclevel2-sha1/ca/roots/serverCA.pem",
-			test_level); // SecurityLevel
-	}
 	else if(cert_level == 2)
 	{
 		context.Initialise(false /* client */,
@@ -491,7 +496,36 @@ bool test_security_level(int cert_level, int test_level, bool expect_failure_on_
 
 	SocketStreamTLS conn;
 
-	if(expect_failure_on_connect)
+	if(test_level == -1)
+	{
+		// We don't know whether the system security level is 0, 1, 2 or higher,
+		// so we don't know whether we will fail to connect to the running daemon
+		// (despite expect_failure_on_connect), so we can't do this part of the test.
+	}
+#if defined HAVE_SSL_CTX_SET_SECURITY_LEVEL && !defined OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+	// versions <= 1.1.1, but this appears system-dependent and unreliable.
+	//
+	// For example:
+	//     ./_test --test-daemon-args= srv3 testfiles/srv3-insecure-daemon.conf
+	//     openssl s_client -connect localhost:2003
+	//         -CAfile testfiles/seclevel2-sha256/ca/roots/serverCA.pem
+	//         -cipher DEFAULT:@SECLEVEL=2 2>&1 | grep "Verify return code"
+	//
+	// prints "Verify return code: 0 (ok)" on CentOS 8 and
+	// "Verify return code: 68 (CA signature digest algorithm too weak)" on Ubuntu 20.04,
+	// both running OpenSSL 1.1.1.
+	//
+	// So we skip the connection test on 1.1.1 when cert_level is 2, test_level is 2 (or -1,
+	// which might be equal to 2 depending on system configuration) and
+	// expect_failure_on_connect is true (connecting to a daemon running
+	// testfiles/srv3-insecure-daemon.conf, with SHA1 certificates).
+	if(cert_level == 2 && (test_level == 2 || test_level == -1) && expect_failure_on_connect)
+	{
+		// Do nothing (don't do the connection test)
+	}
+#endif
+	else if(expect_failure_on_connect)
 	{
 		TEST_CHECK_THROWS(
 			conn.Open(context, Socket::TypeINET, "localhost", 2003),
@@ -511,93 +545,86 @@ bool test_ancient_certificates()
 {
 	int old_num_failures = num_failures;
 
-	// Level -1 (allow weaker, with warning) should pass with any certificates:
-	TEST_THAT(test_security_level(0, -1)); // cert_level, test_level
-
-	// We do not test level 0 (system-wide default) because the system
+	// We do not test level -1 (system-wide default) because the system
 	// may have it set high, and our old certificate will not be usable
 	// in that case, and the user has no way to fix that, so it's not a
 	// useful test.
 
-	// Level 1 (allow weaker, without a warning) should pass with any certificates:
-	TEST_THAT(test_security_level(0, 1)); // cert_level, test_level
-
 #ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
-	// Level 2 (disallow weaker, without a warning) should NOT pass with old certificates:
+	// Level 0 (allow all) should pass with any certificates:
+	TEST_THAT(test_security_level(0, 0)); // cert_level, test_level
+
+# ifdef OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) should fail with certs with SHA1 MD like these:
+	TEST_CHECK_THROWS(
+		test_security_level(0, 1), // cert_level, test_level
+		ServerException, TLSServerWeakCertificate);
+# else // !OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) allows certs with SHA1 MD in OpenSSL versions <= 1.1.1:
+	TEST_THAT(test_security_level(0, 1)); // cert_level, test_level
+# endif // OPENSSL_SHA1_DOWNGRADED
+
+	// Level 2 (allow >112 bit security) should fail with certs with SHA1 MD like these:
 	TEST_CHECK_THROWS(
 		test_security_level(0, 2), // cert_level, test_level
 		ServerException, TLSServerWeakCertificate);
-#else
-	// We have no way to increase the security level, so it should still pass:
-	test_security_level(0, 2); // cert_level, test_level
+#else // !HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	// We have no way to increase the security level, so this OpenSSL is too old to implement
+	// security levels, and should still accept old certificates without question:
+	TEST_THAT(test_security_level(0, 2)); // cert_level, test_level
 #endif
 
 	return (num_failures == old_num_failures); // no new failures -> good
 }
-
-// Test a set of more recent certificates, which have a longer key but are signed using the SHA1
-// algorithm instead of SHA256, which fail with "ca md too weak" instead.
-bool test_old_certificates()
-{
-	int old_num_failures = num_failures;
-
-	// Level -1 (allow weaker, with warning) should pass with any certificates:
-	TEST_THAT(test_security_level(1, -1)); // cert_level, test_level
-
-	// We do not test level 0 (system-wide default) because the system
-	// may have it set high, and our old certificate will not be usable
-	// in that case, and the user has no way to fix that, so it's not a
-	// useful test.
-
-	// Level 1 (allow weaker, without a warning) should pass with any certificates:
-	TEST_THAT(test_security_level(1, 1)); // cert_level, test_level
-
-#ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
-	// Level 2 (disallow weaker, without a warning) should NOT pass with old certificates:
-	TEST_CHECK_THROWS(
-		test_security_level(1, 2), // cert_level, test_level
-		ServerException, TLSServerWeakCertificate);
-#else
-	// We have no way to increase the security level, so it should still pass:
-	test_security_level(1, 2); // cert_level, test_level
-#endif
-
-	return (num_failures == old_num_failures); // no new failures -> good
-}
-
 
 bool test_new_certificates(bool expect_failure_level_2)
 {
 	int old_num_failures = num_failures;
 
-	// Level -1 (allow weaker, with warning) should pass with any certificates:
-	TEST_THAT(test_security_level(2, -1)); // cert_level, test_level
-
-	// Level 0 (system dependent). This will fail if the user (or their
+	// Level -1 (system-wide default). This will fail if the user (or their
 	// distro) sets the system-wide security level very high. We check
 	// this because *we* may need to update Box Backup if this happens
 	// again, as it did when Debian increased the default level.
 	// Newly generated certificates may need to be strengthened.
 	// And we may need to update the documentation.
-	TEST_THAT(test_security_level(2, 0)); // cert_level, test_level
-
-	// Level 1 (allow weaker, without a warning) should pass with any certificates:
-	TEST_THAT(test_security_level(2, 1)); // cert_level, test_level
+	// The arguments that we pass to test_security_level (specifically
+	// expect_failure_on_connect) will depend on the OpenSSL version,
+	// so it's called conditionally below.
 
 #ifdef HAVE_SSL_CTX_SET_SECURITY_LEVEL
-	// Level 2 (disallow weaker, without a warning) should pass with new certificates,
-	// but might fail to connect to a peer with weak (insecure) certificates:
+	// Level 0 (allow all) should pass with any certificates:
+	TEST_THAT(test_security_level(2, 0)); // cert_level, test_level
+
+# ifdef OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) should pass with new certificates,
+	// but should refuse to connect to a peer with weak (insecure) certificates:
+	TEST_THAT(test_security_level(2, 1, expect_failure_level_2));
+	// cert_level, test_level, expect_failure_on_connect
+# else // !OPENSSL_SHA1_DOWNGRADED
+	// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+	// versions <= 1.1.1:
+	TEST_THAT(test_security_level(2, 1, false));
+	// cert_level, test_level, expect_failure_on_connect
+# endif // OPENSSL_SHA1_DOWNGRADED
+
+	// Level 2 (allow >112 bit security) should pass with new certificates, but should refuse
+	// to connect to a peer with weak (insecure) certificates. But this appears to be
+	// system-dependent and unreliable, so test_security_level skips the connection test for
+	// OpenSSL 1.1.1 when/ cert_level is 2, test_level is 2 and expect_failure_on_connect is true:
 	TEST_THAT(test_security_level(2, 2, expect_failure_level_2));
 	// cert_level, test_level, expect_failure
-#else
-	// We have no way to increase the security level, so it should not fail to connect to a
-	// daemon with weak certificates:
-	test_security_level(2, 2, false); // cert_level, test_level, expect_failure
+
+	// The same goes for level -1 (system-wide default), because that might be equal to level 2.
+	TEST_THAT(test_security_level(2, -1, expect_failure_level_2));
+#else // !HAVE_SSL_CTX_SET_SECURITY_LEVEL
+	// We have no way to increase the security level, so this OpenSSL is too old to implement
+	// security levels, and should still accept old certificates without question:
+	TEST_THAT(test_security_level(2, 2)); // cert_level, test_level
+	TEST_THAT(test_security_level(2, -1)); // cert_level, test_level
 #endif
 
 	return (num_failures == old_num_failures); // no new failures -> good
 }
-
 
 int test(int argc, const char *argv[])
 {
@@ -792,8 +819,10 @@ int test(int argc, const char *argv[])
 				context.Initialise(false /* client */,
 						"testfiles/clientCerts.pem",
 						"testfiles/clientPrivKey.pem",
-						"testfiles/clientTrustedCAs.pem");
-				// SecurityLevel == -1 by default (old security + warnings)
+						"testfiles/clientTrustedCAs.pem",
+						0 // SSLSecurityLevel, allow use of our old
+						  // hard-coded certificates in tests for now
+				);
 
 				SocketStreamTLS conn1;
 				conn1.Open(context, Socket::TypeINET, "localhost", 2003);
@@ -849,15 +878,6 @@ int test(int argc, const char *argv[])
 
 		cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
-		cmd += " srv3 testfiles/srv3-seclevel2-sha1.conf";
-		pid = LaunchServer(cmd, "testfiles/srv3.pid");
-
-		TEST_THAT(pid != -1 && pid != 0);
-		TEST_THAT(test_old_certificates());
-		TEST_THAT(KillServer(pid));
-
-		cmd = TEST_EXECUTABLE " --test-daemon-args=";
-		cmd += test_args;
 		cmd += " srv3 testfiles/srv3-seclevel2-sha256.conf";
 		pid = LaunchServer(cmd, "testfiles/srv3.pid");
 
@@ -865,8 +885,9 @@ int test(int argc, const char *argv[])
 		TEST_THAT(test_new_certificates(false)); // !expect_failure_level_2
 		TEST_THAT(KillServer(pid));
 
-		// Start a daemon using old, insecure certificates. We should get an error when we
-		// try to connect to it:
+		// Start a daemon using a specially constructed insecure (SHA1) certificate.
+		// We should get an error when we try to connect to it, IF we are using OpenSSL
+		// >= 3.0 where SHA1 is considered insecure:
 
 		cmd = TEST_EXECUTABLE " --test-daemon-args=";
 		cmd += test_args;
@@ -874,7 +895,13 @@ int test(int argc, const char *argv[])
 		pid = LaunchServer(cmd, "testfiles/srv3.pid");
 
 		TEST_THAT(pid != -1 && pid != 0);
+
+		// Level 1 (allow >80 bit security) should allow certs with SHA1 MD in OpenSSL
+		// versions <= 1.1.1, but this appears system-dependent and unreliable, so
+		// test_new_certificates skips the connection test on 1.1.1 with cert_level 2
+		// and test_level 2 when expect_failure_level_2 is true:
 		TEST_THAT(test_new_certificates(true)); // expect_failure_level_2
+
 		TEST_THAT(KillServer(pid));
 	}
 	

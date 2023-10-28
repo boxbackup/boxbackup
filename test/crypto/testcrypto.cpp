@@ -62,13 +62,22 @@ void test_cipher()
 		encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
 		TEST_CHECK_THROWS(encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY))),
 			CipherException, AlreadyInitialised);
-		// Encrpt something
+
+		// We must always set the IV before each call to TransformBlock:
+		char iv[16] = {1,2,3,4,5,6,7,8};
+		ASSERT((size_t)encrypt1.GetIVLength() <= sizeof(iv));
+		encrypt1.SetIV(iv);
+
+		// Encrypt something
 		char buf1[256];
 		unsigned int buf1_used = encrypt1.TransformBlock(buf1, sizeof(buf1), STRING1, sizeof(STRING1));
 		TEST_THAT(buf1_used >= sizeof(STRING1));
+
 		// Decrypt it
 		CipherContext decrypt1;
 		decrypt1.Init(CipherContext::Decrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));
+		// We must always set the IV before each call to TransformBlock:
+		decrypt1.SetIV(iv);
 		char buf1_de[256];
 		unsigned int buf1_de_used = decrypt1.TransformBlock(buf1_de, sizeof(buf1_de), buf1, buf1_used);
 		TEST_THAT(buf1_de_used == sizeof(STRING1));
@@ -76,11 +85,13 @@ void test_cipher()
 		
 		// Use them again...
 		char buf1_de2[256];
+		// We must always set the IV before each call to TransformBlock:
+		decrypt1.SetIV(iv);
 		unsigned int buf1_de2_used = decrypt1.TransformBlock(buf1_de2, sizeof(buf1_de2), buf1, buf1_used);
 		TEST_THAT(buf1_de2_used == sizeof(STRING1));
 		TEST_THAT(memcmp(STRING1, buf1_de2, sizeof(STRING1)) == 0);
 		
-		// Test the interface
+		// Test the Transform() interface:
 		char buf2[256];
 		TEST_CHECK_THROWS(encrypt1.Transform(buf2, sizeof(buf2), STRING1, sizeof(STRING1)),
 			CipherException, BeginNotCalled);
@@ -107,7 +118,19 @@ void test_cipher()
 		// Try a reset and rekey
 		encrypt1.Reset();
 		encrypt1.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY2, sizeof(KEY2)));
+		// We must always set the IV before each call to TransformBlock:
+		encrypt1.SetIV(iv);
 		buf1_used = encrypt1.TransformBlock(buf1, sizeof(buf1), STRING1, sizeof(STRING1));
+
+		// Decrypt it
+		decrypt1.Reset();
+		decrypt1.Init(CipherContext::Decrypt, CipherType(CipherDescription::Mode_CBC, KEY2, sizeof(KEY2)));
+		// We must always set the IV before each call to TransformBlock:
+		decrypt1.SetIV(iv);
+		memset(buf1_de, 0, sizeof(buf1_de));
+		buf1_de_used = decrypt1.TransformBlock(buf1_de, sizeof(buf1_de), buf1, buf1_used);
+		TEST_THAT(buf1_de_used == sizeof(STRING1));
+		TEST_THAT(memcmp(STRING1, buf1_de, sizeof(STRING1)) == 0);
 	}
 	
 	// Test initialisation vectors
@@ -168,8 +191,31 @@ void test_cipher()
 		encrypt3.Begin();
 		ZERO_BUFFER(buf4);
 		int buf4_used = encrypt3.Transform(buf4, sizeof(buf4), STRING2, 6);
-		TEST_CHECK_THROWS(encrypt3.Final(buf4, sizeof(buf4)), CipherException, EVPFinalFailure);
-		
+
+		{
+			Capture capture;
+			capture.Filter(Log::WARNING);
+
+			// We only want this log message to go to the Capture logger, not the console,
+			// because it makes it look like the test is failing when actually it's fine.
+			Logging::TempLoggerGuard guard(&capture);
+			Logger::LevelGuard suppress_console_log(Logging::GetConsole(), Log::FATAL);
+
+			TEST_CHECK_THROWS(encrypt3.Final(buf4, sizeof(buf4)), CipherException, EVPFinalFailure);
+
+			std::vector<Capture::Message> messages = capture.GetMessages();
+			TEST_EQUAL(1, messages.size());
+			if (messages.size() == 1)
+			{
+				Capture::Message message = messages[0];
+				TEST_STARTSWITH("SSL or crypto error: encrypt: error:", message.message);
+				TEST_LINE(EndsWith("Provider routines::wrong final block length", message.message) ||
+					EndsWith("EVP_EncryptFinal_ex:data not multiple of block length", message.message) ||
+					EndsWith("lib(6):func(127):reason(138)", message.message),
+					message.message);
+			}
+		}
+
 		// Check a nice encryption with the correct block size
 		CipherContext encrypt4;
 		encrypt4.Init(CipherContext::Encrypt, CipherType(CipherDescription::Mode_CBC, KEY, sizeof(KEY)));

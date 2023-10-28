@@ -4256,9 +4256,12 @@ int test(int argc, const char *argv[])
 	}
 
 	sTlsContext.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
+		"testfiles/clientCerts.pem",
+		"testfiles/clientPrivKey.pem",
+		"testfiles/clientTrustedCAs.pem",
+		0 // SSLSecurityLevel, allow use of our old
+		  // hard-coded certificates in tests for now
+	);
 
 	TEST_THAT(test_basics());
 	TEST_THAT(test_readdirectory_on_nonexistent_dir());

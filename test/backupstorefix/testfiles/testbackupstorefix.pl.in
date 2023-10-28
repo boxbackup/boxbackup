@@ -154,7 +154,8 @@ elsif($ARGV[0] eq 'reroot')
 		chomp $line;
 		$line =~s/\[FILENAME NOT ENCRYPTED\]//;
 		next if $line =~ /^WARNING: \*\*\*\* BackupStoreFilename encoded with Clear encoding \*\*\*\*/;
-		next if $line =~ /^WARNING: SSLSecurityLevel not set./;
+		next if $line =~ /^WARNING: SSLSecurityLevel set very low/;
+		next if $line =~ /^WARNING: SSLSecurityLevel is set, but this Box Backup is not compiled with/;
 		my ($id,$type,$name) = split / /, $line;
 		$count++;
 		if($name !~ /\Alost\+found0/)

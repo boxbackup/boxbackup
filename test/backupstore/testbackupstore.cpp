@@ -3299,10 +3299,7 @@ int test(int argc, const char *argv[])
 	TEST_THAT(test_symlinks());
 	TEST_THAT(test_store_info());
 
-	context.Initialise(false /* client */,
-			"testfiles/clientCerts.pem",
-			"testfiles/clientPrivKey.pem",
-			"testfiles/clientTrustedCAs.pem");
+	init_context(context);
 
 	TEST_THAT(test_login_without_account());
 	TEST_THAT(test_login_with_disabled_account());
