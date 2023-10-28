@@ -59,9 +59,33 @@ task:
         image_project: debian-cloud
         image_family: debian-10
 
+    - name: Debian 11 i386
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_family: debian-11
+
+      setup_chroot_script:
+        - ./infrastructure/setup-debian-chroot.sh
+        - schroot --begin-session --session-name debian-i386 --chroot bullseye
+      env:
+        CHROOT: schroot --run-session --chroot debian-i386 --directory /tmp/cirrus-ci-build --
+
+    - name: Debian 11 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_family: debian-11
+
+    - name: Debian 12 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: debian-cloud
+        image_family: debian-12
+
   setup_script:
     - ${CHROOT} apt-get update
-    - ${CHROOT} sh -c "DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::='--force-confold' -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev"
+    - ${CHROOT} sh -c "DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::='--force-confold' -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev make xsltproc libwww-perl libboost-dev"
     - ${CHROOT} useradd -m build
     - ${CHROOT} chown -R build: .
   <<: *standard_build
@@ -71,6 +95,7 @@ freebsd_gce_instance: &freebsd_gce_instance
   platform: FreeBSD
   image_project: freebsd-org-cloud-dev
   # Need to use image_name for now: https://github.com/cirruslabs/cirrus-ci-docs/issues/422
+  disk: 30  # Image is 29GB, VM can't be smaller
 
 task:
   matrix:
@@ -88,6 +113,10 @@ task:
       gce_instance:
         <<: *freebsd_gce_instance
         image_family: freebsd-12-3
+    - name: FreeBSD 11.4 amd64
+      gce_instance:
+        <<: *freebsd_gce_instance
+        image_family: freebsd-11-4
 
   setup_script:
     - pkg install -y git autoconf automake libxslt p5-libwww boost-libs
@@ -122,24 +151,29 @@ task:
 # gcloud compute images list --filter ubuntu-os-cloud
 task:
   matrix:
-    - name: Ubuntu 16.04 amd64
+    - name: Ubuntu 16.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_name: ubuntu-1604-xenial-v20190617
-    - name: Ubuntu 18.04 amd64
+        image_family: ubuntu-pro-1604-lts
+    - name: Ubuntu 18.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_name: ubuntu-1804-bionic-v20190617
-    - name: Ubuntu 20.04 amd64
+        image_family: ubuntu-pro-1804-lts
+    - name: Ubuntu 20.04 LTS amd64
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_family: ubuntu-2004-lts
+        image_family: ubuntu-minimal-2004-lts
+    - name: Ubuntu 22.04 LTS amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2204-lts
   setup_script:
     - apt-get update
-    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev libeditline-dev make xsltproc libwww-perl libboost-dev
+    - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libreadline-dev make xsltproc libwww-perl libboost-dev
     - useradd -m build
     - chown -R build .
   <<: *standard_build
@@ -150,7 +184,17 @@ task:
       gce_instance:
         <<: *standard_gce_instance
         image_project: ubuntu-os-cloud
-        image_name: ubuntu-2304-lunar-amd64-v20231020
+        image_family: ubuntu-minimal-2304-amd64
+    - name: Ubuntu 23.10 amd64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2310-amd64
+    - name: Ubuntu 23.10 arm64
+      gce_instance:
+        <<: *standard_gce_instance
+        image_project: ubuntu-os-cloud
+        image_family: ubuntu-minimal-2310-arm64
   setup_script:
     - apt-get update
     - apt-get install -y git autoconf automake gcc g++ zlib1g-dev libssl-dev libdb-dev libeditreadline-dev make xsltproc libwww-perl libboost-dev
