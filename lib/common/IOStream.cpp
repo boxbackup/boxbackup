@@ -241,7 +241,13 @@ void IOStream::Flush(int Timeout)
 
 	while(StreamDataLeft())
 	{
-		Read(buffer, sizeof(buffer), Timeout);
+		if(Read(buffer, sizeof(buffer), Timeout) == 0)
+		{
+			// Almost certainly a timeout
+			THROW_EXCEPTION_MESSAGE(CommonException, ReadTimedOut,
+				"Read timed out while flushing stream. Connection is probably "
+				"unusable and should be closed.")
+		}
 	}
 }
 
