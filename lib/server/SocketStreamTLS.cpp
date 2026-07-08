@@ -469,7 +469,7 @@ std::string SocketStreamTLS::GetPeerCommonName()
 	}
 
 	// Subject details
-	X509_NAME *subject = ::X509_get_subject_name(cert);
+	const X509_NAME *subject = ::X509_get_subject_name(cert);
 	if(subject == 0)
 	{
 		::X509_free(cert);
